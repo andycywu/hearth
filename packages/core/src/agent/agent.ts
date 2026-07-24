@@ -74,10 +74,13 @@ export class Agent {
       for (let i = 0; i < this.maxIterations; i++) {
         if (aborted()) throw new TurnTimeoutError(this.turnTimeoutMs);
 
-        const result = await this.opts.llm.complete({
-          messages: this.ctx.toMessages(),
-          tools: this.tools.list(),
-        });
+        const req = { messages: this.ctx.toMessages(), tools: this.tools.list() };
+        const llm = this.opts.llm;
+        const result = llm.completeStream
+          ? await llm.completeStream(req, {
+              onContentDelta: (delta) => this.events.emit("token", { delta }),
+            })
+          : await llm.complete(req);
         this.ctx.add(result.message);
 
         if (!result.wantsToolCalls) {

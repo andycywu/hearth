@@ -13,5 +13,8 @@
   "dependencies": {
     "@tv-ai-agent/platform-api": "workspace:*"
   },
+  "devDependencies": {
+    "@tv-ai-agent/adapter-web": "workspace:*"
+  },
   "license": "Apache-2.0"
 }

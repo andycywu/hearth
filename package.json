@@ -20,7 +20,9 @@
     "lint": "eslint . --ext .ts",
     "dev:web": "pnpm --filter @tv-ai-agent/adapter-web run dev",
     "bundle:tizen": "pnpm build && node tools/bundle.mjs tizen",
-    "bundle:aosp": "pnpm build && node tools/bundle.mjs aosp"
+    "bundle:aosp": "pnpm build && node tools/bundle.mjs aosp",
+    "bundle:all": "pnpm build && node tools/bundle.mjs tizen && node tools/bundle.mjs aosp",
+    "check:size": "node tools/check-bundle-size.mjs"
   },
   "devDependencies": {
     "typescript": "^5.5.4",

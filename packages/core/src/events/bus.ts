@@ -19,6 +19,7 @@ export class EventBus<Events = Record<string, unknown>> {
 export interface AgentEvents {
   "turn:start": { input: string };
   "turn:end": { output: string };
+  "token": { delta: string };
   "tool:call": { name: string; args: unknown };
   "tool:result": { name: string; result: unknown };
   "error": { error: Error };
