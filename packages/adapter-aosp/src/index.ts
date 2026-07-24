@@ -1,5 +1,7 @@
-import type {
-  PlatformProvider, DeviceInfo, AppEntry, InputSource, RemoteKey,
+import {
+  matchAppsByName,
+  type PlatformProvider, type DeviceInfo, type AppEntry,
+  type InputSource, type RemoteKey,
 } from "@tv-ai-agent/platform-api";
 
 /**
@@ -13,6 +15,7 @@ interface NativeBridge {
   getDeviceInfo(): string;            // JSON DeviceInfo
   getVolume(): number;
   setVolume(level: number): void;
+  getMute(): boolean;
   setMute(mute: boolean): void;
   getInputSource(): string;
   setInputSource(source: string): void;
@@ -48,6 +51,7 @@ export function createAospAdapter(): PlatformProvider {
     system: {
       getVolume: async () => bridge.getVolume(),
       setVolume: async (l) => bridge.setVolume(clamp(l)),
+      getMute: async () => bridge.getMute(),
       setMute: async (m) => bridge.setMute(m),
       getInputSource: async () => bridge.getInputSource() as InputSource,
       setInputSource: async (s) => bridge.setInputSource(s),
@@ -60,6 +64,8 @@ export function createAospAdapter(): PlatformProvider {
         const raw = bridge.getForegroundApp();
         return raw === "null" ? null : (JSON.parse(raw) as AppEntry);
       },
+      findAppsByName: async (q) =>
+        matchAppsByName(JSON.parse(bridge.listInstalledApps()) as AppEntry[], q),
     },
     navigation: { sendKey: async (k: RemoteKey) => bridge.sendKey(k) },
     network: {

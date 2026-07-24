@@ -1,5 +1,7 @@
-import type {
-  PlatformProvider, DeviceInfo, AppEntry, InputSource, RemoteKey,
+import {
+  matchAppsByName,
+  type PlatformProvider, type DeviceInfo, type AppEntry,
+  type InputSource, type RemoteKey,
 } from "@tv-ai-agent/platform-api";
 
 /**
@@ -21,7 +23,7 @@ export function createWebAdapter(): PlatformProvider {
 
   const device: DeviceInfo = {
     os: "web", osVersion: navigatorVersion(), soc: "unknown", model: "dev-browser",
-    capabilities: { media: false, voice: false },
+    capabilities: { media: true, voice: false },
   };
 
   const provider: PlatformProvider = {
@@ -29,6 +31,7 @@ export function createWebAdapter(): PlatformProvider {
     system: {
       getVolume: async () => state.volume,
       setVolume: async (l) => { state.volume = clamp(l); },
+      getMute: async () => state.muted,
       setMute: async (m) => { state.muted = m; },
       getInputSource: async () => state.input,
       setInputSource: async (s) => { state.input = s; },
@@ -38,6 +41,7 @@ export function createWebAdapter(): PlatformProvider {
       listInstalledApps: async () => state.apps,
       launchApp: async (id) => { console.info("[web] launch", id); },
       getForegroundApp: async () => null,
+      findAppsByName: async (q) => matchAppsByName(state.apps, q),
     },
     navigation: { sendKey: async (k: RemoteKey) => { console.info("[web] key", k); } },
     network: { isOnline: async () => true, connectionType: async () => "ethernet" },
@@ -45,6 +49,12 @@ export function createWebAdapter(): PlatformProvider {
       get: async (k) => state.kv.get(k) ?? null,
       set: async (k, v) => { state.kv.set(k, v); },
       delete: async (k) => { state.kv.delete(k); },
+    },
+    media: {
+      play: async (uri) => { console.info("[web] play", uri); },
+      pause: async () => { console.info("[web] pause"); },
+      resume: async () => { console.info("[web] resume"); },
+      seek: async (ms) => { console.info("[web] seek", ms); },
     },
     has: (cap) => cap in provider && (provider as any)[cap] !== undefined,
     init: async () => { /* nothing to wire */ },

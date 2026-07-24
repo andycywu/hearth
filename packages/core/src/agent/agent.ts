@@ -11,6 +11,21 @@ export interface AgentOptions {
   systemPrompt?: string;
   /** Safety cap on tool-call iterations per user turn. */
   maxIterations?: number;
+  /** Abort a turn if it exceeds this many milliseconds (default 30_000). */
+  turnTimeoutMs?: number;
+}
+
+/** Raised when a turn exceeds its time budget. */
+export class TurnTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`Turn exceeded time budget of ${ms}ms`);
+    this.name = "TurnTimeoutError";
+  }
+}
+
+interface RunOptions {
+  /** Optional caller-supplied signal to cancel the turn. */
+  signal?: AbortSignal;
 }
 
 const DEFAULT_SYSTEM_PROMPT = `You are an on-device AI assistant embedded in a Smart TV.
@@ -28,10 +43,12 @@ export class Agent {
   private readonly tools = new ToolRegistry();
   private readonly ctx: ConversationContext;
   private readonly maxIterations: number;
+  private readonly turnTimeoutMs: number;
 
   constructor(private readonly opts: AgentOptions) {
     this.ctx = new ConversationContext(opts.systemPrompt ?? DEFAULT_SYSTEM_PROMPT);
     this.maxIterations = opts.maxIterations ?? 6;
+    this.turnTimeoutMs = opts.turnTimeoutMs ?? 30_000;
     for (const tool of createTvTools(opts.platform)) this.tools.register(tool);
   }
 
@@ -40,12 +57,23 @@ export class Agent {
     return this.tools;
   }
 
-  async run(userInput: string): Promise<string> {
+  /**
+   * Run one user turn. Bounded by both `maxIterations` (tool-call rounds) and
+   * `turnTimeoutMs` (wall clock). A caller AbortSignal can cancel early.
+   */
+  async run(userInput: string, runOpts: RunOptions = {}): Promise<string> {
+    const timeout = new AbortController();
+    const timer = setTimeout(() => timeout.abort(), this.turnTimeoutMs);
+    const signals = [timeout.signal, runOpts.signal].filter(Boolean) as AbortSignal[];
+    const aborted = () => signals.some((s) => s.aborted);
+
     this.events.emit("turn:start", { input: userInput });
     this.ctx.add({ role: "user", content: userInput });
 
     try {
       for (let i = 0; i < this.maxIterations; i++) {
+        if (aborted()) throw new TurnTimeoutError(this.turnTimeoutMs);
+
         const result = await this.opts.llm.complete({
           messages: this.ctx.toMessages(),
           tools: this.tools.list(),
@@ -59,12 +87,15 @@ export class Agent {
         }
 
         for (const call of result.message.toolCalls ?? []) {
+          if (aborted()) throw new TurnTimeoutError(this.turnTimeoutMs);
           this.events.emit("tool:call", { name: call.name, args: call.args });
           let toolResult: unknown;
           try {
             toolResult = await this.tools.call(call.name, call.args);
           } catch (err) {
-            toolResult = { error: (err as Error).message };
+            // Tool errors are fed back to the model as structured results so it
+            // can recover (e.g. re-resolve an app id), rather than aborting.
+            toolResult = { error: (err as Error).message, tool: call.name };
           }
           this.events.emit("tool:result", { name: call.name, result: toolResult });
           this.ctx.add({
@@ -80,6 +111,8 @@ export class Agent {
     } catch (err) {
       this.events.emit("error", { error: err as Error });
       throw err;
+    } finally {
+      clearTimeout(timer);
     }
   }
 }

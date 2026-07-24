@@ -10,6 +10,7 @@ function fakePlatform(): PlatformProvider {
     system: {
       getVolume: async () => volume,
       setVolume: async (v) => { volume = v; },
+      getMute: async () => false,
       setMute: async () => {},
       getInputSource: async () => "tv",
       setInputSource: async () => {},
@@ -19,6 +20,7 @@ function fakePlatform(): PlatformProvider {
       listInstalledApps: async () => [{ id: "netflix", name: "Netflix" }],
       launchApp: async () => {},
       getForegroundApp: async () => null,
+      findAppsByName: async () => [{ id: "netflix", name: "Netflix" }],
     },
     navigation: { sendKey: async () => {} },
     network: { isOnline: async () => true, connectionType: async () => "wifi" },

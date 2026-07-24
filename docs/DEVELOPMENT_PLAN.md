@@ -60,12 +60,17 @@ those.
 ### Phase 1 — Harden core + build pipeline (≈ weeks 1–3)
 - ✅ **esbuild** pipeline (`tools/bundle.mjs`) produces a single `main.js` per
   target (adapter + core + connector): `pnpm bundle:tizen` / `pnpm bundle:aosp`.
-- Expand the tool set: mute, get/set input, media transport, app search by name.
-- Robust agent loop: streaming, cancellation, per-turn timeouts, tool-arg
-  validation against the tool schema, structured error surfaces.
-- Test coverage: unit tests for core + each adapter against a contract test
-  suite (one shared spec every adapter must pass).
-- CI: typecheck + test + lint on every PR (already wired); add bundle-size check.
+- ✅ Expanded tool set: get/set volume, mute, get/set input source, list apps,
+  search app by name, launch app, press key, media transport (play/pause/
+  resume/seek). Media tools auto-register only when `has("media")`.
+- ✅ Robust agent loop: per-turn timeout (`turnTimeoutMs`) + AbortSignal
+  cancellation, tool-arg validation against each tool's schema
+  (`validateArgs`, with type coercion + enum checks), structured tool errors
+  fed back to the model for recovery.
+- ✅ Test coverage: shared adapter **contract test** (`assertProviderContract`)
+  run against web, Tizen (mocked `tizen.*`/`webapis.*`) and AOSP (mocked native
+  bridge), plus core validation/agent tests — 11 tests green.
+- Remaining: streaming responses; CI bundle-size budget check.
 
 ### Phase 2 — Device bring-up on MTK + NVT (≈ weeks 3–9) — the critical path
 Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.

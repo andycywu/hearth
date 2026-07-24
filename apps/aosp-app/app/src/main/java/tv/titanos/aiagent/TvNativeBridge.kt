@@ -43,6 +43,9 @@ class TvNativeBridge(private val ctx: Context) {
     }
 
     @JavascriptInterface
+    fun getMute(): Boolean = audio.isStreamMute(AudioManager.STREAM_MUSIC)
+
+    @JavascriptInterface
     fun setMute(mute: Boolean) {
         audio.adjustStreamVolume(
             AudioManager.STREAM_MUSIC,

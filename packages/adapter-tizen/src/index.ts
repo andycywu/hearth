@@ -1,5 +1,7 @@
-import type {
-  PlatformProvider, DeviceInfo, AppEntry, InputSource, RemoteKey,
+import {
+  matchAppsByName,
+  type PlatformProvider, type DeviceInfo, type AppEntry,
+  type InputSource, type RemoteKey,
 } from "@tv-ai-agent/platform-api";
 
 /**
@@ -32,19 +34,14 @@ export function createTizenAdapter(): PlatformProvider {
     system: {
       getVolume: async () => Number(webapis.audiocontrol.getVolume()),
       setVolume: async (l) => webapis.audiocontrol.setVolume(clamp(l)),
+      getMute: async () => Boolean(safe(() => webapis?.audiocontrol?.getMute?.()) ?? false),
       setMute: async (m) => webapis.audiocontrol.setMute(m),
       getInputSource: async () => mapTizenSource(safe(() => webapis?.tvinfo?.getCurrentSource?.())),
       setInputSource: async (s) => { notSupported("setInputSource on this firmware", s); },
       powerStandby: async () => { notSupported("powerStandby"); },
     },
     apps: {
-      listInstalledApps: async () =>
-        new Promise<AppEntry[]>((resolve, reject) => {
-          tizen.application.getAppsInfo(
-            (list: any[]) => resolve(list.map((a) => ({ id: a.id, name: a.name, version: a.version }))),
-            (e: any) => reject(new Error(String(e?.message ?? e))),
-          );
-        }),
+      listInstalledApps: listApps,
       launchApp: async (id) =>
         new Promise<void>((resolve, reject) => {
           tizen.application.launch(id, () => resolve(), (e: any) => reject(new Error(String(e?.message ?? e))));
@@ -53,6 +50,7 @@ export function createTizenAdapter(): PlatformProvider {
         const ctx = safe(() => tizen.application.getCurrentApplication().appInfo);
         return ctx ? { id: ctx.id, name: ctx.name } : null;
       },
+      findAppsByName: async (q) => matchAppsByName(await listApps(), q),
     },
     navigation: {
       sendKey: async (k: RemoteKey) => {
@@ -69,10 +67,28 @@ export function createTizenAdapter(): PlatformProvider {
       },
     },
     storage: kv,
+    media: {
+      // Media transport on Tizen is typically driven by the app's own AVPlay /
+      // <video> element; the agent injects the corresponding remote keys so the
+      // active player reacts. Adapters with a managed player can override this.
+      play: async (_uri) => dispatchKey("playpause"),
+      pause: async () => dispatchKey("playpause"),
+      resume: async () => dispatchKey("playpause"),
+      seek: async (_ms) => { /* app-managed; no generic Tizen seek API */ },
+    },
     has: (cap) => cap in provider && (provider as any)[cap] !== undefined,
     init: async () => { /* register key listeners, privileges assumed in config.xml */ },
   };
   return provider;
+
+  function listApps(): Promise<AppEntry[]> {
+    return new Promise<AppEntry[]>((resolve, reject) => {
+      tizen.application.getAppsInfo(
+        (list: any[]) => resolve(list.map((a) => ({ id: a.id, name: a.name, version: a.version }))),
+        (e: any) => reject(new Error(String(e?.message ?? e))),
+      );
+    });
+  }
 }
 
 function detectSoc(): string {

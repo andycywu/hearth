@@ -25,6 +25,7 @@ export type InputSource =
 export interface SystemControl {
   getVolume(): Promise<number>;               // 0..100
   setVolume(level: number): Promise<void>;
+  getMute(): Promise<boolean>;
   setMute(mute: boolean): Promise<void>;
   getInputSource(): Promise<InputSource>;
   setInputSource(source: InputSource): Promise<void>;
@@ -35,6 +36,12 @@ export interface AppControl {
   listInstalledApps(): Promise<AppEntry[]>;
   launchApp(appId: string, params?: Record<string, string>): Promise<void>;
   getForegroundApp(): Promise<AppEntry | null>;
+  /**
+   * Fuzzy lookup by display name (case-insensitive substring). Default
+   * implementations can be derived from listInstalledApps(); provided on the
+   * interface so the agent can resolve "open Netflix" without knowing app ids.
+   */
+  findAppsByName(query: string): Promise<AppEntry[]>;
 }
 
 export interface AppEntry {
@@ -77,6 +84,16 @@ export interface KeyValueStore {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
+}
+
+export { assertProviderContract } from "./contract.js";
+export type { ContractOptions } from "./contract.js";
+
+/** Shared helper: case-insensitive substring match over app display names. */
+export function matchAppsByName(apps: AppEntry[], query: string): AppEntry[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return apps.filter((a) => a.name.toLowerCase().includes(q));
 }
 
 /**
