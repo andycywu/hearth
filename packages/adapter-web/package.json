@@ -1,0 +1,17 @@
+{
+  "name": "@tv-ai-agent/adapter-web",
+  "version": "0.1.0",
+  "description": "Browser/mock adapter for local development and CI — no TV hardware required.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tv-ai-agent/platform-api": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

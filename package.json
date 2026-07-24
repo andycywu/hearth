@@ -1,0 +1,33 @@
+{
+  "name": "tv-ai-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "On-device AI Agent runtime (Harness) for Smart TV platforms — cross-OS (AOSP / Tizen) and cross-SoC (MediaTek / Novatek).",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/tizen-app",
+    "apps/aosp-app"
+  ],
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/*\" run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "lint": "eslint . --ext .ts",
+    "dev:web": "pnpm --filter @tv-ai-agent/adapter-web run dev",
+    "bundle:tizen": "pnpm build && node tools/bundle.mjs tizen",
+    "bundle:aosp": "pnpm build && node tools/bundle.mjs aosp"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5",
+    "eslint": "^9.9.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "esbuild": "^0.23.0"
+  }
+}

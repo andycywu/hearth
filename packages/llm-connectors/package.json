@@ -1,0 +1,11 @@
+{
+  "name": "@tv-ai-agent/llm-connectors",
+  "version": "0.1.0",
+  "description": "LLM client implementations: cloud (OpenAI-compatible) and on-device/local endpoint.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc -b", "typecheck": "tsc --noEmit", "test": "vitest run --passWithNoTests" },
+  "dependencies": { "@tv-ai-agent/core": "workspace:*" },
+  "license": "Apache-2.0"
+}

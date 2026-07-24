@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+apps/tizen-app/*.wgt
+apps/aosp-app/**/build/
+apps/aosp-app/.gradle/
+apps/aosp-app/local.properties
+
+# Env & secrets
+.env
+.env.*
+*.keystore
+*.p12
+signing/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# pnpm temp probe artifacts
+_tmp_*
+
+# Generated runtime bundles (produced by tools/bundle.mjs)
+apps/tizen-app/main.js
+apps/tizen-app/main.js.map
+apps/aosp-app/app/src/main/assets/main.js
+apps/aosp-app/app/src/main/assets/main.js.map

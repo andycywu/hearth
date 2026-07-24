@@ -1,0 +1,17 @@
+{
+  "name": "@tv-ai-agent/adapter-tizen",
+  "version": "0.1.0",
+  "description": "Tizen adapter implementing the platform HAL via the Tizen Web Device API (tizen.*).",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tv-ai-agent/platform-api": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

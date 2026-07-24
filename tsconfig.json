@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/platform-api" },
+    { "path": "packages/adapter-tizen" },
+    { "path": "packages/adapter-aosp" },
+    { "path": "packages/adapter-web" },
+    { "path": "packages/llm-connectors" }
+  ]
+}

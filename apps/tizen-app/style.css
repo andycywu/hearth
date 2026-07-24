@@ -1,0 +1,3 @@
+html, body { margin: 0; height: 100%; background: #05060a; color: #e8eefc; font-family: sans-serif; }
+#app { display: flex; align-items: center; justify-content: center; height: 100%; }
+#status { font-size: 32px; opacity: 0.9; }
