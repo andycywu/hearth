@@ -7,5 +7,6 @@
   "types": "dist/index.d.ts",
   "scripts": { "build": "tsc -b", "typecheck": "tsc --noEmit", "test": "vitest run --passWithNoTests" },
   "dependencies": { "@tv-ai-agent/core": "workspace:*" },
+  "devDependencies": { "@tv-ai-agent/adapter-web": "workspace:*" },
   "license": "Apache-2.0"
 }

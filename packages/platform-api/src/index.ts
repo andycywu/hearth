@@ -58,6 +58,17 @@ export type RemoteKey =
 
 export interface Navigation {
   sendKey(key: RemoteKey): Promise<void>;
+  /**
+   * Whether key navigation is currently usable. On AOSP this reflects whether
+   * the user-enabled AccessibilityService is connected; platforms that always
+   * support navigation may omit it (treated as available).
+   */
+  isAvailable?(): Promise<boolean>;
+  /**
+   * Trigger any one-time setup the user must complete to enable navigation
+   * (e.g. open the Android accessibility settings). No-op where not needed.
+   */
+  requestSetup?(): Promise<void>;
 }
 
 export interface MediaControl {

@@ -17,8 +17,17 @@
 5. Walk the HAL: volume, list/launch app, network. Record results in
    `capability-matrix.md`.
 
+## Privilege levels (the real gate)
+Tizen privileges are tiered **public / partner / platform** and the gate is the
+signing **certificate**, not a proprietary SDK:
+- **public** (any Tizen-Studio author cert): volume, `application.*` launch/info,
+  internet. Covers the core agent.
+- **partner / platform**: input-source (`tvinfo`/`tv-control`), power. Need a
+  **partner or platform certificate** issued by Samsung to partners — you cannot
+  self-sign these. On TitanOS-owned devices, sign at partner/platform level to
+  unlock them.
+
 ## MTK vs NVT notes
-- Privileges granted vary by firmware; trim `config.xml` to what installs.
-- Advanced controls (input source, standby) commonly require partner-level
-  `webapis` or a vendor privilege — request from the SoC vendor.
-- Verify the Chromium engine version; keep to the ES2020 baseline.
+- Granted privileges vary by firmware; trim `config.xml` to what installs.
+- MTK vs NVT differ mainly in Chromium engine version and GPU performance, not in
+  which APIs exist — verify the engine version and keep to the ES2020 baseline.

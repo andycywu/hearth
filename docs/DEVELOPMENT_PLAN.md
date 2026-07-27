@@ -25,27 +25,45 @@ on **AOSP / Android TV** and **Tizen**, across **MediaTek (MTK)** and
 
 **Yes, with the chosen web-based approach, and here is why.**
 
+The gating factor for advanced controls is **not a proprietary vendor SDK** — the
+Tizen SDK and the Android SDK are both freely available. It is the **signing /
+privilege level** the app runs at. The SoC (MTK vs NVT) is largely irrelevant to
+this; what matters is the certificate the app is signed with.
+
 - **Tizen**: A native Tizen TV app *is* a web app (`.wgt`) running in the
-  system Chromium engine, with `tizen.*` / `webapis.*` Device APIs for volume,
-  app launch, network, etc. MTK and NVT both ship Tizen reference builds; the
-  same `.wgt` installs on both — only the available privileges/APIs differ,
-  which the HAL's capability probing handles.
+  system Chromium engine, with `tizen.*` / `webapis.*` Device APIs. Privileges
+  are tiered **public / partner / platform**. Volume, app launch/list and
+  network are **public** (any Tizen-Studio-signed app). Input-source switching,
+  power and some `tvinfo`/`tv-control` APIs are **partner/platform** — they need
+  a partner or platform certificate that Samsung grants to business partners, not
+  something you can self-sign. MTK and NVT both ship Tizen reference builds; the
+  same `.wgt` installs on both — only the granted privilege set differs, which
+  the HAL's capability probing handles.
 - **AOSP / Android TV**: We host the identical web bundle in a system `WebView`
   and inject a Kotlin native bridge (`addJavascriptInterface`). Public
   `AudioManager` covers volume; app listing/launch uses `PackageManager` +
-  Leanback intents. Input-source switching, key injection and standby need
-  either a **system/privileged** app signature or the **MTK/NVT vendor SDK** —
-  this is the main integration risk and is called out per-platform below.
-- **Cross-SoC**: Because control goes through the OS (Tizen WebAPI / Android
-  framework) rather than the chip directly, MTK vs NVT mostly differ only in (a)
-  which vendor privileges/SDK are needed for advanced control and (b) WebView/
-  Chromium version and GPU performance. The HAL isolates those differences.
+  Leanback intents — **no special signing**. Switching HDMI input goes through
+  the TV Input Framework, where "changing a TV input the calling package does not
+  own does nothing" and the TV app is a system app — so a third-party app cannot
+  directly switch inputs. Injecting raw key events into *other* apps needs the
+  `INJECT_EVENTS` signature permission. Two non-privileged paths exist and are
+  implemented: **an AccessibilityService** (user-enabled) for global actions
+  (home/back/recents) and directional focus navigation, and a **best-effort
+  passthrough-input Intent** for input switching.
 
-**Bottom line:** volume, app launch/list, network and navigation are achievable
-on all four targets with the current design. The advanced controls (input
-switch, standby, hardware key injection) are feasible but gated on vendor SDK
-access or a privileged/system app image — plan device bring-up around obtaining
-those.
+- **Cross-SoC**: Because control goes through the OS (Tizen WebAPI / Android
+  framework) rather than the chip directly, MTK vs NVT differ mainly in WebView/
+  Chromium version and GPU performance, not in the control APIs. The HAL isolates
+  those differences.
+
+**Bottom line:** volume, app launch/list, network, navigation and in-app media
+are achievable on all four targets **with no special signing**. The advanced
+controls (system-wide input switch, standby, raw key injection into other apps)
+require a **partner/platform certificate (Tizen)** or **system signature
+(Android)** — or the non-privileged AccessibilityService/Intent fallbacks, which
+cover a useful subset. As a TV-platform vendor, TitanOS can **platform/partner
+sign on its own devices** to unlock the full set; the open-source build running
+on retail TVs degrades gracefully via `has()`.
 
 ## 2. Phased roadmap
 
@@ -69,26 +87,38 @@ those.
   fed back to the model for recovery.
 - ✅ Test coverage: shared adapter **contract test** (`assertProviderContract`)
   run against web, Tizen (mocked `tizen.*`/`webapis.*`) and AOSP (mocked native
-  bridge), plus core validation/agent tests — 11 tests green.
-- Remaining: streaming responses; CI bundle-size budget check.
+  bridge), plus core validation/agent/UI tests and a full offline agent-loop
+  integration test — 26 tests green.
+- ✅ Streaming responses (`completeStream` + `token` events); CI now runs
+  **build → typecheck → lint (ESLint flat config) → test → bundle → size**.
+- ✅ Offline **dev harness** (`apps/dev-harness`, `pnpm dev`) + a deterministic
+  **scripted brain** (`createScriptedClient`) let the whole stack run in a
+  browser with no TV and no API key.
 
 ### Phase 2 — Device bring-up on MTK + NVT (≈ weeks 3–9) — the critical path
 Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
-- **Tizen**: obtain a signing profile, install `.wgt` on MTK and NVT Tizen
-  boards, verify each HAL capability, record which privileges each firmware
-  grants. Fill the capability matrix in `docs/platform/capability-matrix.md`.
-- **AOSP**: build the host APK; verify `AudioManager` + `PackageManager` paths;
-  engage MTK/NVT for the vendor SDK or a system-signed image to unlock input
-  switching, key injection and standby; implement those bridge methods.
+- **Tizen**: obtain a signing profile (author + distributor), install `.wgt` on
+  MTK and NVT Tizen boards, verify each HAL capability with the `?diag` probe,
+  and record which **privilege level** each firmware grants. For partner/platform
+  APIs (input source, power), use a partner/platform certificate on TitanOS-owned
+  devices. Fill `docs/platform/capability-matrix.md`.
+- **AOSP**: build the host APK; verify `AudioManager` + `PackageManager` paths
+  (no special signing); enable the AccessibilityService for navigation and try
+  the passthrough-input Intent for input switching. For raw key injection or
+  guaranteed input control, use a **system/platform signature** on TitanOS-owned
+  devices; implement those bridge methods there.
 - Define an **acceptance demo**: a spoken/typed command → the agent changes
   volume, lists apps, launches one, and navigates — identically on all four
   targets.
 
 ### Phase 3 — UI shell + voice (≈ weeks 8–13, overlaps Phase 2)
-- Build `packages/ui` on **Lightning 3 / Blits** (WebGL) for a smooth 10-foot UI
-  on low-end MTK/NVT GPUs; DOM fallback for capable devices.
+- ✅ `packages/ui` DOM overlay (`mountAgentOverlay`) — streams tokens + tool
+  activity, event wiring isolated from rendering. Runnable today via the dev
+  harness.
+- Swap the view layer to **Lightning 3 / Blits** (WebGL) for low-end MTK/NVT
+  GPUs, reusing the same event wiring; keep the DOM overlay as fallback.
 - Wire the optional `VoicePipeline` HAL (wake word / ASR / TTS) where the
-  platform provides it; degrade gracefully via `has("voice")`.
+  platform provides it (Web Speech API in the browser); degrade via `has("voice")`.
 - Latency budget and performance profiling on the weakest target SoC.
 
 ### Phase 4 — On-device inference + open-source release (≈ weeks 12–16)
@@ -114,10 +144,13 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
 
 ## 4. Risks & mitigations
 
-- **Vendor-gated controls (highest risk).** Input switch / key inject / standby
-  may require MTK/NVT SDK or a system-signed image. *Mitigation:* engage vendor
-  FAEs early (Phase 2 start); ship the non-gated capabilities first; keep them
-  behind `has()` so the agent degrades gracefully.
+- **Privilege-gated controls (highest risk).** Input switch / raw key injection /
+  standby require a **partner or platform certificate (Tizen)** or a **system
+  signature (Android)** — not a proprietary vendor SDK. *Mitigation:* ship the
+  public-privilege capabilities first; use the non-privileged fallbacks
+  (Android AccessibilityService + passthrough-input Intent) for the rest; keep
+  everything behind `has()` so the agent degrades gracefully. TitanOS can
+  platform/partner-sign its own devices to unlock the full set.
 - **WebView/Chromium fragmentation across SoC firmware.** *Mitigation:* target a
   conservative ES2020 baseline (already set), test on each firmware's engine,
   avoid bleeding-edge web APIs.

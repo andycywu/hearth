@@ -24,6 +24,8 @@ interface NativeBridge {
   launchApp(appId: string): void;
   getForegroundApp(): string;         // JSON AppEntry | "null"
   sendKey(key: string): void;
+  isAccessibilityEnabled?(): boolean;
+  openAccessibilitySettings?(): void;
   isOnline(): boolean;
   connectionType(): string;
   kvGet(key: string): string;         // "" when absent
@@ -67,7 +69,11 @@ export function createAospAdapter(): PlatformProvider {
       findAppsByName: async (q) =>
         matchAppsByName(JSON.parse(bridge.listInstalledApps()) as AppEntry[], q),
     },
-    navigation: { sendKey: async (k: RemoteKey) => bridge.sendKey(k) },
+    navigation: {
+      sendKey: async (k: RemoteKey) => bridge.sendKey(k),
+      isAvailable: async () => bridge.isAccessibilityEnabled?.() ?? false,
+      requestSetup: async () => bridge.openAccessibilitySettings?.(),
+    },
     network: {
       isOnline: async () => bridge.isOnline(),
       connectionType: async () => bridge.connectionType() as "wifi" | "ethernet" | "none",

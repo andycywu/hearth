@@ -33,3 +33,5 @@ apps/tizen-app/main.js
 apps/tizen-app/main.js.map
 apps/aosp-app/app/src/main/assets/main.js
 apps/aosp-app/app/src/main/assets/main.js.map
+apps/dev-harness/main.js
+apps/dev-harness/main.js.map

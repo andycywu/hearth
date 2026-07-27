@@ -85,6 +85,13 @@ export async function runDiagnostics(
   });
 
   // --- navigation ---
+  await probe(results, "navigation.available", async () => {
+    if (!platform.navigation.isAvailable) return "assumed (always available)";
+    const ready = await platform.navigation.isAvailable();
+    return ready
+      ? "ready"
+      : skip("not ready — enable the accessibility service (navigation.requestSetup)");
+  });
   await probe(results, "navigation.sendKey", async () => {
     if (!allowWrites) return skip("write-guarded (pass allowWrites)");
     await platform.navigation.sendKey("ok");

@@ -1,0 +1,17 @@
+{
+  "name": "@tv-ai-agent/dev-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser dev harness — run the agent end-to-end with the web/mock adapter, the UI overlay and an offline scripted brain. No TV, no API key required.",
+  "scripts": {
+    "build": "node ../../tools/bundle.mjs dev",
+    "typecheck": "echo \"dev-harness: bundled via esbuild\" && exit 0"
+  },
+  "dependencies": {
+    "@tv-ai-agent/core": "workspace:*",
+    "@tv-ai-agent/adapter-web": "workspace:*",
+    "@tv-ai-agent/ui": "workspace:*",
+    "@tv-ai-agent/llm-connectors": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

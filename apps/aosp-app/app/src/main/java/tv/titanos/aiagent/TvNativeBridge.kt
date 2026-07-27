@@ -1,7 +1,12 @@
 package tv.titanos.aiagent
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
+import android.media.tv.TvContract
+import android.media.tv.TvInputManager
+import android.net.Uri
+import android.provider.Settings
 import android.webkit.JavascriptInterface
 import org.json.JSONArray
 import org.json.JSONObject
@@ -11,9 +16,14 @@ import org.json.JSONObject
  * Every @JavascriptInterface method maps 1:1 to the NativeBridge TypeScript
  * interface. Methods returning structured data return JSON strings.
  *
- * NOTE: Volume/app/input control on production TV hardware usually requires
- * system or vendor (MTK/NVT) privileged APIs. The implementations below use the
- * public SDK where possible and are marked TODO where a vendor SDK is needed.
+ * Signing/privilege model (not a vendor SDK):
+ *  - Volume, app list/launch, network: public SDK, no special signing.
+ *  - Navigation keys: routed through TvAgentAccessibilityService (user-enabled),
+ *    falling back to an in-app KeyEvent when the service is off.
+ *  - Input switching: best-effort via the TV Input Framework passthrough Intent;
+ *    reliability varies by build. Guaranteed control needs a platform signature.
+ *  - Standby: requires the DEVICE_POWER system permission; left unimplemented on
+ *    unprivileged builds.
  */
 class TvNativeBridge(private val ctx: Context) {
 
@@ -53,10 +63,31 @@ class TvNativeBridge(private val ctx: Context) {
         )
     }
 
-    // Input-source switching is vendor-specific (HDMI-CEC / MTK/NVT SDK).
     @JavascriptInterface fun getInputSource(): String = "app"
-    @JavascriptInterface fun setInputSource(source: String) { /* TODO: vendor SDK */ }
-    @JavascriptInterface fun powerStandby() { /* TODO: vendor SDK */ }
+
+    /**
+     * Best-effort input switch with no special signing: find a passthrough TV
+     * input (HDMI, etc.) and ask the system TV app to view it. Works on many
+     * Android TV builds; throws (caught by the adapter) where the platform
+     * restricts it, in which case a platform signature is required.
+     */
+    @JavascriptInterface
+    fun setInputSource(source: String) {
+        val tim = ctx.getSystemService(Context.TV_INPUT_SERVICE) as? TvInputManager
+            ?: throw UnsupportedOperationException("TV Input Framework unavailable")
+        val wanted = source.lowercase()
+        val match = tim.tvInputList.firstOrNull { info ->
+            info.isPassthroughInput &&
+                (info.id.lowercase().contains(wanted) ||
+                 info.loadLabel(ctx)?.toString()?.lowercase()?.contains(wanted) == true)
+        } ?: throw UnsupportedOperationException("No passthrough input matching '$source'")
+        val uri: Uri = TvContract.buildChannelUriForPassthroughInput(match.id)
+        ctx.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    // Standby requires the DEVICE_POWER signature permission; unavailable here.
+    @JavascriptInterface
+    fun powerStandby() { throw UnsupportedOperationException("Not supported: powerStandby (needs system signature)") }
 
     @JavascriptInterface
     fun listInstalledApps(): String {
@@ -82,7 +113,31 @@ class TvNativeBridge(private val ctx: Context) {
 
     @JavascriptInterface fun getForegroundApp(): String = "null"
 
-    @JavascriptInterface fun sendKey(key: String) { /* TODO: inject via accessibility / vendor SDK */ }
+    /**
+     * Route navigation through the AccessibilityService when the user has enabled
+     * it (works on retail devices, no signing). If the service is off, throw so
+     * the adapter surfaces it as unavailable and the UI can prompt to enable it.
+     */
+    @JavascriptInterface
+    fun sendKey(key: String) {
+        if (TvAgentAccessibilityService.tryPressKey(key)) return
+        if (!TvAgentAccessibilityService.isConnected()) {
+            throw UnsupportedOperationException(
+                "Not supported: accessibility service not enabled — call openAccessibilitySettings()")
+        }
+        throw UnsupportedOperationException("Not supported: key '$key' via accessibility")
+    }
+
+    /** True when the navigation AccessibilityService is enabled and connected. */
+    @JavascriptInterface
+    fun isAccessibilityEnabled(): Boolean = TvAgentAccessibilityService.isConnected()
+
+    /** Deep-link the user to the Accessibility settings screen to enable it. */
+    @JavascriptInterface
+    fun openAccessibilitySettings() {
+        ctx.startActivity(
+            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
 
     @JavascriptInterface
     fun isOnline(): Boolean {

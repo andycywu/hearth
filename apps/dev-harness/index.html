@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TV AI Agent — Dev Harness</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #05060a; color: #e8eefc; font-family: sans-serif; }
+      header { padding: 24px 32px; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      p.hint { opacity: .6; margin: 0; font-size: 14px; }
+      #cmd {
+        margin: 16px 32px; width: calc(100% - 64px); box-sizing: border-box;
+        padding: 14px 16px; font-size: 20px; border-radius: 8px; border: 1px solid #2a2f3a;
+        background: #0d1017; color: #e8eefc;
+      }
+      #state { margin: 0 32px; opacity: .5; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>TV AI Agent — Dev Harness</h1>
+      <p class="hint">Offline scripted brain. Try: “set volume to 30”, “mute”, “open Netflix”, “what's the volume?”, “switch to hdmi1”.</p>
+    </header>
+    <input id="cmd" placeholder="Type a command and press Enter…" autofocus />
+    <div id="state">booting…</div>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

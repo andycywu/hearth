@@ -43,7 +43,10 @@ export function createWebAdapter(): PlatformProvider {
       getForegroundApp: async () => null,
       findAppsByName: async (q) => matchAppsByName(state.apps, q),
     },
-    navigation: { sendKey: async (k: RemoteKey) => { console.info("[web] key", k); } },
+    navigation: {
+      sendKey: async (k: RemoteKey) => { console.info("[web] key", k); },
+      isAvailable: async () => true,
+    },
     network: { isOnline: async () => true, connectionType: async () => "ethernet" },
     storage: {
       get: async (k) => state.kv.get(k) ?? null,

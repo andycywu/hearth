@@ -11,17 +11,20 @@
   "workspaces": [
     "packages/*",
     "apps/tizen-app",
-    "apps/aosp-app"
+    "apps/aosp-app",
+    "apps/dev-harness"
   ],
   "scripts": {
     "build": "pnpm -r --filter \"./packages/*\" run build",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
-    "lint": "eslint . --ext .ts",
+    "lint": "eslint .",
     "dev:web": "pnpm --filter @tv-ai-agent/adapter-web run dev",
     "bundle:tizen": "pnpm build && node tools/bundle.mjs tizen",
     "bundle:aosp": "pnpm build && node tools/bundle.mjs aosp",
     "bundle:all": "pnpm build && node tools/bundle.mjs tizen && node tools/bundle.mjs aosp",
+    "bundle:dev": "pnpm build && node tools/bundle.mjs dev",
+    "dev": "pnpm bundle:dev && node tools/serve.mjs apps/dev-harness",
     "check:size": "node tools/check-bundle-size.mjs"
   },
   "devDependencies": {
