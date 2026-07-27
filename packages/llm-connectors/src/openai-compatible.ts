@@ -8,6 +8,10 @@ export interface OpenAiCompatibleOptions {
   apiKey?: string;
   model: string;
   fetchImpl?: typeof fetch;
+  /** Retry attempts for transient failures (network / 5xx / 429). Default 2. */
+  retries?: number;
+  /** Base backoff in ms (exponential); default 300. */
+  retryDelayMs?: number;
 }
 
 /**
@@ -16,7 +20,30 @@ export interface OpenAiCompatibleOptions {
  * lets the TV run fully on-device (point baseUrl at localhost) or in the cloud.
  */
 export function createOpenAiCompatibleClient(opts: OpenAiCompatibleOptions): LlmClient {
-  const doFetch = opts.fetchImpl ?? fetch;
+  const rawFetch = opts.fetchImpl ?? fetch;
+  const retries = opts.retries ?? 2;
+  const retryDelayMs = opts.retryDelayMs ?? 300;
+
+  // Retry the initial request on transient failures (network error, 5xx, 429)
+  // with exponential backoff. The response body is not consumed here, so a
+  // returned ok/4xx response is passed straight through for the caller to read.
+  async function doFetch(u: string, init: RequestInit): Promise<Response> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await rawFetch(u, init);
+        if (res.status >= 500 || res.status === 429) {
+          if (attempt < retries) { await sleep(retryDelayMs * 2 ** attempt); continue; }
+        }
+        return res;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < retries) { await sleep(retryDelayMs * 2 ** attempt); continue; }
+        throw err;
+      }
+    }
+    throw lastErr ?? new Error("fetch failed");
+  }
 
   function url(): string {
     return `${opts.baseUrl}/chat/completions`;
@@ -166,4 +193,7 @@ function toApiMessage(m: ChatMessage): Record<string, unknown> {
 }
 function safeParse(s: string): Record<string, unknown> {
   try { return JSON.parse(s); } catch { return {}; }
+}
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -20,6 +20,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - API reference (`docs/api.md`).
 - Single-surface **canvas renderer** (`mountAgentCanvas`) reusing the agent event
   wiring, plus a pure `wrapLines` helper (Latin + CJK); dev-harness `?render=canvas`.
+- Standalone **Lightning 3 / Blits (WebGL)** demo (`apps/blits-demo`) — same event
+  wiring, GPU-rendered; excluded from the workspace/CI (its own install).
+- **Cross-target acceptance test** (`packages/acceptance`): one command script runs
+  identically on web / Tizen / AOSP / webOS (mocked), asserting the same tool
+  sequence and end state — hardware-free Phase 2 proof.
+- LLM connector **retry/backoff** for transient failures (network / 5xx / 429).
 
 ### Security
 - WebView hardening on AOSP (`MainActivity`: file-access flags, in-origin

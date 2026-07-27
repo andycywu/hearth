@@ -116,8 +116,10 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
 - ✅ `packages/ui` DOM overlay (`mountAgentOverlay`) — streams tokens + tool
   activity, event wiring isolated from rendering. Runnable today via the dev
   harness.
-- Swap the view layer to **Lightning 3 / Blits** (WebGL) for low-end MTK/NVT
-  GPUs, reusing the same event wiring; keep the DOM overlay as fallback.
+- ✅ 2D single-surface **canvas renderer** (`mountAgentCanvas`) — no DOM reflow.
+- ✅ **Lightning 3 / Blits (WebGL)** demo (`apps/blits-demo`, standalone) reusing
+  the same agent-event wiring — the low-end-GPU production path. Next: promote it
+  into `packages/ui` as the default renderer with DOM fallback.
 - ✅ Optional `VoicePipeline` HAL implemented in the web adapter via the Web
   Speech API (ASR + TTS), feature-detected and surfaced through `has("voice")`;
   the dev harness shows a mic button and speaks replies. Native wake-word / ASR

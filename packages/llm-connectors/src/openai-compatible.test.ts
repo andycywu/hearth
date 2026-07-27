@@ -25,6 +25,38 @@ describe("StreamAccumulator", () => {
   });
 });
 
+describe("createOpenAiCompatibleClient retry", () => {
+  it("retries transient 500s then succeeds", async () => {
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls++;
+      if (calls < 3) return { ok: false, status: 500, text: async () => "boom" };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: "hi" } }] }),
+      };
+    }) as unknown as typeof fetch;
+
+    const client = createOpenAiCompatibleClient({
+      baseUrl: "http://x/v1", model: "m", fetchImpl, retries: 2, retryDelayMs: 1,
+    });
+    const r = await client.complete({ messages: [], tools: [] });
+    expect(calls).toBe(3);
+    expect(r.message.content).toBe("hi");
+  });
+
+  it("gives up after exhausting retries", async () => {
+    let calls = 0;
+    const fetchImpl = (async () => { calls++; return { ok: false, status: 503, text: async () => "down" }; }) as unknown as typeof fetch;
+    const client = createOpenAiCompatibleClient({
+      baseUrl: "http://x/v1", model: "m", fetchImpl, retries: 1, retryDelayMs: 1,
+    });
+    await expect(client.complete({ messages: [], tools: [] })).rejects.toThrow(/HTTP 503/);
+    expect(calls).toBe(2); // initial + 1 retry
+  });
+});
+
 describe("createOpenAiCompatibleClient.completeStream", () => {
   it("streams over a mocked SSE response", async () => {
     const sse =
