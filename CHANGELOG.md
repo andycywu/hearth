@@ -18,6 +18,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Optional wake-word support in `VoicePipeline` (`startWakeWord`/`stopWakeWord`),
   implemented in the web adapter; hands-free toggle in the dev harness.
 - API reference (`docs/api.md`).
+- Single-surface **canvas renderer** (`mountAgentCanvas`) reusing the agent event
+  wiring, plus a pure `wrapLines` helper (Latin + CJK); dev-harness `?render=canvas`.
 
 ### Security
 - WebView hardening on AOSP (`MainActivity`: file-access flags, in-origin

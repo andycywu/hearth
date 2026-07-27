@@ -17,6 +17,14 @@ Zero dependencies, works in every TV WebView/Tizen engine today, and it exercise
 the streaming (`token`) and tool events end-to-end. Event wiring is isolated from
 rendering so the view layer can be swapped without touching agent logic.
 
+## Single-surface canvas renderer
+`mountAgentCanvas(agent)` draws everything onto one `<canvas>` (2D context) with
+the **same event wiring** — no DOM reflow, which is the pattern that keeps a
+10-foot UI smooth on low-end GPUs. Try it in the dev harness with
+`?render=canvas`. The pure `wrapLines(measure, text, maxWidth)` helper handles
+Latin and CJK wrapping and is unit-tested. This is the stepping stone to the WebGL
+path below.
+
 ## Lightning 3 / Blits upgrade path (low-end MTK/NVT)
 On very low-end GPUs a DOM-heavy UI can drop frames. To switch to a WebGL
 renderer, keep the same event subscriptions from `overlay.ts` and render into a

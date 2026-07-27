@@ -13,7 +13,8 @@ overlay shows streamed replies and tool activity; a transcript logs the session
 and the status line shows the mock TV state changing.
 
 Open `http://localhost:5173/?diag` to run the capability self-diagnostic (the
-same probe the device builds use) instead of the chat UI.
+same probe the device builds use) instead of the chat UI. Add `?render=canvas`
+to render with the single-surface canvas renderer instead of the DOM overlay.
 
 ## Point it at a real LLM
 Set globals before the bundle loads (e.g. in the browser console or by editing

@@ -1,6 +1,6 @@
 import { Agent, runDiagnostics, reportToMarkdown, type LlmClient } from "@tv-ai-agent/core";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
-import { mountAgentOverlay } from "@tv-ai-agent/ui";
+import { mountAgentOverlay, mountAgentCanvas } from "@tv-ai-agent/ui";
 import { createScriptedClient, createOpenAiCompatibleClient } from "@tv-ai-agent/llm-connectors";
 
 declare global {
@@ -49,7 +49,10 @@ async function boot(): Promise<void> {
     // switch input) prompt before running.
     confirm: (req) => window.confirm(`Allow ${req.name}(${JSON.stringify(req.args)})?`),
   });
-  const ui = mountAgentOverlay(agent);
+  // ?render=canvas uses the single-surface canvas renderer instead of the DOM overlay.
+  const ui = params.get("render") === "canvas"
+    ? mountAgentCanvas(agent, { width: window.innerWidth, height: Math.round(window.innerHeight * 0.45) })
+    : mountAgentOverlay(agent);
 
   // Scrolling transcript of the session.
   const log = document.getElementById("log");
