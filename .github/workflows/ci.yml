@@ -18,5 +18,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm license:check
       - run: pnpm bundle:all
       - run: pnpm check:size

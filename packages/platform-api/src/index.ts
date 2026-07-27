@@ -9,7 +9,7 @@
  */
 
 export interface DeviceInfo {
-  os: "aosp" | "tizen" | "web";
+  os: "aosp" | "tizen" | "webos" | "web";
   osVersion: string;
   /** SoC vendor, e.g. "mediatek" | "novatek" | "unknown". */
   soc: string;

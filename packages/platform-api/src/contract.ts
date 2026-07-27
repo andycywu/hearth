@@ -31,7 +31,7 @@ export async function assertProviderContract(
 
   // --- structure ---
   assert(p.device && typeof p.device.os === "string", "device.os must be a string");
-  assert(["aosp", "tizen", "web"].includes(p.device.os), `unexpected os: ${p.device.os}`);
+  assert(["aosp", "tizen", "webos", "web"].includes(p.device.os), `unexpected os: ${p.device.os}`);
   assert(typeof p.device.soc === "string", "device.soc must be a string");
   assert(typeof p.init === "function", "init() must exist");
   assert(typeof p.has === "function", "has() must exist");

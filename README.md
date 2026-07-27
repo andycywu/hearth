@@ -60,6 +60,7 @@ packages/
   adapter-tizen/   Tizen Web Device API implementation
   adapter-aosp/    Android WebView JS-bridge implementation
   adapter-web/     Browser/mock adapter for dev & CI
+  adapter-webos/   Experimental webOS (LG) adapter via Luna Service Bus
   llm-connectors/  Cloud + on-device LLM clients (OpenAI-compatible)
   ui/              (Planned) Lightning 3 / Blits 10-foot UI shell
 apps/

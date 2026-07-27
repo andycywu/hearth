@@ -18,7 +18,8 @@ on **AOSP / Android TV** and **Tizen**, across **MediaTek (MTK)** and
 
 - Being a general test-automation harness (this Harness is the agent runtime).
 - Supporting webOS / Fire TV / tvOS on day one (the architecture allows it later
-  by adding an adapter; not in the initial scope).
+  by adding an adapter — an **experimental webOS adapter skeleton** already exists
+  as proof of this, but is not a v1 target).
 - Shipping a proprietary model — inference is pluggable and out of scope here.
 
 ## 1. Feasibility — can this actually run on MTK/NVT + AOSP/Tizen?
@@ -131,8 +132,9 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
 - Privacy pass: keep sensitive commands on-device; document the cloud/on-device
   routing policy.
 - Open-source hygiene: ✅ Apache-2.0, `SECURITY.md`, `CONTRIBUTING`, issue/PR
-  templates, `CHANGELOG.md`, tag-driven **release workflow** + `docs/RELEASING.md`.
-  Remaining: security review, dependency/license audit, SBOM, cut `v0.1.0`.
+  templates, `CHANGELOG.md`, tag-driven **release workflow** + `docs/RELEASING.md`,
+  **Dependabot**, **license gate** (`pnpm license:check`, in CI) and **SBOM**
+  generator (`pnpm sbom`, CycloneDX). Remaining: security review, cut `v0.1.0`.
 
 ## 3. Milestones & acceptance criteria
 

@@ -7,6 +7,7 @@
     { "path": "packages/adapter-tizen" },
     { "path": "packages/adapter-aosp" },
     { "path": "packages/adapter-web" },
+    { "path": "packages/adapter-webos" },
     { "path": "packages/llm-connectors" },
     { "path": "packages/ui" }
   ]

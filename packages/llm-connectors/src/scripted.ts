@@ -24,7 +24,7 @@ export function createScriptedClient(opts: ScriptedClientOptions = {}): LlmClien
     if (!last) return finalText("Hi! Try: \"set volume to 30\" or \"open Netflix\".");
 
     if (last.role === "tool") return followUp(last, messages);
-    if (last.role === "user") return fromUser(last.content);
+    if (last.role === "user") return fromUser(last.content, messages);
     return finalText("Okay.");
   }
 
@@ -44,8 +44,20 @@ export function createScriptedClient(opts: ScriptedClientOptions = {}): LlmClien
 }
 
 // --- intent parsing from the user's message ---
-function fromUser(raw: string): CompletionResult {
+function fromUser(raw: string, messages: ChatMessage[]): CompletionResult {
   const text = raw.toLowerCase().trim();
+
+  // Coreference: "launch it again", "open that", "再開一次" → relaunch the last
+  // app, resolved from conversation history. Only fires when no app name is
+  // given, so "open YouTube again" still opens YouTube.
+  const repeat =
+    /^(?:again|do it again|再一?次|重(?:開|新開啟?))\s*$/.test(text) ||
+    /^(?:open|launch|play|開啟?|啟動|播放)\s+(?:it|that|它|那個)(?:\s+again)?\s*$/.test(text);
+  if (repeat) {
+    const id = lastLaunchedAppId(messages);
+    if (id) return toolCall("launch_app", { appId: id });
+    return finalText("What should I open?");
+  }
 
   const vol = text.match(/(?:volume|音量).*?(\d{1,3})|(\d{1,3}).*?(?:volume|音量)/);
   if (vol) {
@@ -128,6 +140,24 @@ function lastUserText(messages: ChatMessage[]): string {
     if (m && m.role === "user") return m.content.toLowerCase();
   }
   return "";
+}
+/** Resolve the most recently launched app id from prior tool calls / search results. */
+function lastLaunchedAppId(messages: ChatMessage[]): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (!m) continue;
+    // A prior assistant turn that launched an app.
+    const launch = m.toolCalls?.find((tc) => tc.name === "launch_app");
+    if (launch && typeof (launch.args as any).appId === "string") return (launch.args as any).appId;
+    // Or the most recent app-search result.
+    if (m.role === "tool") {
+      const data = safeParse(m.content);
+      if (Array.isArray(data) && data[0] && typeof (data[0] as any).id === "string") {
+        return (data[0] as any).id;
+      }
+    }
+  }
+  return undefined;
 }
 
 // --- helpers ---

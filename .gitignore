@@ -28,6 +28,10 @@ Thumbs.db
 # pnpm temp probe artifacts
 _tmp_*
 
+# Generated SBOM / release artifacts
+sbom.json
+dist-release/
+
 # Generated runtime bundles (produced by tools/bundle.mjs)
 apps/tizen-app/main.js
 apps/tizen-app/main.js.map

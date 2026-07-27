@@ -64,4 +64,14 @@ describe("scripted client — full agent loop (offline)", () => {
     await agent.run("turn it down");
     expect(await platform.system.getVolume()).toBe(40);
   });
+
+  it("resolves 'it' to the last launched app (coreference across turns)", async () => {
+    const { agent } = makeAgent();
+    await agent.run("open Netflix");
+    const tools: Array<{ name: string; args: any }> = [];
+    agent.events.on("tool:call", (e) => tools.push({ name: e.name, args: e.args }));
+    await agent.run("launch it again");
+    const launch = tools.find((t) => t.name === "launch_app");
+    expect(launch?.args).toMatchObject({ appId: "com.netflix.ninja" });
+  });
 });

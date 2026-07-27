@@ -25,7 +25,9 @@
     "bundle:all": "pnpm build && node tools/bundle.mjs tizen && node tools/bundle.mjs aosp",
     "bundle:dev": "pnpm build && node tools/bundle.mjs dev",
     "dev": "pnpm bundle:dev && node tools/serve.mjs apps/dev-harness",
-    "check:size": "node tools/check-bundle-size.mjs"
+    "check:size": "node tools/check-bundle-size.mjs",
+    "license:check": "node tools/license-check.mjs",
+    "sbom": "node tools/sbom.mjs"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
