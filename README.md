@@ -101,6 +101,13 @@ Short version: harden the core and build pipeline (Phase 1) → real device
 bring-up on MTK + NVT for both AOSP and Tizen (Phase 2) → UI shell and voice
 (Phase 3) → on-device inference and public open-source release (Phase 4).
 
+## Documentation
+
+- [Development plan](docs/DEVELOPMENT_PLAN.md) · [Architecture](docs/ARCHITECTURE.md) · [API reference](docs/api.md)
+- [Extending (custom tools, persistence, new OS)](docs/extending.md)
+- [On-device inference](docs/on-device-inference.md) · [Security review](docs/SECURITY_REVIEW.md) · [Releasing](docs/RELEASING.md)
+- Platform bring-up: [Tizen](docs/platform/tizen-bringup.md) · [AOSP](docs/platform/aosp-bringup.md) · [AOSP accessibility](docs/platform/aosp-accessibility.md) · [capability matrix](docs/platform/capability-matrix.md)
+
 ## Contributing & license
 
 Contributions welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) and

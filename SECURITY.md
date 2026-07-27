@@ -10,3 +10,6 @@ issue). We aim to acknowledge within a few business days.
   against tool schemas) and keep the native bridge's exposed methods minimal.
 - On-device inference is preferred for privacy-sensitive commands; document any
   data sent to a cloud LLM endpoint.
+
+See [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md) for the v0.1.0 threat
+model and self-review.

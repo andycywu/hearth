@@ -1,0 +1,16 @@
+{
+  "name": "@tv-ai-agent/webos-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "webOS (LG) web-app host — bundles the agent runtime into an .ipk for webOS TVs.",
+  "scripts": {
+    "build": "node ../../tools/bundle.mjs webos",
+    "typecheck": "echo \"webos-app: bundled via esbuild\" && exit 0"
+  },
+  "dependencies": {
+    "@tv-ai-agent/core": "workspace:*",
+    "@tv-ai-agent/adapter-webos": "workspace:*",
+    "@tv-ai-agent/llm-connectors": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

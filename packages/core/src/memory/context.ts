@@ -26,6 +26,17 @@ export class ConversationContext {
     return this.messages.length;
   }
 
+  /** Snapshot of stored messages (excludes the system prompt) for persistence. */
+  dump(): ChatMessage[] {
+    return this.messages.map((m) => ({ ...m }));
+  }
+
+  /** Replace stored messages from a snapshot (applies the same trim cap). */
+  restore(messages: ChatMessage[]): void {
+    this.messages = [];
+    for (const m of messages) this.add(m);
+  }
+
   reset(): void {
     this.messages = [];
   }

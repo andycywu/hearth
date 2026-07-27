@@ -10,11 +10,25 @@ export interface ToolSpec {
   name: string;
   description: string;
   parameters: Record<string, ToolParameter>;
+  /**
+   * If true, the agent asks the host to confirm before executing (via
+   * `AgentOptions.confirm`). Use for higher-impact actions (input switch,
+   * launching apps, standby). Ignored when no confirm handler is set.
+   */
+  confirm?: boolean;
 }
 
 export interface Tool<Args = Record<string, unknown>, Result = unknown> {
   spec: ToolSpec;
   execute(args: Args): Promise<Result>;
+}
+
+/** Ergonomic helper for defining a custom tool with inferred types. */
+export function defineTool<Args extends Record<string, unknown> = Record<string, unknown>, Result = unknown>(
+  spec: ToolSpec,
+  execute: (args: Args) => Promise<Result>,
+): Tool<Args, Result> {
+  return { spec, execute };
 }
 
 /** Raised when LLM-proposed arguments do not match a tool's schema. */
@@ -113,6 +127,11 @@ export class ToolRegistry {
 
   has(name: string): boolean {
     return this.tools.has(name);
+  }
+
+  /** The spec for a registered tool, if any. */
+  getSpec(name: string): ToolSpec | undefined {
+    return this.tools.get(name)?.spec;
   }
 
   list(): ToolSpec[] {

@@ -132,9 +132,11 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
 - Privacy pass: keep sensitive commands on-device; document the cloud/on-device
   routing policy.
 - Open-source hygiene: ✅ Apache-2.0, `SECURITY.md`, `CONTRIBUTING`, issue/PR
-  templates, `CHANGELOG.md`, tag-driven **release workflow** + `docs/RELEASING.md`,
-  **Dependabot**, **license gate** (`pnpm license:check`, in CI) and **SBOM**
-  generator (`pnpm sbom`, CycloneDX). Remaining: security review, cut `v0.1.0`.
+  templates, `CHANGELOG.md` (0.1.0 cut), tag-driven **release workflow** +
+  `docs/RELEASING.md`, **Dependabot**, **license gate** (`pnpm license:check`, in
+  CI), **SBOM** (`pnpm sbom`, CycloneDX), and a **security self-review**
+  (`docs/SECURITY_REVIEW.md`). Remaining: push a public repo + external audit;
+  tag `v0.1.0`.
 
 ## 3. Milestones & acceptance criteria
 
@@ -173,3 +175,5 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
 - Add an LLM backend → implement `LlmClient` in `packages/llm-connectors`.
 - Add a new OS target → add `packages/adapter-<os>` implementing the HAL and an
   app host under `apps/`. No core changes required.
+- Add app/plugin tools → pass `tools: [...]` to `new Agent(...)` (use
+  `defineTool`); persist sessions with `persistKey`. See `docs/extending.md`.

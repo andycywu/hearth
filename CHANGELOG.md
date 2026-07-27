@@ -7,6 +7,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Custom tool extension point (`AgentOptions.tools`, `defineTool`) and a built-in
+  `help` tool.
+- Conversation persistence via `platform.storage` (`persistKey` + `restore()`).
+- Confirmation gate for high-impact tools (`ToolSpec.confirm`, `AgentOptions.confirm`);
+  `set_input_source` and `launch_app` are confirm-required by default.
+- Multilingual replies: system prompt answers in the user's language; the offline
+  scripted brain replies bilingually (English/Traditional Chinese).
+- webOS app host (`apps/webos-app`, `.ipk`); dev-harness `?diag` view + transcript.
+- Optional wake-word support in `VoicePipeline` (`startWakeWord`/`stopWakeWord`),
+  implemented in the web adapter; hands-free toggle in the dev harness.
+- API reference (`docs/api.md`).
+
+### Security
+- WebView hardening on AOSP (`MainActivity`: file-access flags, in-origin
+  navigation) and a `Content-Security-Policy` `<meta>` in every app `index.html`.
+
+## [0.1.0] - 2026-07-27
+
+### Added
 - Portable agent core ("the Harness"): agent loop, tool registry, LLM
   abstraction, rolling memory, typed event bus.
 - Platform HAL (`@tv-ai-agent/platform-api`) with adapters for Tizen, AOSP
@@ -29,4 +48,5 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a partner/platform certificate (Tizen) or system signature (Android); the
   open-source build degrades gracefully via `has()`.
 
-[Unreleased]: https://github.com/andycywu/tv-ai-agent/commits/main
+[Unreleased]: https://github.com/andycywu/tv-ai-agent/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/andycywu/tv-ai-agent/releases/tag/v0.1.0

@@ -2,4 +2,5 @@ packages:
   - "packages/*"
   - "apps/tizen-app"
   - "apps/aosp-app"
+  - "apps/webos-app"
   - "apps/dev-harness"

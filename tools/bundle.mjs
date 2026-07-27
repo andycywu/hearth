@@ -24,6 +24,10 @@ const TARGETS = {
     entry: "apps/aosp-app/web/main.ts",
     outfile: "apps/aosp-app/app/src/main/assets/main.js",
   },
+  webos: {
+    entry: "apps/webos-app/src/main.ts",
+    outfile: "apps/webos-app/main.js",
+  },
   dev: {
     entry: "apps/dev-harness/src/main.ts",
     outfile: "apps/dev-harness/main.js",
@@ -35,7 +39,7 @@ const watch = process.argv.includes("--watch");
 const dev = process.argv.includes("--dev");
 const cfg = TARGETS[target];
 if (!cfg) {
-  console.error("Usage: node tools/bundle.mjs <tizen|aosp|dev> [--watch] [--dev]");
+  console.error("Usage: node tools/bundle.mjs <tizen|aosp|webos|dev> [--watch] [--dev]");
   process.exit(1);
 }
 

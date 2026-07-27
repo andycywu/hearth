@@ -1,6 +1,6 @@
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import type { LlmClient } from "../llm/client.js";
-import { ToolRegistry } from "../tools/registry.js";
+import { ToolRegistry, type Tool } from "../tools/registry.js";
 import { createTvTools } from "../tools/tv-tools.js";
 import { ConversationContext } from "../memory/context.js";
 import { EventBus, type AgentEvents } from "../events/bus.js";
@@ -13,6 +13,28 @@ export interface AgentOptions {
   maxIterations?: number;
   /** Abort a turn if it exceeds this many milliseconds (default 30_000). */
   turnTimeoutMs?: number;
+  /**
+   * Extra tools to register alongside the built-in TV tools — the extension
+   * point for app- or plugin-specific capabilities. See docs/extending.md.
+   */
+  tools?: Tool[];
+  /**
+   * When set, conversation history is auto-saved to `platform.storage` under
+   * this key after every turn. Call `restore()` at startup to reload it.
+   */
+  persistKey?: string;
+  /**
+   * Called before executing a tool whose spec has `confirm: true`. Return false
+   * to decline; the model receives a structured "declined" result and can adapt.
+   * When unset, confirm-required tools run without prompting (opt-in guard).
+   */
+  confirm?: (req: ConfirmRequest) => boolean | Promise<boolean>;
+}
+
+export interface ConfirmRequest {
+  name: string;
+  args: Record<string, unknown>;
+  description: string;
 }
 
 /** Raised when a turn exceeds its time budget. */
@@ -31,7 +53,8 @@ interface RunOptions {
 const DEFAULT_SYSTEM_PROMPT = `You are an on-device AI assistant embedded in a Smart TV.
 You control the TV through the provided tools. Be concise. Prefer a single tool
 call when the user's intent is clear. Never invent app ids — call list_apps first
-if unsure.`;
+if unsure. Always reply in the same language the user used (e.g. answer in
+Traditional Chinese if they wrote Chinese).`;
 
 /**
  * The Harness: a platform-agnostic agent loop. It feeds the user request to the
@@ -50,6 +73,23 @@ export class Agent {
     this.maxIterations = opts.maxIterations ?? 6;
     this.turnTimeoutMs = opts.turnTimeoutMs ?? 30_000;
     for (const tool of createTvTools(opts.platform)) this.tools.register(tool);
+    for (const tool of opts.tools ?? []) this.tools.register(tool);
+    this.registerHelpTool();
+  }
+
+  /** A built-in tool so the user can ask "what can you do?". */
+  private registerHelpTool(): void {
+    this.tools.register({
+      spec: {
+        name: "help",
+        description: "List the things the assistant can do (the available tools).",
+        parameters: {},
+      },
+      execute: async () =>
+        this.tools.list()
+          .filter((s) => s.name !== "help")
+          .map((s) => ({ name: s.name, description: s.description })),
+    });
   }
 
   /** Expose the registry so hosts can register extra tools before running. */
@@ -65,6 +105,32 @@ export class Agent {
   /** Clear conversation history (e.g. when the user starts a new session). */
   reset(): void {
     this.ctx.reset();
+    if (this.opts.persistKey) void this.opts.platform.storage.delete(this.opts.persistKey);
+  }
+
+  /**
+   * Reload persisted history from `platform.storage` (requires `persistKey`).
+   * Returns true if history was restored. Call once at startup.
+   */
+  async restore(): Promise<boolean> {
+    if (!this.opts.persistKey) return false;
+    const raw = await this.opts.platform.storage.get(this.opts.persistKey);
+    if (!raw) return false;
+    try {
+      this.ctx.restore(JSON.parse(raw));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async persist(): Promise<void> {
+    if (!this.opts.persistKey) return;
+    try {
+      await this.opts.platform.storage.set(this.opts.persistKey, JSON.stringify(this.ctx.dump()));
+    } catch {
+      /* storage is best-effort; never fail a turn on persistence */
+    }
   }
 
   /**
@@ -84,7 +150,9 @@ export class Agent {
     runOpts.signal?.addEventListener("abort", onAbort, { once: true });
 
     try {
-      return await Promise.race([this.runLoop(userInput, deadline), deadline]);
+      const output = await Promise.race([this.runLoop(userInput, deadline), deadline]);
+      await this.persist();
+      return output;
     } catch (err) {
       this.events.emit("error", { error: err as Error });
       throw err;
@@ -118,6 +186,23 @@ export class Agent {
 
       for (const call of result.message.toolCalls ?? []) {
         this.events.emit("tool:call", { name: call.name, args: call.args });
+
+        // Confirmation gate for higher-impact tools (input switch, launch, …).
+        const spec = this.tools.getSpec(call.name);
+        if (spec?.confirm && this.opts.confirm) {
+          const approved = await this.opts.confirm({
+            name: call.name,
+            args: call.args,
+            description: spec.description,
+          });
+          if (!approved) {
+            const declined = { declined: true, error: "Action declined by the user." };
+            this.events.emit("tool:result", { name: call.name, result: declined });
+            this.ctx.add({ role: "tool", toolCallId: call.id, content: JSON.stringify(declined) });
+            continue;
+          }
+        }
+
         let toolResult: unknown;
         try {
           toolResult = await Promise.race([this.tools.call(call.name, call.args), deadline]);

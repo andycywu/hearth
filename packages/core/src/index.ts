@@ -1,7 +1,8 @@
-export { Agent, TurnTimeoutError, type AgentOptions } from "./agent/agent.js";
+export { Agent, TurnTimeoutError, type AgentOptions, type ConfirmRequest } from "./agent/agent.js";
 export {
   ToolRegistry,
   validateArgs,
+  defineTool,
   ToolValidationError,
   UnknownToolError,
   type Tool,

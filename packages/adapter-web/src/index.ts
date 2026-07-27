@@ -88,6 +88,7 @@ function createWebVoice(): VoicePipeline | undefined {
 
   const listeners = new Set<(text: string, isFinal: boolean) => void>();
   let recognition: any;
+  let wake: any;
 
   return {
     startListening: async () => {
@@ -109,6 +110,31 @@ function createWebVoice(): VoicePipeline | undefined {
       if (!synth || !w.SpeechSynthesisUtterance) return;
       synth.cancel();
       synth.speak(new w.SpeechSynthesisUtterance(text));
+    },
+    startWakeWord: async (phrase: string, onWake: () => void) => {
+      if (!SR) throw new Error("SpeechRecognition unavailable on this engine");
+      const needle = phrase.trim().toLowerCase();
+      wake = new SR();
+      wake.continuous = true;
+      wake.interimResults = true;
+      wake.onresult = (e: any) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const heard = String(e.results[i][0].transcript).toLowerCase();
+          if (heard.includes(needle)) {
+            try { wake.stop(); } catch { /* ignore */ }
+            onWake();
+            return;
+          }
+        }
+      };
+      // Some engines auto-stop; restart to keep listening until stopWakeWord.
+      wake.onend = () => { if (wake) { try { wake.start(); } catch { /* ignore */ } } };
+      wake.start();
+    },
+    stopWakeWord: async () => {
+      const w2 = wake;
+      wake = undefined;
+      try { w2?.stop?.(); } catch { /* ignore */ }
     },
   };
 }

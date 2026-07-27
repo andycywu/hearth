@@ -66,6 +66,7 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
       spec: {
         name: "set_input_source",
         description: "Switch the active input source.",
+        confirm: true,
         parameters: {
           source: {
             type: "string",
@@ -104,6 +105,7 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
         name: "launch_app",
         description:
           "Launch an installed application by its id. Resolve the id with search_app_by_name first if unsure.",
+        confirm: true,
         parameters: {
           appId: { type: "string", description: "Application id", required: true },
         },

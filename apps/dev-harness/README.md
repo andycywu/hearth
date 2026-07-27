@@ -8,8 +8,12 @@ pnpm dev          # builds, bundles, serves at http://localhost:5173
 ```
 
 Then type commands: `set volume to 30`, `mute`, `open Netflix`,
-`what's the volume?`, `switch to hdmi1`. The overlay shows streamed replies and
-tool activity; the status line shows the mock TV state changing.
+`launch it again`, `make it louder`, `what's the volume?`, `switch to hdmi1`. The
+overlay shows streamed replies and tool activity; a transcript logs the session
+and the status line shows the mock TV state changing.
+
+Open `http://localhost:5173/?diag` to run the capability self-diagnostic (the
+same probe the device builds use) instead of the chat UI.
 
 ## Point it at a real LLM
 Set globals before the bundle loads (e.g. in the browser console or by editing

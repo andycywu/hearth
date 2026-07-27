@@ -5,11 +5,16 @@
     <meta name="viewport" content="width=1920, height=1080" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'" />
     <title>TV AI Agent</title>
-    <link rel="stylesheet" href="style.css" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #05060a; color: #e8eefc; font-family: sans-serif; }
+      #app { display: flex; align-items: center; justify-content: center; height: 100%; }
+      #status { font-size: 32px; opacity: .9; }
+    </style>
+    <!-- webOS injects webOS.js at runtime; harmless to reference for local dev. -->
+    <script src="webOSTVjs/webOSTV.js"></script>
   </head>
   <body>
     <div id="app"><div id="status">TV AI Agent — starting…</div></div>
-    <!-- Bundled runtime: `pnpm build` output copied here by tools/bundle.mjs -->
     <script type="module" src="main.js"></script>
   </body>
 </html>

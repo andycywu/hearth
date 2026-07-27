@@ -21,11 +21,12 @@ export function createScriptedClient(opts: ScriptedClientOptions = {}): LlmClien
 
   function decide(messages: ChatMessage[]): CompletionResult {
     const last = messages[messages.length - 1];
-    if (!last) return finalText("Hi! Try: \"set volume to 30\" or \"open Netflix\".");
+    const lang = detectLang(lastUserText(messages) || (last?.role === "user" ? last.content : ""));
+    if (!last) return finalText(t("greeting", lang));
 
-    if (last.role === "tool") return followUp(last, messages);
-    if (last.role === "user") return fromUser(last.content, messages);
-    return finalText("Okay.");
+    if (last.role === "tool") return followUp(last, messages, lang);
+    if (last.role === "user") return fromUser(last.content, messages, lang);
+    return finalText(t("ok", lang));
   }
 
   return {
@@ -44,7 +45,7 @@ export function createScriptedClient(opts: ScriptedClientOptions = {}): LlmClien
 }
 
 // --- intent parsing from the user's message ---
-function fromUser(raw: string, messages: ChatMessage[]): CompletionResult {
+function fromUser(raw: string, messages: ChatMessage[], lang: Lang): CompletionResult {
   const text = raw.toLowerCase().trim();
 
   // Coreference: "launch it again", "open that", "再開一次" → relaunch the last
@@ -56,7 +57,7 @@ function fromUser(raw: string, messages: ChatMessage[]): CompletionResult {
   if (repeat) {
     const id = lastLaunchedAppId(messages);
     if (id) return toolCall("launch_app", { appId: id });
-    return finalText("What should I open?");
+    return finalText(t("whatOpen", lang));
   }
 
   const vol = text.match(/(?:volume|音量).*?(\d{1,3})|(\d{1,3}).*?(?:volume|音量)/);
@@ -66,7 +67,12 @@ function fromUser(raw: string, messages: ChatMessage[]): CompletionResult {
   }
   // Relative volume: read the current level first, then adjust in followUp.
   if (isLouder(text) || isQuieter(text)) return toolCall("get_volume", {});
-  if (/\b(volume|音量)\b\s*\??$/.test(text) || /what.*volume/.test(text)) {
+  if (
+    /\b(volume|音量)\b\s*\??$/.test(text) ||
+    /what.*volume/.test(text) ||
+    /音量.*(多少|幾|是多少)/.test(text) ||
+    /現在.*音量/.test(text)
+  ) {
     return toolCall("get_volume", {});
   }
   if (/\bunmute\b|取消靜音|開聲音/.test(text)) return toolCall("set_mute", { mute: false });
@@ -86,16 +92,16 @@ function fromUser(raw: string, messages: ChatMessage[]): CompletionResult {
     return toolCall("search_app_by_name", { query });
   }
 
-  return finalText("I can set volume, mute, switch input, or open an app. Try \"open Netflix\".");
+  return finalText(t("help", lang));
 }
 
 // --- decide what to do after a tool result comes back ---
-function followUp(toolMsg: ChatMessage, messages: ChatMessage[]): CompletionResult {
+function followUp(toolMsg: ChatMessage, messages: ChatMessage[], lang: Lang): CompletionResult {
   const data = safeParse(toolMsg.content);
 
   // An app search returned candidates → launch the first match.
   if (Array.isArray(data)) {
-    if (data.length === 0) return finalText("I couldn't find that app.");
+    if (data.length === 0) return finalText(t("notFound", lang));
     const first = data[0] as { id?: string; name?: string };
     if (first?.id) {
       // Only auto-launch if the user actually asked to open something.
@@ -103,7 +109,8 @@ function followUp(toolMsg: ChatMessage, messages: ChatMessage[]): CompletionResu
         (m) => m.role === "user" && /open|launch|play|watch|開|啟動|播放/i.test(m.content),
       );
       if (askedToOpen) return toolCall("launch_app", { appId: first.id });
-      return finalText(`Found: ${data.map((a: any) => a.name).join(", ")}.`);
+      const names = data.map((a: any) => a.name).join(", ");
+      return finalText(lang === "zh" ? `找到:${names}。` : `Found: ${names}.`);
     }
   }
 
@@ -112,27 +119,49 @@ function followUp(toolMsg: ChatMessage, messages: ChatMessage[]): CompletionResu
     // Order matters: mutating tools return { ok: true, ... }; read tools return
     // only the queried field. Check error/ok before the read-only fields so a
     // successful action reports "Done." rather than echoing its readback.
-    if (o.error) return finalText(`That didn't work: ${String(o.error)}`);
-    if (o.ok === true) return finalText("Done.");
+    if (o.error) return finalText(lang === "zh" ? `執行失敗:${String(o.error)}` : `That didn't work: ${String(o.error)}`);
+    if (o.ok === true) return finalText(t("done", lang));
     if (typeof o.volume === "number") {
       // Relative-volume flow: the get_volume readback came back — apply ±step.
       const lastUser = lastUserText(messages);
       if (isLouder(lastUser)) return toolCall("set_volume", { level: Math.min(100, o.volume + 10) });
       if (isQuieter(lastUser)) return toolCall("set_volume", { level: Math.max(0, o.volume - 10) });
-      return finalText(`The volume is ${o.volume}.`);
+      return finalText(lang === "zh" ? `目前音量是 ${o.volume}。` : `The volume is ${o.volume}.`);
     }
-    if (typeof o.muted === "boolean") return finalText(o.muted ? "Muted." : "Unmuted.");
-    if (typeof o.source === "string") return finalText(`Input is now ${o.source}.`);
+    if (typeof o.muted === "boolean") return finalText(o.muted ? t("muted", lang) : t("unmuted", lang));
+    if (typeof o.source === "string") return finalText(lang === "zh" ? `輸入源已切換為 ${o.source}。` : `Input is now ${o.source}.`);
   }
 
-  return finalText("Done.");
+  return finalText(t("done", lang));
 }
 
-function isLouder(t: string): boolean {
-  return /louder|turn it up|volume up|大聲|\bup\b.*volume|音量.*(調高|大)/.test(t);
+// --- tiny i18n for the offline brain's canned replies ---
+type Lang = "zh" | "en";
+function detectLang(s: string): Lang {
+  return /[一-鿿]/.test(s) ? "zh" : "en";
 }
-function isQuieter(t: string): boolean {
-  return /quieter|softer|turn it down|volume down|小聲|音量.*(調低|小)/.test(t);
+const STRINGS = {
+  greeting: { en: 'Hi! Try: "set volume to 30" or "open Netflix".', zh: '嗨!試試:「音量調到 30」或「開啟 Netflix」。' },
+  ok: { en: "Okay.", zh: "好的。" },
+  done: { en: "Done.", zh: "完成。" },
+  notFound: { en: "I couldn't find that app.", zh: "找不到那個應用程式。" },
+  whatOpen: { en: "What should I open?", zh: "你想開啟什麼?" },
+  muted: { en: "Muted.", zh: "已靜音。" },
+  unmuted: { en: "Unmuted.", zh: "已取消靜音。" },
+  help: {
+    en: 'I can set volume, mute, switch input, or open an app. Try "open Netflix".',
+    zh: '我可以調整音量、靜音、切換輸入源或開啟應用程式。試試「開啟 Netflix」。',
+  },
+};
+function t(key: keyof typeof STRINGS, lang: Lang): string {
+  return STRINGS[key][lang];
+}
+
+function isLouder(s: string): boolean {
+  return /louder|turn it up|volume up|大聲|\bup\b.*volume|音量.*(調高|大)/.test(s);
+}
+function isQuieter(s: string): boolean {
+  return /quieter|softer|turn it down|volume down|小聲|音量.*(調低|小)/.test(s);
 }
 function lastUserText(messages: ChatMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {

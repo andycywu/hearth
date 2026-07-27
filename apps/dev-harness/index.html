@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'" />
     <title>TV AI Agent — Dev Harness</title>
     <style>
       html, body { margin: 0; height: 100%; background: #05060a; color: #e8eefc; font-family: sans-serif; }
@@ -23,8 +24,10 @@
       <p class="hint">Offline scripted brain. Try: “set volume to 30”, “mute”, “open Netflix”, “what's the volume?”, “switch to hdmi1”.</p>
     </header>
     <input id="cmd" placeholder="Type a command and press Enter…" autofocus />
-    <button id="mic" hidden style="margin:0 32px;padding:12px 18px;font-size:18px;border-radius:8px;border:1px solid #2a2f3a;background:#0d1017;color:#e8eefc;cursor:pointer">🎤 Speak</button>
+    <button id="mic" hidden style="margin:0 8px 0 32px;padding:12px 18px;font-size:18px;border-radius:8px;border:1px solid #2a2f3a;background:#0d1017;color:#e8eefc;cursor:pointer">🎤 Speak</button>
+    <button id="wake" hidden style="margin:0 32px 0 0;padding:12px 18px;font-size:18px;border-radius:8px;border:1px solid #2a2f3a;background:#0d1017;color:#e8eefc;cursor:pointer">👂 Hands-free</button>
     <div id="state">booting…</div>
+    <div id="log" style="margin:16px 32px;font-size:16px;line-height:1.5;max-height:40vh;overflow:auto"></div>
     <script type="module" src="main.js"></script>
   </body>
 </html>

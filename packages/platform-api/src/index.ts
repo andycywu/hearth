@@ -89,6 +89,13 @@ export interface VoicePipeline {
   stopListening(): Promise<void>;
   onTranscript(cb: (text: string, isFinal: boolean) => void): () => void;
   speak(text: string): Promise<void>;
+  /**
+   * Optional hands-free wake word. Listens continuously for `phrase`; when heard,
+   * `onWake` fires (the adapter stops wake listening so a command can be
+   * captured). Adapters without wake support omit these.
+   */
+  startWakeWord?(phrase: string, onWake: () => void): Promise<void>;
+  stopWakeWord?(): Promise<void>;
 }
 
 export interface KeyValueStore {

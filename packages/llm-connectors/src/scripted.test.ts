@@ -65,6 +65,21 @@ describe("scripted client — full agent loop (offline)", () => {
     expect(await platform.system.getVolume()).toBe(40);
   });
 
+  it("replies in Chinese when the user writes Chinese", async () => {
+    const { platform, agent } = makeAgent();
+    const out = await agent.run("音量調到 30");
+    expect(await platform.system.getVolume()).toBe(30);
+    expect(out).toContain("完成");
+  });
+
+  it("reads volume back in Chinese", async () => {
+    const { agent } = makeAgent();
+    await agent.run("set volume to 42");
+    const out = await agent.run("現在音量多少?");
+    expect(out).toContain("42");
+    expect(out).toMatch(/音量/);
+  });
+
   it("resolves 'it' to the last launched app (coreference across turns)", async () => {
     const { agent } = makeAgent();
     await agent.run("open Netflix");

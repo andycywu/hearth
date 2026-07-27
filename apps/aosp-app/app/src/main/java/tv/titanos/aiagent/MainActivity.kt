@@ -20,7 +20,22 @@ class MainActivity : AppCompatActivity() {
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
-            webViewClient = WebViewClient()
+            // Hardening: the bundle is local; deny cross-origin file access and
+            // block the WebView from loading arbitrary remote content itself.
+            settings.allowFileAccessFromFileURLs = false
+            settings.allowUniversalAccessFromFileURLs = false
+            @Suppress("DEPRECATION")
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            webViewClient = object : WebViewClient() {
+                // Keep navigation inside the bundled asset origin.
+                override fun shouldOverrideUrlLoading(
+                    view: WebView, request: android.webkit.WebResourceRequest,
+                ): Boolean {
+                    val url = request.url.toString()
+                    return !url.startsWith("file:///android_asset/")
+                }
+            }
             // Expose the native bridge to JS as `TvNativeBridge`.
             addJavascriptInterface(TvNativeBridge(this@MainActivity), "TvNativeBridge")
         }

@@ -1,0 +1,19 @@
+{
+  "id": "tv.titanos.aiagent",
+  "version": "0.1.0",
+  "vendor": "TitanOS",
+  "type": "web",
+  "main": "index.html",
+  "title": "TV AI Agent",
+  "icon": "icon.png",
+  "largeIcon": "icon.png",
+  "iconColor": "#05060a",
+  "disableBackHistoryAPI": true,
+  "requiredPermissions": [
+    "audio.operation",
+    "settings.read",
+    "read.app.info",
+    "manage.app",
+    "internet"
+  ]
+}
