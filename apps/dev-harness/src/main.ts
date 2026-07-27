@@ -18,13 +18,15 @@ async function boot(): Promise<void> {
   const platform = createWebAdapter();
   await platform.init();
 
-  // Real endpoint if configured, otherwise the offline scripted brain.
-  const llm: LlmClient = window.__AGENT_LLM_BASE_URL__
-    ? createOpenAiCompatibleClient({
-        baseUrl: window.__AGENT_LLM_BASE_URL__,
-        model: window.__AGENT_LLM_MODEL__ ?? "local-tv-agent",
-        apiKey: window.__AGENT_LLM_API_KEY__,
-      })
+  // Endpoint config precedence: URL query (?llm=…&model=…) > window globals >
+  // offline scripted brain. The query form lets you point at a local model with
+  // no code edit, e.g. ?llm=http://127.0.0.1:11434/v1&model=llama3.2
+  const params = new URLSearchParams(location.search);
+  const baseUrl = params.get("llm") ?? window.__AGENT_LLM_BASE_URL__;
+  const model = params.get("model") ?? window.__AGENT_LLM_MODEL__ ?? "local-tv-agent";
+
+  const llm: LlmClient = baseUrl
+    ? createOpenAiCompatibleClient({ baseUrl, model, apiKey: window.__AGENT_LLM_API_KEY__ })
     : createScriptedClient();
 
   const agent = new Agent({ platform, llm });

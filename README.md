@@ -79,6 +79,15 @@ pnpm test           # run unit tests (vitest)
 node tools/demo.mjs # run the agent locally with the mock adapter
 ```
 
+Try the agent in a browser — no TV, no API key — with the offline dev harness:
+
+```bash
+pnpm dev   # serves http://localhost:5173 (type or speak commands)
+```
+
+To drive it with a real/local model, append `?llm=…` (see
+[`docs/on-device-inference.md`](docs/on-device-inference.md)).
+
 Building the device apps: see
 [`apps/tizen-app/README.md`](apps/tizen-app/README.md) and
 [`apps/aosp-app/README.md`](apps/aosp-app/README.md), plus the bring-up guides in

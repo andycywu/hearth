@@ -1,0 +1,46 @@
+name: Release
+on:
+  push:
+    tags: [ "v*" ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm bundle:all
+      - run: pnpm check:size
+
+      # Package the web runtime bundles (the OS-agnostic artifact). Signed .wgt
+      # and .apk are produced on tooling with the Tizen/Android SDKs — see
+      # docs/RELEASING.md — and can be attached to the release afterwards.
+      - name: Package web bundles
+        run: |
+          mkdir -p dist-release
+          cp apps/tizen-app/main.js dist-release/tizen-runtime.js
+          cp apps/aosp-app/app/src/main/assets/main.js dist-release/aosp-runtime.js
+          (cd dist-release && sha256sum *.js > SHA256SUMS)
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist-release/tizen-runtime.js
+            dist-release/aosp-runtime.js
+            dist-release/SHA256SUMS

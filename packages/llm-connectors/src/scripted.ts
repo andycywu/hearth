@@ -52,6 +52,8 @@ function fromUser(raw: string): CompletionResult {
     const level = Number(vol[1] ?? vol[2]);
     return toolCall("set_volume", { level });
   }
+  // Relative volume: read the current level first, then adjust in followUp.
+  if (isLouder(text) || isQuieter(text)) return toolCall("get_volume", {});
   if (/\b(volume|音量)\b\s*\??$/.test(text) || /what.*volume/.test(text)) {
     return toolCall("get_volume", {});
   }
@@ -100,12 +102,32 @@ function followUp(toolMsg: ChatMessage, messages: ChatMessage[]): CompletionResu
     // successful action reports "Done." rather than echoing its readback.
     if (o.error) return finalText(`That didn't work: ${String(o.error)}`);
     if (o.ok === true) return finalText("Done.");
-    if (typeof o.volume === "number") return finalText(`The volume is ${o.volume}.`);
+    if (typeof o.volume === "number") {
+      // Relative-volume flow: the get_volume readback came back — apply ±step.
+      const lastUser = lastUserText(messages);
+      if (isLouder(lastUser)) return toolCall("set_volume", { level: Math.min(100, o.volume + 10) });
+      if (isQuieter(lastUser)) return toolCall("set_volume", { level: Math.max(0, o.volume - 10) });
+      return finalText(`The volume is ${o.volume}.`);
+    }
     if (typeof o.muted === "boolean") return finalText(o.muted ? "Muted." : "Unmuted.");
     if (typeof o.source === "string") return finalText(`Input is now ${o.source}.`);
   }
 
   return finalText("Done.");
+}
+
+function isLouder(t: string): boolean {
+  return /louder|turn it up|volume up|大聲|\bup\b.*volume|音量.*(調高|大)/.test(t);
+}
+function isQuieter(t: string): boolean {
+  return /quieter|softer|turn it down|volume down|小聲|音量.*(調低|小)/.test(t);
+}
+function lastUserText(messages: ChatMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m && m.role === "user") return m.content.toLowerCase();
+  }
+  return "";
 }
 
 // --- helpers ---

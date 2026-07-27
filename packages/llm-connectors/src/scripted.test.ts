@@ -47,4 +47,21 @@ describe("scripted client — full agent loop (offline)", () => {
     await agent.run("mute");
     expect(await platform.system.getMute()).toBe(true);
   });
+
+  it("handles relative volume (louder): reads then adjusts (+10)", async () => {
+    const { platform, agent } = makeAgent();
+    await agent.run("set volume to 50");
+    const tools: string[] = [];
+    agent.events.on("tool:call", (e) => tools.push(e.name));
+    await agent.run("make it louder");
+    expect(tools).toEqual(["get_volume", "set_volume"]);
+    expect(await platform.system.getVolume()).toBe(60);
+  });
+
+  it("handles relative volume (quieter): reads then adjusts (-10)", async () => {
+    const { platform, agent } = makeAgent();
+    await agent.run("set volume to 50");
+    await agent.run("turn it down");
+    expect(await platform.system.getVolume()).toBe(40);
+  });
 });

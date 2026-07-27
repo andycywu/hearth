@@ -124,14 +124,15 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
 - Latency budget and performance profiling on the weakest target SoC.
 
 ### Phase 4 — On-device inference + open-source release (≈ weeks 12–16)
-- Stand up a localhost inference server on-device (e.g. llama.cpp / a vendor NPU
-  runtime) exposing the OpenAI-compatible schema the connector already speaks;
-  benchmark model size vs. RAM/latency on MTK and NVT.
+- ✅ Local/on-device inference wired: the connector speaks the OpenAI schema, the
+  dev harness accepts `?llm=` (Ollama/llama.cpp/vLLM), device entries default to
+  loopback. Guide: `docs/on-device-inference.md`. Remaining: benchmark model size
+  vs. RAM/latency on real MTK/NVT boards.
 - Privacy pass: keep sensitive commands on-device; document the cloud/on-device
   routing policy.
-- Open-source hygiene: security review, dependency/license audit, SBOM,
-  `SECURITY.md`, issue/PR templates, first tagged release `v0.1.0`, and a public
-  contribution guide. Publish the GitHub repo.
+- Open-source hygiene: ✅ Apache-2.0, `SECURITY.md`, `CONTRIBUTING`, issue/PR
+  templates, `CHANGELOG.md`, tag-driven **release workflow** + `docs/RELEASING.md`.
+  Remaining: security review, dependency/license audit, SBOM, cut `v0.1.0`.
 
 ## 3. Milestones & acceptance criteria
 
