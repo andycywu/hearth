@@ -21,6 +21,11 @@ export class ConversationContext {
     return [{ role: "system", content: this.systemPrompt }, ...this.messages];
   }
 
+  /** Number of stored (non-system) messages currently retained. */
+  get length(): number {
+    return this.messages.length;
+  }
+
   reset(): void {
     this.messages = [];
   }

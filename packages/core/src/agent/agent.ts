@@ -57,65 +57,81 @@ export class Agent {
     return this.tools;
   }
 
+  /** Number of retained conversation messages (excludes the system prompt). */
+  get historyLength(): number {
+    return this.ctx.length;
+  }
+
+  /** Clear conversation history (e.g. when the user starts a new session). */
+  reset(): void {
+    this.ctx.reset();
+  }
+
   /**
    * Run one user turn. Bounded by both `maxIterations` (tool-call rounds) and
    * `turnTimeoutMs` (wall clock). A caller AbortSignal can cancel early.
    */
   async run(userInput: string, runOpts: RunOptions = {}): Promise<string> {
-    const timeout = new AbortController();
-    const timer = setTimeout(() => timeout.abort(), this.turnTimeoutMs);
-    const signals = [timeout.signal, runOpts.signal].filter(Boolean) as AbortSignal[];
-    const aborted = () => signals.some((s) => s.aborted);
-
-    this.events.emit("turn:start", { input: userInput });
-    this.ctx.add({ role: "user", content: userInput });
+    // A deadline (and optional caller signal) that can reject the whole turn,
+    // even while it is awaiting a slow/hung LLM call — Promise.race is what makes
+    // the timeout actually interrupt, not just a between-steps check.
+    let onTimeout: ((e: Error) => void) | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      onTimeout = reject;
+    });
+    const timer = setTimeout(() => onTimeout?.(new TurnTimeoutError(this.turnTimeoutMs)), this.turnTimeoutMs);
+    const onAbort = () => onTimeout?.(new TurnTimeoutError(this.turnTimeoutMs));
+    runOpts.signal?.addEventListener("abort", onAbort, { once: true });
 
     try {
-      for (let i = 0; i < this.maxIterations; i++) {
-        if (aborted()) throw new TurnTimeoutError(this.turnTimeoutMs);
-
-        const req = { messages: this.ctx.toMessages(), tools: this.tools.list() };
-        const llm = this.opts.llm;
-        const result = llm.completeStream
-          ? await llm.completeStream(req, {
-              onContentDelta: (delta) => this.events.emit("token", { delta }),
-            })
-          : await llm.complete(req);
-        this.ctx.add(result.message);
-
-        if (!result.wantsToolCalls) {
-          const output = result.message.content;
-          this.events.emit("turn:end", { output });
-          return output;
-        }
-
-        for (const call of result.message.toolCalls ?? []) {
-          if (aborted()) throw new TurnTimeoutError(this.turnTimeoutMs);
-          this.events.emit("tool:call", { name: call.name, args: call.args });
-          let toolResult: unknown;
-          try {
-            toolResult = await this.tools.call(call.name, call.args);
-          } catch (err) {
-            // Tool errors are fed back to the model as structured results so it
-            // can recover (e.g. re-resolve an app id), rather than aborting.
-            toolResult = { error: (err as Error).message, tool: call.name };
-          }
-          this.events.emit("tool:result", { name: call.name, result: toolResult });
-          this.ctx.add({
-            role: "tool",
-            toolCallId: call.id,
-            content: JSON.stringify(toolResult),
-          });
-        }
-      }
-      const msg = "Reached the maximum number of tool iterations for this turn.";
-      this.events.emit("turn:end", { output: msg });
-      return msg;
+      return await Promise.race([this.runLoop(userInput, deadline), deadline]);
     } catch (err) {
       this.events.emit("error", { error: err as Error });
       throw err;
     } finally {
       clearTimeout(timer);
+      runOpts.signal?.removeEventListener("abort", onAbort);
     }
+  }
+
+  private async runLoop(userInput: string, deadline: Promise<never>): Promise<string> {
+    this.events.emit("turn:start", { input: userInput });
+    this.ctx.add({ role: "user", content: userInput });
+
+    for (let i = 0; i < this.maxIterations; i++) {
+      const req = { messages: this.ctx.toMessages(), tools: this.tools.list() };
+      const llm = this.opts.llm;
+      // Race the LLM call against the deadline so a hung call is interrupted.
+      const result = await Promise.race([
+        llm.completeStream
+          ? llm.completeStream(req, { onContentDelta: (delta) => this.events.emit("token", { delta }) })
+          : llm.complete(req),
+        deadline,
+      ]);
+      this.ctx.add(result.message);
+
+      if (!result.wantsToolCalls) {
+        const output = result.message.content;
+        this.events.emit("turn:end", { output });
+        return output;
+      }
+
+      for (const call of result.message.toolCalls ?? []) {
+        this.events.emit("tool:call", { name: call.name, args: call.args });
+        let toolResult: unknown;
+        try {
+          toolResult = await Promise.race([this.tools.call(call.name, call.args), deadline]);
+        } catch (err) {
+          // Tool errors are fed back to the model as structured results so it
+          // can recover (e.g. re-resolve an app id), rather than aborting.
+          toolResult = { error: (err as Error).message, tool: call.name };
+        }
+        this.events.emit("tool:result", { name: call.name, result: toolResult });
+        this.ctx.add({ role: "tool", toolCallId: call.id, content: JSON.stringify(toolResult) });
+      }
+    }
+    const msg = "Reached the maximum number of tool iterations for this turn.";
+    this.events.emit("turn:end", { output: msg });
+    return msg;
   }
 }

@@ -30,8 +30,30 @@ async function boot(): Promise<void> {
   const agent = new Agent({ platform, llm });
   const ui = mountAgentOverlay(agent);
 
+  // Optional voice: speak replies and accept spoken commands when supported.
+  if (platform.has("voice") && platform.voice) {
+    const voice = platform.voice;
+    agent.events.on("turn:end", ({ output }) => { void voice.speak(output); });
+    const mic = document.getElementById("mic") as HTMLButtonElement | null;
+    if (mic) {
+      mic.hidden = false;
+      let listening = false;
+      voice.onTranscript((text, isFinal) => {
+        if (input) input.value = text;
+        if (isFinal) { listening = false; mic.textContent = "🎤 Speak"; void ui.ask(text); }
+      });
+      mic.addEventListener("click", async () => {
+        if (listening) { await voice.stopListening(); listening = false; mic.textContent = "🎤 Speak"; return; }
+        listening = true; mic.textContent = "● Listening…";
+        try { await voice.startListening(); }
+        catch { listening = false; mic.textContent = "🎤 Speak"; }
+      });
+    }
+  }
+
   if (state) {
-    state.textContent = `ready · ${platform.device.model} · llm=${llm.id} · volume=${await platform.system.getVolume()}`;
+    const v = platform.has("voice") ? "voice✓" : "voice✗";
+    state.textContent = `ready · ${platform.device.model} · llm=${llm.id} · ${v} · volume=${await platform.system.getVolume()}`;
   }
 
   input?.addEventListener("keydown", async (e) => {

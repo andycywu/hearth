@@ -117,8 +117,10 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
   harness.
 - Swap the view layer to **Lightning 3 / Blits** (WebGL) for low-end MTK/NVT
   GPUs, reusing the same event wiring; keep the DOM overlay as fallback.
-- Wire the optional `VoicePipeline` HAL (wake word / ASR / TTS) where the
-  platform provides it (Web Speech API in the browser); degrade via `has("voice")`.
+- ✅ Optional `VoicePipeline` HAL implemented in the web adapter via the Web
+  Speech API (ASR + TTS), feature-detected and surfaced through `has("voice")`;
+  the dev harness shows a mic button and speaks replies. Native wake-word / ASR
+  on Tizen/AOSP still to wire per platform.
 - Latency budget and performance profiling on the weakest target SoC.
 
 ### Phase 4 — On-device inference + open-source release (≈ weeks 12–16)

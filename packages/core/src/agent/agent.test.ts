@@ -55,4 +55,29 @@ describe("Agent", () => {
     const out = await agent.run("turn it up a bit");
     expect(out).toContain("25");
   });
+
+  it("retains history across turns and clears it on reset", async () => {
+    const llm: LlmClient = {
+      id: "echo",
+      complete: async (): Promise<CompletionResult> => ({
+        wantsToolCalls: false,
+        message: { role: "assistant", content: "ok" },
+      }),
+    };
+    const agent = new Agent({ platform: fakePlatform(), llm });
+    await agent.run("first");
+    await agent.run("second");
+    expect(agent.historyLength).toBeGreaterThan(0);
+    agent.reset();
+    expect(agent.historyLength).toBe(0);
+  });
+
+  it("aborts a turn that exceeds the time budget", async () => {
+    const slowLlm: LlmClient = {
+      id: "slow",
+      complete: () => new Promise(() => { /* never resolves */ }),
+    };
+    const agent = new Agent({ platform: fakePlatform(), llm: slowLlm, turnTimeoutMs: 20 });
+    await expect(agent.run("hang")).rejects.toThrow(/time budget/i);
+  });
 });

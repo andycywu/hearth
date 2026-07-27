@@ -1,7 +1,7 @@
 import {
   matchAppsByName,
   type PlatformProvider, type DeviceInfo, type AppEntry,
-  type InputSource, type RemoteKey,
+  type InputSource, type RemoteKey, type VoicePipeline,
 } from "@tv-ai-agent/platform-api";
 
 /**
@@ -21,13 +21,16 @@ export function createWebAdapter(): PlatformProvider {
     ] as AppEntry[],
   };
 
+  const voice = createWebVoice();
+
   const device: DeviceInfo = {
     os: "web", osVersion: navigatorVersion(), soc: "unknown", model: "dev-browser",
-    capabilities: { media: true, voice: false },
+    capabilities: { media: true, voice: voice !== undefined },
   };
 
   const provider: PlatformProvider = {
     device,
+    voice,
     system: {
       getVolume: async () => state.volume,
       setVolume: async (l) => { state.volume = clamp(l); },
@@ -68,4 +71,44 @@ export function createWebAdapter(): PlatformProvider {
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 function navigatorVersion(): string {
   return typeof navigator !== "undefined" ? navigator.userAgent : "node";
+}
+
+/**
+ * Browser voice pipeline via the Web Speech API (SpeechRecognition + speech
+ * synthesis). Feature-detected: returns undefined in Node/CI and on engines
+ * without support, so the adapter reports voice unavailable via `has("voice")`.
+ * This gives the dev harness real speech-in/out with no extra dependencies.
+ */
+function createWebVoice(): VoicePipeline | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as any;
+  const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+  const synth: any = w.speechSynthesis;
+  if (!SR && !synth) return undefined;
+
+  const listeners = new Set<(text: string, isFinal: boolean) => void>();
+  let recognition: any;
+
+  return {
+    startListening: async () => {
+      if (!SR) throw new Error("SpeechRecognition unavailable on this engine");
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.onresult = (e: any) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i];
+          listeners.forEach((cb) => cb(r[0].transcript, r.isFinal));
+        }
+      };
+      recognition.start();
+    },
+    stopListening: async () => { recognition?.stop?.(); },
+    onTranscript: (cb) => { listeners.add(cb); return () => { listeners.delete(cb); }; },
+    speak: async (text: string) => {
+      if (!synth || !w.SpeechSynthesisUtterance) return;
+      synth.cancel();
+      synth.speak(new w.SpeechSynthesisUtterance(text));
+    },
+  };
 }
