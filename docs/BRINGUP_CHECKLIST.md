@@ -7,6 +7,10 @@ result goes into [`platform/capability-matrix.md`](platform/capability-matrix.md
 The bar to hit is the same script the automated cross-target test already proves
 in CI (`packages/acceptance`): the on-device run must match it.
 
+> **Doing a POC?** You can avoid vendor signatures entirely — start on emulators,
+> scope to public capabilities, and only self-sign on your own eng board later.
+> See [`POC.md`](POC.md); skip the privileged/signing steps below.
+
 > Menu paths / SDK flags vary by firmware year — treat the linked official docs
 > as authoritative if a command differs.
 

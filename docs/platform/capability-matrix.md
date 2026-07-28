@@ -1,6 +1,10 @@
 # Capability matrix (fill during Phase 2 bring-up)
 
-Legend: ✅ works · ⚠️ needs vendor SDK / system privilege · ❔ untested · ➖ n/a
+Legend: ✅ works · ⚠️ needs partner/platform/system signing · ❔ untested · ➖ n/a
+
+**POC-safe rows (no signing needed):** volume, mute, list/launch apps, network,
+navigation, media. The ⚠️ rows (input source, key injection, power standby) are
+deferred until a self-signed eng board — see [`../POC.md`](../POC.md).
 
 | Capability        | AOSP+MTK | AOSP+NVT | Tizen+MTK | Tizen+NVT |
 |-------------------|----------|----------|-----------|-----------|
