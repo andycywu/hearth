@@ -15,7 +15,8 @@ pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm bundle:all && pnp
 - [x] [A2 — Extract a shared view-model; make Blits a first-class renderer](A2-blits-ui-package.md) —
   done: `createAgentViewModel` + tests; all three renderers consume it.
 - [x] [A3 — Raise test coverage](A3-test-coverage.md) — done: 54 → 105 tests.
-- [A4 — Wire voice + confirm into device app entries](A4-device-entries.md)
+- [x] [A4 — Wire voice + confirm into device app entries](A4-device-entries.md) —
+  done via shared `createConfirmHandler()` / `speakReplies()`.
 - [A5 — Skill tutorial + example skill](A5-skill-tutorial.md)
 - [A6 — Nice-to-haves (badges, bench, i18n)](A6-nice-to-haves.md)
 

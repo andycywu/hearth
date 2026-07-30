@@ -11,7 +11,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tv-ai-agent/core": "workspace:*"
+    "@tv-ai-agent/core": "workspace:*",
+    "@tv-ai-agent/platform-api": "workspace:*"
   },
   "license": "Apache-2.0"
 }

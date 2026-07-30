@@ -34,6 +34,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   implements `draw`. Blits is now a first-class renderer without adding Vite or
   Blits to `packages/*`.
 
+- `createConfirmHandler()` and `speakReplies()` in `@tv-ai-agent/ui`, and all
+  three device hosts (Tizen / AOSP / webOS) now use them: high-impact tools are
+  gated before they fire on a real TV, and replies are spoken where the platform
+  advertises voice. The dev harness uses the same two helpers, so "parity with
+  the harness" is now shared code rather than a copy per host.
 - Test coverage raised from 54 to 105: TV tool behaviour and media capability
   gating, diagnostics write/restore and navigation-readiness paths, AOSP
   accessibility gating, webOS Luna mapping, OpenAI request/message mapping, and

@@ -85,11 +85,12 @@ Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6.
   fixed a real bug: the AOSP adapter's "not found" guard was unreachable
   (`ReferenceError` came first).
 
-- [ ] **A4. Wire voice + confirm into the device app entries.** `apps/tizen-app`,
-  `apps/aosp-app/web`, `apps/webos-app` mains currently create the Agent without
-  the `confirm` handler or voice UI that the dev harness has. Add a minimal
-  confirm handler and (where `has("voice")`) speak replies. *Acceptance:* bundles
-  build; behaviour parity with the dev harness.
+- [x] **A4. Wire voice + confirm into the device app entries.** *Done.* Added
+  `createConfirmHandler()` / `speakReplies()` to `@tv-ai-agent/ui` (11 tests) and
+  wired all three device hosts plus the dev harness to them, so the parity is
+  shared code, not three copies. The handler uses `window.confirm` where the
+  engine has one and otherwise logs and approves (configurable via `fallback`),
+  so a turn can't stall on an invisible dialog. All bundles build within budget.
 
 - [ ] **A5. Skill tutorial + example skill** (was deferred by the owner —
   confirm before doing). Write `docs/skills.md` ("write a cross-vendor skill")

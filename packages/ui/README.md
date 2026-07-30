@@ -39,6 +39,26 @@ live text.
 That is the whole contract a new view layer has to satisfy: all three renderers
 in this repo (DOM overlay, 2D canvas, Blits WebGL) differ only in `draw`.
 
+## Device-host helpers (confirm + spoken replies)
+The two things every host needs beyond drawing, so the Tizen / AOSP / webOS
+entries don't each grow their own copy:
+
+```ts
+import { createConfirmHandler, speakReplies } from "@tv-ai-agent/ui";
+
+const agent = new Agent({ platform, llm, confirm: createConfirmHandler() });
+speakReplies(agent, platform);   // no-op unless platform.has("voice")
+```
+
+`createConfirmHandler()` gates the tools whose spec sets `confirm: true`
+(`set_input_source`, `launch_app`). It asks via `window.confirm` by default; pass
+`ask` to swap in a focusable 10-foot dialog, and `fallback: false` to deny
+instead of approve on engines that provide no dialog at all. Without a handler,
+`Agent` runs confirm-required tools unprompted.
+
+`speakReplies` speaks each turn's final output and returns an unsubscribe. TTS
+failures are swallowed — speech must never break a turn.
+
 ## Single-surface canvas renderer
 `mountAgentCanvas(agent)` draws everything onto one `<canvas>` (2D context) from
 the **same view-model** — no DOM reflow, which is the pattern that keeps a

@@ -1,6 +1,7 @@
 import { Agent, runDiagnostics, reportToMarkdown } from "@tv-ai-agent/core";
 import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
 import { createOpenAiCompatibleClient } from "@tv-ai-agent/llm-connectors";
+import { createConfirmHandler, speakReplies } from "@tv-ai-agent/ui";
 
 declare global {
   interface Window {
@@ -30,7 +31,10 @@ async function boot(): Promise<void> {
     model: window.__AGENT_LLM_MODEL__ ?? "local-tv-agent",
   });
 
-  const agent = new Agent({ platform, llm });
+  // Parity with the dev harness: gate the high-impact tools and speak replies
+  // when the device has a voice pipeline.
+  const agent = new Agent({ platform, llm, confirm: createConfirmHandler() });
+  speakReplies(agent, platform);
   window.__tvAgent = agent;
   console.info(`[aosp] agent ready on ${platform.device.model} (${platform.device.soc})`);
 }

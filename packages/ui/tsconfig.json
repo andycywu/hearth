@@ -3,5 +3,5 @@
   "compilerOptions": { "composite": true, "outDir": "dist", "rootDir": "src" },
   "include": ["src/**/*"],
   "exclude": ["src/**/*.test.ts", "dist"],
-  "references": [{ "path": "../core" }]
+  "references": [{ "path": "../core" }, { "path": "../platform-api" }]
 }

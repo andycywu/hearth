@@ -1,6 +1,8 @@
 import { Agent, runDiagnostics, reportToMarkdown, type LlmClient } from "@tv-ai-agent/core";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
-import { mountAgentOverlay, mountAgentCanvas } from "@tv-ai-agent/ui";
+import {
+  mountAgentOverlay, mountAgentCanvas, createConfirmHandler, speakReplies,
+} from "@tv-ai-agent/ui";
 import { createScriptedClient, createOpenAiCompatibleClient } from "@tv-ai-agent/llm-connectors";
 
 declare global {
@@ -46,8 +48,8 @@ async function boot(): Promise<void> {
     platform,
     llm,
     // Demonstrate the confirmation gate: confirm-required tools (launch app,
-    // switch input) prompt before running.
-    confirm: (req) => window.confirm(`Allow ${req.name}(${JSON.stringify(req.args)})?`),
+    // switch input) prompt before running. Same handler the device hosts use.
+    confirm: createConfirmHandler(),
   });
   // ?render=canvas uses the single-surface canvas renderer instead of the DOM overlay.
   const ui = params.get("render") === "canvas"
@@ -74,9 +76,9 @@ async function boot(): Promise<void> {
   }
 
   // Optional voice: speak replies and accept spoken commands when supported.
+  speakReplies(agent, platform);
   if (platform.has("voice") && platform.voice) {
     const voice = platform.voice;
-    agent.events.on("turn:end", ({ output }) => { void voice.speak(output); });
     const mic = document.getElementById("mic") as HTMLButtonElement | null;
     let listening = false;
     async function startCapture(): Promise<void> {

@@ -1,6 +1,7 @@
 import { Agent, runDiagnostics, reportToMarkdown } from "@tv-ai-agent/core";
 import { createTizenAdapter } from "@tv-ai-agent/adapter-tizen";
 import { createOpenAiCompatibleClient } from "@tv-ai-agent/llm-connectors";
+import { createConfirmHandler, speakReplies } from "@tv-ai-agent/ui";
 
 declare global {
   interface Window {
@@ -28,8 +29,11 @@ async function boot(): Promise<void> {
       model: window.__AGENT_LLM_MODEL__ ?? "local-tv-agent",
     });
 
-    const agent = new Agent({ platform, llm });
-    window.__tvAgent = agent; // UI shell / voice pipeline attach here
+    // Parity with the dev harness: gate the high-impact tools and speak replies
+    // when the device has a voice pipeline.
+    const agent = new Agent({ platform, llm, confirm: createConfirmHandler() });
+    speakReplies(agent, platform);
+    window.__tvAgent = agent; // UI shell attaches here
     if (status) status.textContent = `Ready on ${platform.device.model} (${platform.device.soc})`;
   } catch (e) {
     if (status) status.textContent = "Boot error: " + (e as Error).message;
