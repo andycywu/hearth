@@ -7,6 +7,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+
+Device bring-up (Phase 2 tooling):
+- `resolveLlmEndpoint()` — one precedence rule (`?llm=`/`?model=`/`?key=` → window
+  globals → default) shared by all four hosts, so a **shipped** `.wgt`/APK/`.ipk`
+  can be repointed at another model by relaunching with a query string instead of
+  being rebuilt. The docs already promised `?llm=` on device; now it works.
+- `tools/mock-llm-server.mjs` — serves the offline scripted brain as an
+  OpenAI-compatible endpoint, so an on-device run uses the exact decisions the CI
+  acceptance test asserts (`adb reverse` keeps it inside the app's CSP).
+- `tools/device-acceptance.mjs` — runs the `packages/acceptance` script against a
+  real/emulated Android device over the Chrome DevTools Protocol and compares the
+  tool sequence and end state to the CI baseline. No dependencies; no manual typing.
+- `?confirm=auto|deny` bring-up override (`confirmOverrideFromUrl`), logged loudly,
+  so an automated run isn't blocked on a native dialog.
+- `?diag` now also prints the report to the console, so bring-up can copy it off
+  the device (`adb logcat -s chromium:I`, Web Inspector, `ares-inspect`) instead of
+  reading a screenshot.
+- Hosts expose `window.__tvPlatform` alongside `window.__tvAgent` so a device run
+  can assert real device state.
 - Custom tool extension point (`AgentOptions.tools`, `defineTool`) and a built-in
   `help` tool.
 - Conversation persistence via `platform.storage` (`persistKey` + `restore()`).
@@ -68,6 +87,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   behaviour unchanged.
 
 ### Fixed
+- AOSP: the WebView had no `WebChromeClient`, so `window.confirm()` was silently
+  cancelled — every confirm-required tool (switch input, launch app) looked as if
+  a user had declined it without ever being asked. The host now shows a real,
+  remote-focusable `AlertDialog` for JS confirm/alert.
 - AOSP host crashed on launch: `AppCompatActivity` had no `Theme.AppCompat`
   theme. Added `Theme.TvAiAgent` (no action bar, black window background).
 - `createAospAdapter()` threw a bare `ReferenceError: TvNativeBridge is not

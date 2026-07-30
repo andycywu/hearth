@@ -2,8 +2,11 @@ package tv.titanos.aiagent
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.webkit.JsResult
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 /**
@@ -38,6 +41,34 @@ class MainActivity : AppCompatActivity() {
                 ): Boolean {
                     val url = request.url.toString()
                     return !url.startsWith("file:///android_asset/")
+                }
+            }
+            // Without a WebChromeClient, a WebView silently cancels JS dialogs —
+            // window.confirm() returns false, so every confirm-required tool
+            // (switch input, launch app) would appear to be declined by a user
+            // who was never asked. Render a real, remote-focusable dialog instead.
+            webChromeClient = object : WebChromeClient() {
+                override fun onJsConfirm(
+                    view: WebView?, url: String?, message: String?, result: JsResult,
+                ): Boolean {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setMessage(message ?: "")
+                        .setPositiveButton(android.R.string.ok) { _, _ -> result.confirm() }
+                        .setNegativeButton(android.R.string.cancel) { _, _ -> result.cancel() }
+                        .setOnCancelListener { result.cancel() }
+                        .show()
+                    return true
+                }
+
+                override fun onJsAlert(
+                    view: WebView?, url: String?, message: String?, result: JsResult,
+                ): Boolean {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setMessage(message ?: "")
+                        .setPositiveButton(android.R.string.ok) { _, _ -> result.confirm() }
+                        .setOnCancelListener { result.cancel() }
+                        .show()
+                    return true
                 }
             }
             // Expose the native bridge to JS as `TvNativeBridge`.

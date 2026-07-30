@@ -3,7 +3,9 @@ import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 import {
   mountAgentOverlay, mountAgentCanvas, createConfirmHandler, speakReplies,
 } from "@tv-ai-agent/ui";
-import { createScriptedClient, createOpenAiCompatibleClient } from "@tv-ai-agent/llm-connectors";
+import {
+  createScriptedClient, createOpenAiCompatibleClient, resolveLlmEndpoint,
+} from "@tv-ai-agent/llm-connectors";
 import { createWeatherTool } from "@tv-ai-agent/skills-example";
 import type { Tool } from "@tv-ai-agent/core";
 
@@ -38,12 +40,17 @@ async function boot(): Promise<void> {
   // Endpoint config precedence: URL query (?llm=…&model=…) > window globals >
   // offline scripted brain. The query form lets you point at a local model with
   // no code edit, e.g. ?llm=http://127.0.0.1:11434/v1&model=llama3.2
+  // Same resolver the device hosts use — no default here, so with nothing
+  // configured we fall back to the offline brain instead of a dead endpoint.
   const params = new URLSearchParams(location.search);
-  const baseUrl = params.get("llm") ?? window.__AGENT_LLM_BASE_URL__;
-  const model = params.get("model") ?? window.__AGENT_LLM_MODEL__ ?? "local-tv-agent";
+  const endpoint = resolveLlmEndpoint();
 
-  const llm: LlmClient = baseUrl
-    ? createOpenAiCompatibleClient({ baseUrl, model, apiKey: window.__AGENT_LLM_API_KEY__ })
+  const llm: LlmClient = endpoint.baseUrl
+    ? createOpenAiCompatibleClient({
+        baseUrl: endpoint.baseUrl,
+        model: endpoint.model,
+        ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
+      })
     : createScriptedClient();
 
   // `?skills=weather` registers the example cross-vendor skill (docs/skills.md).

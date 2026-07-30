@@ -59,6 +59,28 @@ export function speakReplies(agent: Agent, platform: PlatformProvider): () => vo
   });
 }
 
+/**
+ * Bring-up override read from the page URL: `?confirm=auto` approves every gated
+ * tool and `?confirm=deny` declines every one, both without a dialog. Returns
+ * undefined when the flag is absent, so the host keeps its normal handler.
+ *
+ * This exists because an automated device run (`tools/device-acceptance.mjs`)
+ * can't press a button on a native dialog. It is deliberately explicit and
+ * logged: an auto-approving build must never be mistaken for the default.
+ */
+export function confirmOverrideFromUrl(
+  search = typeof location !== "undefined" ? location.search : "",
+): ((req: ConfirmRequest) => boolean) | undefined {
+  const mode = new URLSearchParams(search).get("confirm");
+  if (mode !== "auto" && mode !== "deny") return undefined;
+  const approve = mode === "auto";
+  console.info(`[confirm] bring-up override active: ?confirm=${mode} — every gated tool is auto-${approve ? "approved" : "declined"}`);
+  return (req: ConfirmRequest) => {
+    console.info(`[confirm] ${approve ? "approved" : "declined"} ${req.name}`);
+    return approve;
+  };
+}
+
 function defaultAsk(): ((question: string) => boolean) | undefined {
   const w = typeof window !== "undefined" ? (window as Window & { confirm?: unknown }) : undefined;
   return typeof w?.confirm === "function" ? (q: string) => window.confirm(q) : undefined;

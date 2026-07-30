@@ -2,6 +2,7 @@ export { mountAgentOverlay, type OverlayOptions, type OverlayController } from "
 export { mountAgentCanvas, type CanvasOptions, type CanvasController } from "./canvas.js";
 export {
   createConfirmHandler,
+  confirmOverrideFromUrl,
   speakReplies,
   type ConfirmHandlerOptions,
 } from "./device-ux.js";

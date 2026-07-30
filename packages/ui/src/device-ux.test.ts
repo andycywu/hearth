@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { EventBus, type AgentEvents } from "@tv-ai-agent/core";
 import type { Agent, ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider, VoicePipeline } from "@tv-ai-agent/platform-api";
-import { createConfirmHandler, speakReplies } from "./device-ux.js";
+import { createConfirmHandler, confirmOverrideFromUrl, speakReplies } from "./device-ux.js";
 
 const request = (over: Partial<ConfirmRequest> = {}): ConfirmRequest => ({
   name: "set_input_source",
@@ -68,6 +68,28 @@ describe("createConfirmHandler", () => {
     } finally {
       delete (globalThis as any).window;
     }
+  });
+});
+
+describe("confirmOverrideFromUrl", () => {
+  it("stays out of the way unless the flag is present", () => {
+    expect(confirmOverrideFromUrl("")).toBeUndefined();
+    expect(confirmOverrideFromUrl("?diag&llm=http://x/v1")).toBeUndefined();
+  });
+
+  it("auto-approves with ?confirm=auto so an automated device run can proceed", async () => {
+    const handler = confirmOverrideFromUrl("?confirm=auto&llm=http://x/v1");
+    expect(await handler!(request())).toBe(true);
+  });
+
+  it("auto-declines with ?confirm=deny", async () => {
+    expect(await confirmOverrideFromUrl("?confirm=deny")!(request())).toBe(false);
+  });
+
+  it("ignores an unrecognised value rather than guessing", () => {
+    // Falling back to the real handler is the safe reading of ?confirm=yes.
+    expect(confirmOverrideFromUrl("?confirm=yes")).toBeUndefined();
+    expect(confirmOverrideFromUrl("?confirm=")).toBeUndefined();
   });
 });
 
