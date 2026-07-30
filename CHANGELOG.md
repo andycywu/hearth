@@ -28,6 +28,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - LLM connector **retry/backoff** for transient failures (network / 5xx / 429).
 - Gradle wrapper (8.7) for `apps/aosp-app` so the Android host builds with one
   command; the debug APK now compiles against the Android SDK.
+- Shared, DOM-free **agent view-model** (`createAgentViewModel`) in
+  `@tv-ai-agent/ui` — one tested reducer over the agent events, consumed by all
+  three renderers (DOM overlay, 2D canvas, Blits WebGL), so a new view layer only
+  implements `draw`. Blits is now a first-class renderer without adding Vite or
+  Blits to `packages/*`.
+
+### Changed
+- `mountAgentOverlay` / `mountAgentCanvas` render the shared view-model instead
+  of each subscribing to the agent bus themselves; public signatures and visual
+  behaviour unchanged.
 
 ### Fixed
 - AOSP host crashed on launch: `AppCompatActivity` had no `Theme.AppCompat`

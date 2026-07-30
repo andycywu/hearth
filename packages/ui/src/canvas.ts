@@ -1,6 +1,7 @@
 import type { Agent } from "@tv-ai-agent/core";
-import { formatToolCall, truncate } from "./format.js";
+import { truncate } from "./format.js";
 import { wrapLines } from "./wrap.js";
+import { createAgentViewModel, type AgentViewState } from "./view-model.js";
 
 export interface CanvasOptions {
   /** Element to mount into. Defaults to document.body. */
@@ -20,7 +21,7 @@ export interface CanvasController {
  * overlay that draws everything onto one canvas, avoiding DOM reflow. This is
  * the pattern that keeps a 10-foot UI smooth on low-end MTK/NVT GPUs; the
  * production path replaces the 2D context with a WebGL renderer (Lightning 3 /
- * Blits) while reusing the identical agent-event wiring below.
+ * Blits) while consuming the same `createAgentViewModel` state.
  */
 export function mountAgentCanvas(agent: Agent, opts: CanvasOptions = {}): CanvasController {
   if (typeof document === "undefined") {
@@ -38,7 +39,8 @@ export function mountAgentCanvas(agent: Agent, opts: CanvasOptions = {}): Canvas
   const ctx = canvas.getContext("2d")!;
   ctx.scale(dpr, dpr);
 
-  const state = { reply: "", activity: "", error: "" };
+  const vm = createAgentViewModel(agent);
+  let state: AgentViewState = vm.snapshot();
   let raf = 0;
   const schedule = () => {
     if (raf) return;
@@ -78,23 +80,16 @@ export function mountAgentCanvas(agent: Agent, opts: CanvasOptions = {}): Canvas
     }
   }
 
-  const unsub: Array<() => void> = [];
-  unsub.push(agent.events.on("turn:start", () => { state.reply = ""; state.activity = ""; state.error = ""; schedule(); }));
-  unsub.push(agent.events.on("token", ({ delta }) => { state.reply += delta; schedule(); }));
-  unsub.push(agent.events.on("tool:call", ({ name, args }) => { state.activity = formatToolCall(name, args); schedule(); }));
-  unsub.push(agent.events.on("turn:end", ({ output }) => {
-    if (!state.reply) state.reply = output;
-    state.activity = "";
-    schedule();
-  }));
-  unsub.push(agent.events.on("error", ({ error }) => { state.error = error.message; schedule(); }));
+  // One coalesced repaint per frame, however many events arrived — token streams
+  // fire far faster than the panel refreshes.
+  vm.subscribe((next) => { state = next; schedule(); });
 
   draw();
 
   return {
     ask: async (input: string) => { await agent.run(input); },
     destroy: () => {
-      unsub.forEach((u) => u());
+      vm.destroy();
       if (raf) cancelAnimationFrame(raf);
       canvas.remove();
     },

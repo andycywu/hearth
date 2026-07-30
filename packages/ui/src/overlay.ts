@@ -1,5 +1,6 @@
 import type { Agent } from "@tv-ai-agent/core";
-import { formatToolCall, truncate } from "./format.js";
+import { truncate } from "./format.js";
+import { createAgentViewModel, type AgentViewState } from "./view-model.js";
 
 export interface OverlayOptions {
   /** Element to mount into. Defaults to document.body. */
@@ -15,13 +16,11 @@ export interface OverlayController {
 }
 
 /**
- * Minimal, dependency-free 10-foot overlay. It subscribes to the agent's event
- * bus and renders status, streamed tokens and tool activity. This is the DOM
- * reference view; on very low-end MTK/NVT GPUs swap it for a Lightning/Blits
- * (WebGL) renderer that drives the same Agent + events (see README).
- *
- * Rendering is isolated behind `render*` methods so a WebGL view can reuse the
- * exact same event wiring.
+ * Minimal, dependency-free 10-foot overlay. It renders the shared
+ * `createAgentViewModel` state — status, streamed tokens and tool activity. This
+ * is the DOM reference view; on very low-end MTK/NVT GPUs swap it for a
+ * Lightning/Blits (WebGL) renderer that consumes the same view-model (see
+ * README), so only the drawing differs.
  */
 export function mountAgentOverlay(agent: Agent, opts: OverlayOptions = {}): OverlayController {
   if (typeof document === "undefined") {
@@ -42,24 +41,24 @@ export function mountAgentOverlay(agent: Agent, opts: OverlayOptions = {}): Over
   root.append(reply, activity);
   mount.appendChild(root);
 
-  // --- event wiring (identical for any view implementation) ---
-  const unsub: Array<() => void> = [];
-  unsub.push(agent.events.on("turn:start", () => { reply.textContent = ""; activity.textContent = ""; }));
-  unsub.push(agent.events.on("token", ({ delta }) => { reply.textContent += delta; }));
-  unsub.push(agent.events.on("tool:call", ({ name, args }) => {
-    if (showActivity) activity.textContent = "· " + truncate(formatToolCall(name, args));
-  }));
-  unsub.push(agent.events.on("tool:result", () => { /* keep last activity line */ }));
-  unsub.push(agent.events.on("turn:end", ({ output }) => {
-    if (!reply.textContent) reply.textContent = truncate(output, 400);
-    activity.textContent = "";
-  }));
-  unsub.push(agent.events.on("error", ({ error }) => { activity.textContent = "⚠ " + error.message; }));
+  // --- drawing (the only part specific to this renderer) ---
+  function render(state: AgentViewState): void {
+    // Streamed text is shown in full; a non-streamed final answer is capped so
+    // one long reply can't overflow the screen.
+    reply.textContent = state.streamed ? state.reply : truncate(state.reply, 400);
+    if (state.error) activity.textContent = "⚠ " + state.error;
+    else if (showActivity && state.activity) activity.textContent = "· " + truncate(state.activity);
+    else activity.textContent = "";
+  }
+
+  const vm = createAgentViewModel(agent);
+  vm.subscribe(render);
+  render(vm.snapshot());
 
   return {
     ask: async (input: string) => { await agent.run(input); },
     destroy: () => {
-      unsub.forEach((u) => u());
+      vm.destroy();
       root.remove();
     },
   };

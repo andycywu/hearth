@@ -70,14 +70,12 @@ Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6.
   package visibility made `list_apps`/`launch_app` come back empty (added
   `<queries>`).
 
-- [ ] **A2. Promote Blits to a first-class UI renderer.** Currently a standalone
-  demo (`apps/blits-demo`). Create `packages/ui-blits` (or a `ui` submodule)
-  exporting `mountAgentBlits(agent, opts)` with the same event wiring as
-  `mountAgentOverlay`/`mountAgentCanvas`. Keep it **optional** so the main build
-  doesn't require Vite/Blits (guard with dynamic import or a separate build).
-  *Acceptance:* `apps/blits-demo` imports from the package; `pnpm build`/CI stays
-  green; document in `packages/ui/README.md`. *Rendering verification needs a
-  browser (Group C).* 
+- [x] **A2. Promote Blits to a first-class UI renderer.** *Done.* Extracted the
+  duplicated agent-event wiring into `createAgentViewModel` in `@tv-ai-agent/ui`
+  (10 unit tests); the DOM overlay, the 2D canvas and `apps/blits-demo` all
+  consume it, so the renderers differ only in `draw`. Blits/Vite stay out of
+  `packages/*` — the demo keeps its own install. `npm run build` in the demo is
+  green. *Rendering/perf verification still needs a browser (Group C / C1).*
 
 - [ ] **A3. Raise test coverage.** Add unit tests for: media tools
   (`media_play/pause/resume/seek`), `set_input_source` / `get_input_source`

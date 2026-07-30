@@ -28,9 +28,11 @@ would come from the voice pipeline or the remote.
 ## How it maps to the rest of the repo
 - `createWebAdapter()` + `createScriptedClient()` — same offline stack as the dev
   harness; swap in a device adapter + `createOpenAiCompatibleClient` for real use.
-- The Blits component subscribes to `agent.events` (`token`, `tool:call`,
-  `turn:end`) and updates reactive state — mirror of `mountAgentOverlay` /
-  `mountAgentCanvas`.
+- The Blits component consumes `createAgentViewModel(agent)` from
+  `@tv-ai-agent/ui` — the very same tested view-model behind `mountAgentOverlay`
+  and `mountAgentCanvas` — and maps its state onto Blits reactive properties.
+  There is no duplicated event wiring left.
 
-To promote this into `packages/ui` as the default renderer later, keep the event
-wiring and replace the DOM/2D-canvas draw calls with Blits components.
+Because the view-model is shared, promoting Blits to the default renderer is a
+view-layer decision only: it needs GPU verification on the weakest target panel
+(Group C in `HANDOFF.md`), not another integration.
