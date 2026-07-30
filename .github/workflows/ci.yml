@@ -21,3 +21,25 @@ jobs:
       - run: pnpm license:check
       - run: pnpm bundle:all
       - run: pnpm check:size
+
+  # The Blits (WebGL) renderer lives outside the pnpm workspace on purpose — its
+  # Vite/Blits toolchain must not become a dependency of packages/*. This job
+  # builds it anyway so it can't silently rot when the shared view-model changes.
+  # Non-blocking: a failure here reports without failing the required check.
+  blits-demo:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      # The demo aliases the packages' dist/, so build the workspace first.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Build the WebGL demo
+        working-directory: apps/blits-demo
+        run: npm ci && npm run build

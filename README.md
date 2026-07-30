@@ -1,5 +1,9 @@
 # TV AI Agent (Harness)
 
+[![CI](https://github.com/andycywu/tv-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/andycywu/tv-ai-agent/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A520-informational)](.nvmrc)
+
 An **open-source, on-device AI agent runtime** for Smart TVs. One portable,
 web-based core that runs across operating systems (**AOSP / Android TV** and
 **Tizen**) and across SoC vendors (**MediaTek / MTK** and **Novatek / NVT**).
@@ -62,11 +66,16 @@ packages/
   adapter-web/     Browser/mock adapter for dev & CI
   adapter-webos/   Experimental webOS (LG) adapter via Luna Service Bus
   llm-connectors/  Cloud + on-device LLM clients (OpenAI-compatible)
-  ui/              (Planned) Lightning 3 / Blits 10-foot UI shell
+  ui/              10-foot UI: shared view-model + DOM overlay & canvas renderers
+  skills-example/  Worked example of a portable skill (see docs/skills.md)
+  acceptance/      One command script, asserted identical on every adapter
 apps/
   tizen-app/       Tizen web-app host → .wgt
   aosp-app/        Android host app (WebView + native bridge, Kotlin)
-tools/             Bundler shim + local demo
+  webos-app/       webOS host → .ipk
+  dev-harness/     Browser demo (pnpm dev) — no TV, no API key
+  blits-demo/      Lightning 3 / Blits WebGL renderer (own install, outside CI)
+tools/             Bundler, bundle-size budget, benchmark, diagnostics, SBOM
 docs/              Architecture, dev plan, platform bring-up, ADRs
 ```
 
@@ -86,8 +95,13 @@ Try the agent in a browser — no TV, no API key — with the offline dev harnes
 pnpm dev   # serves http://localhost:5173 (type or speak commands)
 ```
 
-To drive it with a real/local model, append `?llm=…` (see
-[`docs/on-device-inference.md`](docs/on-device-inference.md)).
+Useful query flags: `?llm=…&model=…` for a real/local model (see
+[`docs/on-device-inference.md`](docs/on-device-inference.md)), `?render=canvas`
+for the single-surface renderer, `?diag` for the capability report, and
+`?skills=weather` for the example skill ([`docs/skills.md`](docs/skills.md)).
+
+`pnpm bench` reports p50/p95 per-turn latency of the agent loop itself (no model,
+no network) — the harness overhead that has to stay small on a TV SoC.
 
 Building the device apps: see
 [`apps/tizen-app/README.md`](apps/tizen-app/README.md) and

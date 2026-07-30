@@ -181,13 +181,38 @@ localhost llama.cpp / Ollama / vLLM) and supports streaming.
 ```ts
 mountAgentOverlay(agent: Agent, opts?: { mount?: HTMLElement; showActivity?: boolean }): OverlayController;
 // OverlayController: { ask(input: string): Promise<void>; destroy(): void }
+mountAgentCanvas(agent: Agent, opts?: { mount?: HTMLElement; width?: number; height?: number }): CanvasController;
+
+// Shared, DOM-free wiring every renderer consumes.
+createAgentViewModel(agent: Agent): AgentViewModel;
+// AgentViewModel: { snapshot(): AgentViewState; subscribe(cb): () => void; destroy(): void }
+// AgentViewState: { reply, activity, error: string; busy, streamed: boolean }
+
+// Device-host helpers.
+createConfirmHandler(opts?: { ask?: (q: string) => boolean | Promise<boolean>; fallback?: boolean }):
+  (req: ConfirmRequest) => boolean | Promise<boolean>;
+speakReplies(agent: Agent, platform: PlatformProvider): () => void;
 
 formatToolCall(name: string, args: unknown): string;
 truncate(text: string, max?: number): string;
+wrapLines(measure: (s: string) => number, text: string, maxWidth: number): string[];
 ```
 
-DOM overlay that renders streamed tokens + tool activity. Event wiring is isolated
-from rendering so a Lightning/Blits view can replace it (see `packages/ui/README.md`).
+`createAgentViewModel` is the whole renderer contract: the DOM overlay, the 2D
+canvas and the Blits WebGL demo differ only in how they draw its state. State is
+undecorated — prefixes and truncation belong to the renderer. See
+`packages/ui/README.md`.
+
+---
+
+## `@tv-ai-agent/skills-example`
+
+```ts
+createWeatherTool(opts?: { fetchImpl?: typeof fetch; timeoutMs?: number; language?: string }):
+  Tool<{ city: string }, { city: string; country?: string; tempC: number; summary: string }>;
+```
+
+A worked, keyless example of a portable skill — see [`skills.md`](skills.md).
 
 ---
 

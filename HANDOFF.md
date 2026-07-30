@@ -100,8 +100,11 @@ Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6.
   client now reads the registered tool list and only proposes a skill's tool when
   the host registered it.
 
-- [ ] **A6. Nice-to-haves.** README status badges (CI), a `pnpm bench` latency
-  script for the agent loop, expand i18n beyond zh/en if needed.
+- [x] **A6. Nice-to-haves.** *Done.* README badges (CI/license/Node) + refreshed
+  repo layout and dev-harness flags; `pnpm bench` (`tools/bench.mjs`) reporting
+  p50/p95 per-turn harness latency; Japanese (`ja`) added to the offline brain
+  with a `{0}`-template phrase table; a non-blocking CI job that builds
+  `apps/blits-demo`.
 
 ### GROUP B — needs emulator or real hardware (Phase 2 bring-up)
 

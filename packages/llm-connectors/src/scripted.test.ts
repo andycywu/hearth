@@ -130,6 +130,69 @@ describe("scripted client — full agent loop (offline)", () => {
     expect(calls).toEqual([]);
   });
 
+  describe("Japanese", () => {
+    it("sets the volume and replies in Japanese", async () => {
+      const { platform, agent } = makeAgent();
+      const out = await agent.run("音量を30にして");
+      expect(await platform.system.getVolume()).toBe(30);
+      expect(out).toBe("完了しました。");
+    });
+
+    it("reads the volume back in Japanese", async () => {
+      const { agent } = makeAgent();
+      await agent.run("set volume to 42");
+      const out = await agent.run("音量はいくつですか?");
+      expect(out).toBe("現在の音量は 42 です。");
+    });
+
+    it("handles relative volume (大きく / 小さく)", async () => {
+      const { platform, agent } = makeAgent();
+      await agent.run("set volume to 50");
+      await agent.run("音量を大きくして");
+      expect(await platform.system.getVolume()).toBe(60);
+      await agent.run("音量を小さくして");
+      expect(await platform.system.getVolume()).toBe(50);
+    });
+
+    it("mutes and unmutes, not confusing 解除 for a mute request", async () => {
+      // A successful action reports "done" rather than echoing its readback, so
+      // what matters here is the device state, in both directions.
+      const { platform, agent } = makeAgent();
+      expect(await agent.run("ミュートして")).toBe("完了しました。");
+      expect(await platform.system.getMute()).toBe(true);
+      expect(await agent.run("ミュートを解除して")).toBe("完了しました。");
+      expect(await platform.system.getMute()).toBe(false);
+    });
+
+    it("opens an app despite the verb coming last", async () => {
+      const { agent } = makeAgent();
+      const tools: string[] = [];
+      agent.events.on("tool:call", (e) => tools.push(e.name));
+      const out = await agent.run("Netflix を開いて");
+      expect(tools).toEqual(["search_app_by_name", "launch_app"]);
+      expect(out).toBe("完了しました。");
+    });
+
+    it("falls back to Japanese help text for anything it can't parse", async () => {
+      const { agent } = makeAgent();
+      const out = await agent.run("ちょっと何かしてくれる?");
+      expect(out).toContain("音量調整");
+    });
+
+    it("answers a Japanese weather question via the skill", async () => {
+      const calls: Array<Record<string, unknown>> = [];
+      const { agent } = makeAgent([fakeWeatherTool(calls)]);
+      const out = await agent.run("東京の天気は?");
+      expect(calls).toEqual([{ city: "東京" }]);
+      expect(out).toBe("東京は 21.3°C、Light rain。");
+    });
+
+    it("still answers Chinese in Chinese (Han-only text isn't misread as ja)", async () => {
+      const { agent } = makeAgent();
+      expect(await agent.run("音量調到 30")).toBe("完成。");
+    });
+  });
+
   it("resolves 'it' to the last launched app (coreference across turns)", async () => {
     const { agent } = makeAgent();
     await agent.run("open Netflix");

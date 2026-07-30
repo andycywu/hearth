@@ -86,12 +86,16 @@ function fromUser(
     /\b(volume|音量)\b\s*\??$/.test(text) ||
     /what.*volume/.test(text) ||
     /音量.*(多少|幾|是多少)/.test(text) ||
-    /現在.*音量/.test(text)
+    /現在.*音量/.test(text) ||
+    /音量.*(いくつ|どのくらい|何|は\s*\?)/.test(text)
   ) {
     return toolCall("get_volume", {});
   }
-  if (/\bunmute\b|取消靜音|開聲音/.test(text)) return toolCall("set_mute", { mute: false });
-  if (/\bmute\b|靜音|關聲音/.test(text)) return toolCall("set_mute", { mute: true });
+  // Unmute first: "ミュート解除" and "取消靜音" both contain the mute word.
+  if (/\bunmute\b|取消靜音|開聲音|(?:ミュート|消音).*解除|解除.*(?:ミュート|消音)/.test(text)) {
+    return toolCall("set_mute", { mute: false });
+  }
+  if (/\bmute\b|靜音|關聲音|ミュート|消音/.test(text)) return toolCall("set_mute", { mute: true });
 
   const hdmi = text.match(/hdmi\s*([1-4])/);
   if (hdmi) return toolCall("set_input_source", { source: `hdmi${hdmi[1]}` });
@@ -106,6 +110,9 @@ function fromUser(
     const query = (open[1] ?? "").replace(/[。.!?！？]+$/, "").trim();
     return toolCall("search_app_by_name", { query });
   }
+  // Japanese puts the verb last: "Netflix を開いて".
+  const openJa = text.match(/(.+?)\s*を\s*(?:開いて|開く|起動|再生|見せて|つけて)/);
+  if (openJa?.[1]) return toolCall("search_app_by_name", { query: openJa[1].trim() });
 
   return finalText(t("help", lang));
 }
@@ -125,7 +132,7 @@ function followUp(toolMsg: ChatMessage, messages: ChatMessage[], lang: Lang): Co
       );
       if (askedToOpen) return toolCall("launch_app", { appId: first.id });
       const names = data.map((a: any) => a.name).join(", ");
-      return finalText(lang === "zh" ? `找到:${names}。` : `Found: ${names}.`);
+      return finalText(tf("found", lang, names));
     }
   }
 
@@ -134,14 +141,11 @@ function followUp(toolMsg: ChatMessage, messages: ChatMessage[], lang: Lang): Co
     // Order matters: mutating tools return { ok: true, ... }; read tools return
     // only the queried field. Check error/ok before the read-only fields so a
     // successful action reports "Done." rather than echoing its readback.
-    if (o.error) return finalText(lang === "zh" ? `執行失敗:${String(o.error)}` : `That didn't work: ${String(o.error)}`);
+    if (o.error) return finalText(tf("failed", lang, String(o.error)));
     // Custom skill result (docs/skills.md example): { city, tempC, summary }.
     if (typeof o.tempC === "number" && typeof o.summary === "string") {
-      return finalText(
-        lang === "zh"
-          ? `${String(o.city)}目前 ${o.tempC}°C,${o.summary}。`
-          : `${String(o.city)}: ${o.tempC}°C, ${o.summary.toLowerCase()}.`,
-      );
+      const condition = lang === "en" ? o.summary.toLowerCase() : o.summary;
+      return finalText(tf("weather", lang, String(o.city), o.tempC, condition));
     }
     if (o.ok === true) return finalText(t("done", lang));
     if (typeof o.volume === "number") {
@@ -149,35 +153,65 @@ function followUp(toolMsg: ChatMessage, messages: ChatMessage[], lang: Lang): Co
       const lastUser = lastUserText(messages);
       if (isLouder(lastUser)) return toolCall("set_volume", { level: Math.min(100, o.volume + 10) });
       if (isQuieter(lastUser)) return toolCall("set_volume", { level: Math.max(0, o.volume - 10) });
-      return finalText(lang === "zh" ? `目前音量是 ${o.volume}。` : `The volume is ${o.volume}.`);
+      return finalText(tf("volumeIs", lang, o.volume));
     }
     if (typeof o.muted === "boolean") return finalText(o.muted ? t("muted", lang) : t("unmuted", lang));
-    if (typeof o.source === "string") return finalText(lang === "zh" ? `輸入源已切換為 ${o.source}。` : `Input is now ${o.source}.`);
+    if (typeof o.source === "string") return finalText(tf("inputNow", lang, o.source));
   }
 
   return finalText(t("done", lang));
 }
 
 // --- tiny i18n for the offline brain's canned replies ---
-type Lang = "zh" | "en";
+export type Lang = "zh" | "ja" | "en";
+
+/**
+ * Which language to answer in. Japanese is checked before Chinese: ja text mixes
+ * kana with Han characters, so a kana hit is decisive, whereas Han alone is not.
+ * Han-only Japanese (e.g. 音量) is indistinguishable from Chinese by script and
+ * falls through to zh — acceptable for canned replies; a real model reads the
+ * whole sentence.
+ */
 function detectLang(s: string): Lang {
+  if (/[぀-ゟ゠-ヿ]/.test(s)) return "ja";   // hiragana / katakana
   return /[一-鿿]/.test(s) ? "zh" : "en";
 }
 const STRINGS = {
-  greeting: { en: 'Hi! Try: "set volume to 30" or "open Netflix".', zh: '嗨!試試:「音量調到 30」或「開啟 Netflix」。' },
-  ok: { en: "Okay.", zh: "好的。" },
-  done: { en: "Done.", zh: "完成。" },
-  notFound: { en: "I couldn't find that app.", zh: "找不到那個應用程式。" },
-  whatOpen: { en: "What should I open?", zh: "你想開啟什麼?" },
-  muted: { en: "Muted.", zh: "已靜音。" },
-  unmuted: { en: "Unmuted.", zh: "已取消靜音。" },
+  greeting: {
+    en: 'Hi! Try: "set volume to 30" or "open Netflix".',
+    zh: '嗨!試試:「音量調到 30」或「開啟 Netflix」。',
+    ja: 'こんにちは!「音量を 30 にして」や「Netflix を開いて」と言ってみてください。',
+  },
+  ok: { en: "Okay.", zh: "好的。", ja: "はい。" },
+  done: { en: "Done.", zh: "完成。", ja: "完了しました。" },
+  notFound: { en: "I couldn't find that app.", zh: "找不到那個應用程式。", ja: "そのアプリが見つかりません。" },
+  whatOpen: { en: "What should I open?", zh: "你想開啟什麼?", ja: "何を開きますか?" },
+  muted: { en: "Muted.", zh: "已靜音。", ja: "ミュートしました。" },
+  unmuted: { en: "Unmuted.", zh: "已取消靜音。", ja: "ミュートを解除しました。" },
   help: {
     en: 'I can set volume, mute, switch input, or open an app. Try "open Netflix".',
     zh: '我可以調整音量、靜音、切換輸入源或開啟應用程式。試試「開啟 Netflix」。',
+    ja: '音量調整、ミュート、入力切替、アプリの起動ができます。「Netflix を開いて」とどうぞ。',
   },
 };
 function t(key: keyof typeof STRINGS, lang: Lang): string {
   return STRINGS[key][lang];
+}
+
+/**
+ * Replies that interpolate a value. Kept as `{0}`-style templates so every
+ * locale for a phrase sits on one line and adding a language stays a data edit.
+ */
+const PHRASES = {
+  found: { en: "Found: {0}.", zh: "找到:{0}。", ja: "見つかりました:{0}。" },
+  failed: { en: "That didn't work: {0}", zh: "執行失敗:{0}", ja: "実行できませんでした:{0}" },
+  volumeIs: { en: "The volume is {0}.", zh: "目前音量是 {0}。", ja: "現在の音量は {0} です。" },
+  inputNow: { en: "Input is now {0}.", zh: "輸入源已切換為 {0}。", ja: "入力を {0} に切り替えました。" },
+  // {0} place, {1} temperature, {2} condition — from the example skill.
+  weather: { en: "{0}: {1}°C, {2}.", zh: "{0}目前 {1}°C,{2}。", ja: "{0}は {1}°C、{2}。" },
+};
+function tf(key: keyof typeof PHRASES, lang: Lang, ...args: Array<string | number>): string {
+  return PHRASES[key][lang].replace(/\{(\d)\}/g, (_, i: string) => String(args[Number(i)] ?? ""));
 }
 
 /**
@@ -187,14 +221,15 @@ function t(key: keyof typeof STRINGS, lang: Lang): string {
  */
 function matchWeatherCity(raw: string): string | undefined {
   const s = raw.trim();
-  if (!/weather|forecast|天氣|氣溫/i.test(s)) return undefined;
+  if (!/weather|forecast|天氣|氣溫|天気|気温/i.test(s)) return undefined;
 
   const en = s.match(/(?:weather|forecast|temperature)\s*(?:like\s*)?(?:in|for|at)\s+([^?.!,]+)/i);
   if (en?.[1]) return acceptCity(en[1]);
 
-  // "台北天氣如何?" / "台北的氣溫" — the place sits before the keyword.
-  const zh = s.match(/([^\s,，。！？?的]{2,12})(?:的)?\s*(?:天氣|氣溫)/);
-  if (zh?.[1]) return acceptCity(zh[1]);
+  // "台北天氣如何?" / "台北の天気" — the place sits before the keyword in both
+  // Chinese and Japanese; drop a trailing 的/の particle.
+  const cjk = s.match(/([^\s,，、。！？?的の]{2,12})(?:的|の)?\s*(?:天氣|氣溫|天気|気温)/);
+  if (cjk?.[1]) return acceptCity(cjk[1]);
 
   return undefined;
 }
@@ -202,6 +237,7 @@ function matchWeatherCity(raw: string): string | undefined {
 const NOT_A_CITY = new Set([
   "today", "tomorrow", "tonight", "now", "outside", "here", "there",
   "現在", "今天", "明天", "今晚", "外面", "這裡", "那裡",
+  "今日", "明日", "今夜", "ここ", "そこ", "外",
 ]);
 function acceptCity(captured: string): string | undefined {
   const city = captured.replace(/[。.!?！？,，]+$/, "").trim();
@@ -209,10 +245,10 @@ function acceptCity(captured: string): string | undefined {
 }
 
 function isLouder(s: string): boolean {
-  return /louder|turn it up|volume up|大聲|\bup\b.*volume|音量.*(調高|大)/.test(s);
+  return /louder|turn it up|volume up|大聲|\bup\b.*volume|音量.*(調高|大き?|上げ)/.test(s);
 }
 function isQuieter(s: string): boolean {
-  return /quieter|softer|turn it down|volume down|小聲|音量.*(調低|小)/.test(s);
+  return /quieter|softer|turn it down|volume down|小聲|音量.*(調低|小さ?|下げ)/.test(s);
 }
 function lastUserText(messages: ChatMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {

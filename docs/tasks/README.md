@@ -19,7 +19,8 @@ pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm bundle:all && pnp
   done via shared `createConfirmHandler()` / `speakReplies()`.
 - [x] [A5 — Skill tutorial + example skill](A5-skill-tutorial.md) — done:
   `docs/skills.md` + `packages/skills-example` (`?skills=weather`).
-- [A6 — Nice-to-haves (badges, bench, i18n)](A6-nice-to-haves.md)
+- [x] [A6 — Nice-to-haves (badges, bench, i18n)](A6-nice-to-haves.md) — done:
+  badges, `pnpm bench`, `ja` locale, Blits CI job.
 
 ## Group B/C/D — need emulator / browser / release
 See [`HANDOFF.md`](../../HANDOFF.md), [`docs/EMULATOR_SETUP.md`](../EMULATOR_SETUP.md),

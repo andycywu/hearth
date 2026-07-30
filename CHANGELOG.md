@@ -34,6 +34,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   implements `draw`. Blits is now a first-class renderer without adding Vite or
   Blits to `packages/*`.
 
+- `pnpm bench` (`tools/bench.mjs`): p50/p95 per-turn latency of the agent loop
+  over the acceptance script, with the offline brain — i.e. harness overhead with
+  no model or network noise. README badges (CI / license / Node).
+- Japanese replies and intents in the offline scripted brain (`ja`): kana-first
+  language detection, verb-final app opening ("Netflix を開いて"), ミュート /
+  解除, relative volume, and a `{0}`-template phrase table so the next locale is
+  a data edit.
+- Non-blocking CI job that builds `apps/blits-demo`, so the WebGL renderer can't
+  silently rot while staying out of the workspace toolchain.
 - **Skill authoring guide** (`docs/skills.md`): pure-logic vs capability-gated
   skills, why that split decides whether a vendor signature is needed, and the
   rules a portable skill follows.
