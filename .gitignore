@@ -40,5 +40,6 @@ apps/aosp-app/app/src/main/assets/main.js.map
 apps/webos-app/main.js
 apps/webos-app/main.js.map
 apps/webos-app/*.ipk
+apps/webos-app/dist-ipk/
 apps/dev-harness/main.js
 apps/dev-harness/main.js.map

@@ -5,11 +5,12 @@ see [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md).
 
 _Last updated: 2026-07-30 · target release: v0.1.0_
 
-**Group A of [`../HANDOFF.md`](../HANDOFF.md) is complete, and B1/B3 are done on an
-Android TV emulator**: the app runs on device, the capability probe is clean, and
-the CI acceptance script passes there unchanged. Tizen (B2) is blocked on an
-elevated package install + a Samsung-account certificate; real MTK/NVT boards
-(B5) and the Blits GPU pass (C1) still need hardware.
+**Group A is complete; B1, B3 and B4 are done on an Android TV emulator** — the app
+runs on device, the capability probe is clean, the CI acceptance script passes
+unchanged, and a real local model drives it. **Packaging is verified for all three
+hosts** (APK / signed `.wgt` / `.ipk`), so Tizen and webOS need only an install
+target: a TV emulator image (elevated SDK install) or a TV in Developer Mode. Real
+MTK/NVT boards (B5) and the Blits GPU pass (C1) still need hardware.
 
 ## At a glance
 
@@ -25,7 +26,9 @@ elevated package install + a Samsung-account certificate; real MTK/NVT boards
 | Tests / CI / lint / bundle-size / license / SBOM | ✅ 141 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
 | **Android TV emulator bring-up** | ✅ probe clean, acceptance script passes |
-| **Tizen emulator bring-up** | ⛔ needs elevated SDK install + Samsung cert |
+| **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
+| **Tizen / webOS packaging** | ✅ signed `.wgt` + `.ipk` verified |
+| **Tizen / webOS install run** | ⛔ needs a TV emulator image or a TV in Developer Mode |
 | **Real MTK/NVT device bring-up** | ⛔ needs hardware |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
@@ -95,4 +98,11 @@ pnpm dev                                    # browser demo (offline)
 pnpm bundle:tizen | bundle:aosp | bundle:webos   # device bundles
 pnpm bench                                  # agent-loop latency
 cd apps/aosp-app && ./gradlew :app:assembleDebug   # Android host (JDK 17+, SDK)
+pnpm package:tizen                          # signed .wgt   (needs tizen-core `tz`)
+pnpm package:webos                          # .ipk          (needs @webos-tools/cli)
+
+# On a connected Android device/emulator:
+node tools/mock-llm-server.mjs &            # offline brain over HTTP
+adb reverse tcp:8080 tcp:8080
+node tools/device-acceptance.mjs            # CI acceptance script, on the device
 ```

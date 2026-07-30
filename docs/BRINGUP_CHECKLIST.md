@@ -113,11 +113,10 @@ Repeat on the **NVT** AOSP board.
 ## 4. webOS (optional)
 
 ```bash
-pnpm bundle:webos
-cd apps/webos-app
-ares-package .
+npm i -g @webos-tools/cli         # one-time; no account needed to build
+pnpm package:webos                # → apps/webos-app/dist-ipk/*.ipk (verified, 34 KB)
 ares-setup-device                 # register the TV (one-time)
-ares-install ./tv.titanos.aiagent_0.1.0_all.ipk -d <device>
+ares-install apps/webos-app/dist-ipk/tv.titanos.aiagent_0.1.0_all.ipk -d <device>
 ares-launch tv.titanos.aiagent -d <device>
 ```
 - [ ] Launch with `?diag`; copy the report. (`ares-inspect` opens devtools.)

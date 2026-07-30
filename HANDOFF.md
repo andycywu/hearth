@@ -147,15 +147,28 @@ The debug APK is already built at
   emulator column*, including the platform behaviours that differ from the mocks
   (volume quantization, mute zeroing the volume readback, focus-dependent keys).
   Remaining columns need hardware or the Tizen emulator.
-- [~] **B4. Point at a local model** (`?llm=` / globals) — *plumbing done and
-  proven:* `?llm=` now works on all three device hosts, and the on-device run above
-  drove the agent through an HTTP endpoint (`tools/mock-llm-server.mjs`) rather than
-  a built-in brain. Pointing at a *real* local model (Ollama/llama.cpp) is the
-  remaining step — same command, different `--llm`/`?llm=` value
-  (`docs/on-device-inference.md`).
+- [x] **B4. Point at a local model** — *done (2026-07-30).* `?llm=` works on all
+  three device hosts, and the emulator ran the acceptance script against a **real**
+  model (Qwen2.5-1.5B-Instruct Q4 under `llama-server`, reached via
+  `adb reverse`). Tool calls reached `AudioManager` and changed device state, so
+  the whole path is proven; the model itself skipped the chained steps
+  (read-then-write, search-then-launch). Same device passes with the scripted
+  brain, which is how you tell the two apart. Numbers and the model-floor
+  conclusion: `docs/on-device-inference.md`.
+  *Remaining:* repeat with a 3B/7B-class model to find the floor, and eventually
+  on real silicon rather than a host CPU.
 - [ ] **B5. Real MTK/NVT boards** (needs hardware) — repeat; for gated controls
   self-sign on your own eng board (POC Stage C) and implement the stubbed bridge
   methods (`setInputSource`, `powerStandby`, `sendKey`).
+
+Packaging is now done and verified for **all three** hosts, so a device only needs
+the install step:
+
+| Host | Command | Verified output |
+|---|---|---|
+| AOSP | `pnpm bundle:aosp` + `./gradlew :app:assembleDebug` | `app-debug.apk`, runs |
+| Tizen | `pnpm package:tizen` | signed `tizen-app.wgt`, 37 KB |
+| webOS | `pnpm package:webos` | `tv.titanos.aiagent_0.1.0_all.ipk`, 34 KB |
 
 ### GROUP C — needs a browser / GPU
 

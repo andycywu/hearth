@@ -9,6 +9,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 Device bring-up (Phase 2 tooling):
+- **webOS `.ipk` packaging** — `pnpm package:webos` (`tools/package-webos.mjs`).
+  Works around two `ares-package` behaviours: it minifies with an old uglify-js
+  that can't parse our ES2020 bundle (`-n`, a flag missing from `--help`), and it
+  packages the whole app directory, which in a pnpm workspace meant shipping the
+  linked `node_modules` tree, the TS source and the sourcemap — 290 KB became
+  34 KB with excludes.
+- **First run against a real local model** (Qwen2.5-1.5B-Instruct Q4 via
+  `llama-server`, reached from the emulator through `adb reverse`): tool calls
+  reach `AudioManager` and change device state, but the model skips the chained
+  steps (read-then-write, search-then-launch). Measured and tabulated in
+  `docs/on-device-inference.md` — **tool *chaining* is what sets the model floor**,
+  and 1.5B is below it. `tools/device-acceptance.mjs` now prints a diagnosis
+  separating "the platform is broken" from "the model is weak", which is the
+  distinction that run made concrete.
 - **Tizen packaging moved to `tizen-core` (`tz`)** — Tizen Studio is EOL and the
   toolchain is now the Tizen VS Code extension. `pnpm package:tizen`
   (`tools/package-tizen.mjs`) bundles, builds and signs a `.wgt` in one command;

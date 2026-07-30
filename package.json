@@ -28,6 +28,7 @@
     "bundle:dev": "pnpm build && node tools/bundle.mjs dev",
     "dev": "pnpm bundle:dev && node tools/serve.mjs apps/dev-harness",
     "package:tizen": "pnpm build && node tools/package-tizen.mjs",
+    "package:webos": "pnpm build && node tools/package-webos.mjs",
     "icon": "node tools/make-icon.mjs",
     "bench": "pnpm build && node tools/bench.mjs",
     "check:size": "node tools/check-bundle-size.mjs",

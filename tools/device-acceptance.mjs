@@ -290,6 +290,23 @@ try {
   const zhOk = skipZh || results.zh?.ok === true;
   results.pass = toolsMatch && mutedOk && volumeOk && zhOk && (results.errors?.length ?? 0) === 0;
 
+  // A mismatch means very different things depending on what's driving the agent,
+  // and conflating the two wastes debugging time. Point at the likely culprit.
+  if (!toolsMatch) {
+    if (results.errors?.length) {
+      results.diagnosis = "the agent raised errors — treat this as a platform/transport problem, not the model";
+    } else if (results.tools.length === 0) {
+      results.diagnosis = "no tool ran at all — check the endpoint is reachable (adb reverse) and returns tool calls";
+    } else if (results.tools.every((t) => EXPECTED_TOOLS.includes(t))) {
+      results.diagnosis =
+        "the tools that ran are all legitimate but the sequence differs — usually the model, " +
+        "not the device: small models skip the read-then-write and search-then-launch chains. " +
+        "Re-run against tools/mock-llm-server.mjs to confirm the platform is fine.";
+    } else {
+      results.diagnosis = "an unexpected tool ran — check the tool schemas the model is being given";
+    }
+  }
+
   if (asJson) {
     console.log(JSON.stringify({
       ...results,
@@ -301,6 +318,7 @@ try {
     if (!toolsMatch) {
       console.log(`  expected: ${EXPECTED_TOOLS.join(", ")}`);
       console.log(`  actual  : ${results.tools.join(", ")}`);
+      console.log(`  → ${results.diagnosis}`);
     }
     console.log(`end state     : volume=${results.end.volume} muted=${results.end.muted} ` +
                 `(expected ~${EXPECTED_VOLUME}±${VOLUME_TOLERANCE} / true) ${volumeOk && mutedOk ? "OK" : "WRONG"}`);
