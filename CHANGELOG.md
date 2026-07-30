@@ -9,6 +9,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 Device bring-up (Phase 2 tooling):
+- **Tizen packaging moved to `tizen-core` (`tz`)** — Tizen Studio is EOL and the
+  toolchain is now the Tizen VS Code extension. `pnpm package:tizen`
+  (`tools/package-tizen.mjs`) bundles, builds and signs a `.wgt` in one command;
+  the author certificate is created locally with `tz cert`, so **no Samsung
+  account is needed** for public-level capabilities (partner certs remain
+  required only for the privileged rows the POC defers). Docs updated across
+  `EMULATOR_SETUP`, `POC`, `BRINGUP_CHECKLIST`, `RELEASING`, `platform/tizen-bringup`
+  and the app README.
+- **App icon** (`pnpm icon`, `tools/make-icon.mjs`): both `config.xml` (Tizen) and
+  `appinfo.json` (webOS) referenced an `icon.png` that didn't exist, which breaks
+  packaging on both. Drawn in code — no image dependencies — so it can be
+  regenerated at any size.
 - `resolveLlmEndpoint()` — one precedence rule (`?llm=`/`?model=`/`?key=` → window
   globals → default) shared by all four hosts, so a **shipped** `.wgt`/APK/`.ipk`
   can be repointed at another model by relaunching with a query string instead of

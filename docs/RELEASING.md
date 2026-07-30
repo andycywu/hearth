@@ -27,9 +27,9 @@ runtime bundles, and creates a GitHub Release.
 These require the platform SDKs and signing material and are **not** produced in
 generic CI:
 
-- **Tizen `.wgt`:** on tooling with Tizen Studio + a signing profile —
-  `pnpm bundle:tizen`, then `tizen build-web` / `tizen package -t wgt -s <profile>`
-  (see `apps/tizen-app/README.md`). Attach the signed `.wgt` to the release.
+- **Tizen `.wgt`:** on tooling with the Tizen VS Code extension (`tz`) and a
+  signing profile — `pnpm package:tizen` (see `apps/tizen-app/README.md`). Attach
+  the signed `.wgt` to the release.
 - **Android `.apk`:** on tooling with the Android SDK —
   `pnpm bundle:aosp`, then `./gradlew :app:assembleRelease` with your keystore
   (see `apps/aosp-app/README.md`). For first-party TitanOS devices, sign with the

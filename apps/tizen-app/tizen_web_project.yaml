@@ -26,16 +26,25 @@ signing_profile: ""
 trust_anchor: []
 
 # list of files in web project (.html,.css etc) and resources
+# Only what the app needs at runtime: the TypeScript source and package.json are
+# build inputs, and shipping them would just bloat the .wgt.
 files:
-  - README.md
+  - config.xml
+  - icon.png
   - index.html
   - main.js
-  - package.json
-  - src/main.ts
   - style.css
 
 # list of files to exclude based on the matched patterns
 excludes:
+  # pnpm links workspace deps as junctions; the packager can't read them and
+  # fails with "Incorrect function". They're build-time only in any case.
+  - node_modules/*
+  - node_modules/.*
+  - main.js.map
+  - src/*
+  - package.json
+  - README.md
   - Build/*
   - Debug/*
   - Directory.Build.targets

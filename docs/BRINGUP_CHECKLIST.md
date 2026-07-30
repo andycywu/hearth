@@ -23,8 +23,9 @@ in CI (`packages/acceptance`): the on-device run must match it.
 - [ ] An LLM endpoint to point at. Easiest first pass: a cloud OpenAI-compatible
       gateway. On-device pass: a localhost server on the TV (see §6).
 - [ ] Per platform:
-  - **Tizen:** Tizen Studio + TV extension; an **author + distributor
-    certificate** (Certificate Manager). Samsung TV in Developer Mode.
+  - **Tizen:** the **Tizen VS Code extension** (Tizen Studio is EOL), which ships
+    the `tz` CLI; an author certificate created locally with `tz cert` — no
+    Samsung account for public-level capabilities. Samsung TV in Developer Mode.
     Docs: https://docs.tizen.org/
   - **AOSP/Android TV:** Android SDK (adb) + JDK 17; device with ADB debugging.
   - **webOS:** `@webos-tools/cli` (`ares-*`); TV Developer Mode + session.
@@ -57,13 +58,14 @@ globals in the app HTML before `main.js` loads:
 ON → enter your host PC IP → reboot.
 
 ```bash
-cd apps/tizen-app
-tizen build-web -- .
-tizen package -t wgt -s <your-security-profile> -- .buildResult
+pnpm package:tizen               # bundle + tz build + tz pack (signed .wgt)
 sdb connect <TV_IP>
 sdb devices                      # confirm the TV is listed
-tizen install -n TvAiAgent.wgt -t <target-id>
+tz install -n apps/tizen-app/Debug/tizen-app.wgt
+tz run -n tvaiagent.TvAiAgent
 ```
+One-time certificate setup (no Samsung account for public capabilities) is in
+[`EMULATOR_SETUP.md`](EMULATOR_SETUP.md) §A2.
 - [ ] App installs and launches; on-screen status shows `model` + `soc`.
 - [ ] Note the reported **soc** = mediatek / novatek (from `productinfo`).
 

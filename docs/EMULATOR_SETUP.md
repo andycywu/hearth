@@ -115,53 +115,72 @@ running) → inspect the app's WebView.
 
 ---
 
-## A2. Tizen TV emulator (Tizen Studio)
+## A2. Tizen TV (VS Code extension + tizen-core)
 
-> **Status on this workstation (checked 2026-07-30):** Tizen Studio is installed
-> at `C:\tizen-studio` with platforms tizen-4.0 … tizen-10.0, the `tizen`/`sdb`
-> CLIs and Emulator Manager present — but **no TV extension, no emulator image and
-> no certificates** (`~/tizen-studio-data/{emulator,profile,keystore}` are empty).
-> The two remaining steps both need you rather than an agent:
->
-> 1. `package-manager-cli.exe` **requires elevation**, so TV Extensions + a TV
->    emulator image can't be installed from a normal shell. Run Package Manager
->    (or that CLI) from an elevated prompt.
-> 2. A Tizen **dev certificate needs an interactive Samsung-account sign-in** in
->    Certificate Manager. Nothing can be packaged or installed without it.
->
-> Everything on our side is ready: `pnpm bundle:tizen` produces the runtime, and
-> the entry now supports `?diag`, `?llm=` and `?confirm=` exactly like AOSP.
+**Tizen Studio is EOL.** The current toolchain is the **Tizen VS Code extension**,
+which ships a CLI called **tizen-core** (`tz`) — it replaces `tizen build-web`,
+`tizen package`, Certificate Manager and Emulator Manager. `sdb` is still `sdb`.
 
-### Install
-1. Download and run the **Tizen Studio** installer (with IDE). Accept the
-   license, pick an install dir.
-2. Open **Package Manager → Extension SDK** tab → install **TV Extensions** and
-   the **Samsung Certificate Extension**. (Elevated; see the status note above.)
-
-### Create a dev certificate (self-service — no partner deal)
-- **Tools → Certificate Manager → +** → create a **Samsung** author +
-  distributor certificate for **TV development** (needs a free Samsung account).
-
-### Create + launch the emulator
-1. **Tools → Emulator Manager → Create** → select the **tv** device image →
-   Finish.
-2. In the emulator's **HW Support** tab, ensure **CPU VT** and **GPU** are **ON**
-   (it won't launch otherwise) and give it ≥ **1024 MB** RAM. Launch it.
-
-### Install our app
 ```bash
-pnpm bundle:tizen
-cd apps/tizen-app
-tizen build-web -- .
-tizen package -t wgt -s <your-dev-profile> -- .buildResult
-sdb devices                         # the emulator appears
-tizen install -n TvAiAgent.wgt -t <emulator-id>
+# Windows default; set TIZEN_CORE to override
+export TIZEN_CORE="C:/tizen-studio/tools/tizen-core/tz.exe"
+"$TIZEN_CORE" --help
 ```
-- For the capability probe, set the app's start page to `index.html?diag` (or add
-  `?diag` when launching) and read the on-screen report.
 
-Debug: Tizen Web Inspector (right-click the emulator → Web Inspector, or via the
-Tizen Studio log/inspector tooling).
+### Create a dev certificate — no Samsung account needed
+`tz` generates an author certificate locally and signs with the bundled **public**
+distributor certificate. That covers every capability in the POC's ✅ column; a
+**partner** certificate (which does need the Samsung-account flow) is only
+required for the privileged rows we deliberately defer — see [`POC.md`](POC.md).
+
+```bash
+tz cert -n "Your Name" -p <password, ≥8 chars> -f my-dev
+#   → <tizen-studio-data>/keystore/author/my-dev.p12
+
+tz security-profiles add -n my-dev -A \
+  -a "C:/tizen-studio-data/keystore/author/my-dev.p12" -p <password> \
+  -d "C:/tizen-studio/tools/tizen-core/certificates/distributor/tizen_public_signer.p12" \
+  -P tizenpkcs12passfordsigner
+
+tz security-profiles list        # confirms the active profile
+```
+
+### Build and sign the .wgt
+One command from the repo root — bundles the runtime, generates the icon if
+missing, then runs `tz build` + `tz pack`:
+
+```bash
+pnpm package:tizen               # → apps/tizen-app/Debug/tizen-app.wgt (signed)
+pnpm package:tizen --profile my-dev     # or name a profile explicitly
+```
+
+Verified working: a 37 KB signed package containing `config.xml`, `icon.png`,
+`index.html`, `main.js`, `style.css`, `author-signature.xml`, `signature1.xml`.
+
+### Install and run
+```bash
+sdb connect <TV_IP>              # a real TV in Developer Mode, or an emulator
+sdb devices
+tz install -n apps/tizen-app/Debug/tizen-app.wgt
+tz run -n tvaiagent.TvAiAgent    # app id from config.xml
+```
+For the capability probe, set the app's start page to `index.html?diag`. The
+report is also written to the console, so the Web Inspector gives you copyable
+text rather than a screenshot.
+
+### What's still missing here (as of 2026-07-30)
+- **No TV emulator image is installed** (`tz emul list-vm` is empty, and
+  `platforms/*/emulator-images` doesn't exist). Images come from the **Package
+  Manager**, whose CLI needs **elevation** — run *Tizen: Package Manager* from the
+  VS Code command palette, or `package-manager-cli.exe` from an elevated prompt,
+  and install the **TV extension** + a TV emulator image.
+- **Web app templates are declared but not installed**
+  (`templates/web_app/tizen-10.0/` is empty), so `tz new -T web_app` fails. It
+  doesn't matter for us — `apps/tizen-app` is an existing project with its own
+  `tizen_web_project.yaml` — but it will bite anyone starting from a template.
+- With no emulator, the fastest path to a real check is a **Samsung TV in
+  Developer Mode** (Apps → `12345` → Developer Mode ON → host PC IP → reboot),
+  then `sdb connect <TV_IP>` and the install commands above.
 
 ---
 

@@ -53,19 +53,27 @@ pnpm dev            # http://localhost:5173  — offline scripted brain
 3. Launch the app; open the WebView with `?diag`. Volume (AudioManager) and
    app list/launch work; enable the AccessibilityService for navigation.
 
-### A2. Tizen TV emulator (Tizen Studio)
-1. Tizen Studio → **Emulator Manager** → create + launch a TV emulator.
-2. Build/install with a **development** certificate (self-service in Certificate
-   Manager — no partner deal):
+### A2. Tizen TV (VS Code extension + `tz`)
+Tizen Studio is EOL; the toolchain is now the **Tizen VS Code extension** and its
+`tizen-core` CLI. An author certificate is generated **locally** (`tz cert`) and
+signed with the bundled public distributor cert — no Samsung account, no partner
+deal, which is exactly the POC's premise.
+
+1. One-time: `tz cert` + `tz security-profiles add`
+   ([`EMULATOR_SETUP.md`](EMULATOR_SETUP.md) §A2 has the flags).
+2. Build and sign:
    ```bash
-   pnpm bundle:tizen
-   cd apps/tizen-app
-   tizen build-web -- .
-   tizen package -t wgt -s <dev-profile> -- .buildResult
-   sdb devices           # emulator shows up
-   tizen install -n TvAiAgent.wgt -t <emulator-id>
+   pnpm package:tizen          # → apps/tizen-app/Debug/tizen-app.wgt (verified)
    ```
-3. Launch with `?diag`; run the acceptance script.
+3. Install on an emulator or a Developer-Mode TV, then launch with `?diag` and run
+   the acceptance script:
+   ```bash
+   sdb connect <TV_IP> && sdb devices
+   tz install -n apps/tizen-app/Debug/tizen-app.wgt
+   tz run -n tvaiagent.TvAiAgent
+   ```
+   A **TV emulator image** still comes from the Package Manager (needs elevation);
+   see the status note in `EMULATOR_SETUP.md` §A2.
 
 > webOS also has an emulator in the webOS TV SDK if you want a third target.
 
