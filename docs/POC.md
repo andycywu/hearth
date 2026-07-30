@@ -32,7 +32,8 @@ script (`packages/acceptance`).
 
 ## Stage A — Emulators (zero hardware, zero vendor)
 
-Fastest proof of the software path. HDMI inputs / real installed apps don't
+Fastest proof of the software path. **Full install steps:
+[`EMULATOR_SETUP.md`](EMULATOR_SETUP.md).** HDMI inputs / real installed apps don't
 exist on emulators, so those probes show empty/unsupported — expected.
 
 ### A0. Browser (baseline, no emulator at all)

@@ -40,8 +40,12 @@ class MainActivity : AppCompatActivity() {
             addJavascriptInterface(TvNativeBridge(this@MainActivity), "TvNativeBridge")
         }
         setContentView(webView)
-        // Runtime web bundle is copied to app/src/main/assets by tools/bundle.mjs
-        webView.loadUrl("file:///android_asset/index.html")
+        // Runtime web bundle is copied to app/src/main/assets by tools/bundle.mjs.
+        // A "start" intent extra lets you open a specific page/query without a
+        // rebuild, e.g. for the capability probe:
+        //   adb shell am start -n tv.titanos.aiagent/.MainActivity -e start "index.html?diag"
+        val start = intent?.getStringExtra("start")?.takeIf { it.startsWith("index.html") } ?: "index.html"
+        webView.loadUrl("file:///android_asset/$start")
     }
 
     override fun onDestroy() {

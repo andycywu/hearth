@@ -103,10 +103,11 @@ bring-up on MTK + NVT for both AOSP and Tizen (Phase 2) → UI shell and voice
 
 ## Documentation
 
+- **Continuing development?** Start with [`HANDOFF.md`](HANDOFF.md) (prioritized task list).
 - [Project status](docs/STATUS.md) · [Development plan](docs/DEVELOPMENT_PLAN.md) · [Architecture](docs/ARCHITECTURE.md) · [API reference](docs/api.md)
 - [Extending (custom tools, persistence, new OS)](docs/extending.md)
 - [On-device inference](docs/on-device-inference.md) · [Security review](docs/SECURITY_REVIEW.md) · [Releasing](docs/RELEASING.md)
-- Platform bring-up: [POC plan (no vendor signing)](docs/POC.md) · [step-by-step checklist](docs/BRINGUP_CHECKLIST.md) · [Tizen](docs/platform/tizen-bringup.md) · [AOSP](docs/platform/aosp-bringup.md) · [AOSP accessibility](docs/platform/aosp-accessibility.md) · [capability matrix](docs/platform/capability-matrix.md)
+- Platform bring-up: [POC plan (no vendor signing)](docs/POC.md) · [emulator setup](docs/EMULATOR_SETUP.md) · [step-by-step checklist](docs/BRINGUP_CHECKLIST.md) · [Tizen](docs/platform/tizen-bringup.md) · [AOSP](docs/platform/aosp-bringup.md) · [AOSP accessibility](docs/platform/aosp-accessibility.md) · [capability matrix](docs/platform/capability-matrix.md)
 
 ## Contributing & license
 
