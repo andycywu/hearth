@@ -19,23 +19,27 @@ export interface ScriptedClientOptions {
 export function createScriptedClient(opts: ScriptedClientOptions = {}): LlmClient {
   const id = opts.id ?? "scripted:offline";
 
-  function decide(messages: ChatMessage[]): CompletionResult {
+  function decide(req: CompletionRequest): CompletionResult {
+    const messages = req.messages;
+    // Which tools this agent actually registered. Custom skills (docs/skills.md)
+    // are opt-in, so a pattern must never propose a tool that isn't there.
+    const available = new Set((req.tools ?? []).map((s) => s.name));
     const last = messages[messages.length - 1];
     const lang = detectLang(lastUserText(messages) || (last?.role === "user" ? last.content : ""));
     if (!last) return finalText(t("greeting", lang));
 
     if (last.role === "tool") return followUp(last, messages, lang);
-    if (last.role === "user") return fromUser(last.content, messages, lang);
+    if (last.role === "user") return fromUser(last.content, messages, lang, available);
     return finalText(t("ok", lang));
   }
 
   return {
     id,
     async complete(req: CompletionRequest): Promise<CompletionResult> {
-      return decide(req.messages);
+      return decide(req);
     },
     async completeStream(req: CompletionRequest, handlers: StreamHandlers): Promise<CompletionResult> {
-      const r = decide(req.messages);
+      const r = decide(req);
       if (!r.wantsToolCalls && r.message.content) {
         for (const chunk of chunkText(r.message.content)) handlers.onContentDelta?.(chunk);
       }
@@ -45,8 +49,19 @@ export function createScriptedClient(opts: ScriptedClientOptions = {}): LlmClien
 }
 
 // --- intent parsing from the user's message ---
-function fromUser(raw: string, messages: ChatMessage[], lang: Lang): CompletionResult {
+function fromUser(
+  raw: string,
+  messages: ChatMessage[],
+  lang: Lang,
+  available: Set<string>,
+): CompletionResult {
   const text = raw.toLowerCase().trim();
+
+  // Custom skill demo: only offered when the host registered the tool.
+  if (available.has("get_weather")) {
+    const city = matchWeatherCity(raw);
+    if (city) return toolCall("get_weather", { city });
+  }
 
   // Coreference: "launch it again", "open that", "再開一次" → relaunch the last
   // app, resolved from conversation history. Only fires when no app name is
@@ -120,6 +135,14 @@ function followUp(toolMsg: ChatMessage, messages: ChatMessage[], lang: Lang): Co
     // only the queried field. Check error/ok before the read-only fields so a
     // successful action reports "Done." rather than echoing its readback.
     if (o.error) return finalText(lang === "zh" ? `執行失敗:${String(o.error)}` : `That didn't work: ${String(o.error)}`);
+    // Custom skill result (docs/skills.md example): { city, tempC, summary }.
+    if (typeof o.tempC === "number" && typeof o.summary === "string") {
+      return finalText(
+        lang === "zh"
+          ? `${String(o.city)}目前 ${o.tempC}°C,${o.summary}。`
+          : `${String(o.city)}: ${o.tempC}°C, ${o.summary.toLowerCase()}.`,
+      );
+    }
     if (o.ok === true) return finalText(t("done", lang));
     if (typeof o.volume === "number") {
       // Relative-volume flow: the get_volume readback came back — apply ±step.
@@ -155,6 +178,34 @@ const STRINGS = {
 };
 function t(key: keyof typeof STRINGS, lang: Lang): string {
   return STRINGS[key][lang];
+}
+
+/**
+ * Pull a place name out of a weather question, or undefined if this isn't one.
+ * Deliberately narrow: the offline brain is a pattern matcher, so it would
+ * rather fall through to the help text than send a garbage city to a skill.
+ */
+function matchWeatherCity(raw: string): string | undefined {
+  const s = raw.trim();
+  if (!/weather|forecast|天氣|氣溫/i.test(s)) return undefined;
+
+  const en = s.match(/(?:weather|forecast|temperature)\s*(?:like\s*)?(?:in|for|at)\s+([^?.!,]+)/i);
+  if (en?.[1]) return acceptCity(en[1]);
+
+  // "台北天氣如何?" / "台北的氣溫" — the place sits before the keyword.
+  const zh = s.match(/([^\s,，。！？?的]{2,12})(?:的)?\s*(?:天氣|氣溫)/);
+  if (zh?.[1]) return acceptCity(zh[1]);
+
+  return undefined;
+}
+/** Reject time words and other non-places the loose patterns can capture. */
+const NOT_A_CITY = new Set([
+  "today", "tomorrow", "tonight", "now", "outside", "here", "there",
+  "現在", "今天", "明天", "今晚", "外面", "這裡", "那裡",
+]);
+function acceptCity(captured: string): string | undefined {
+  const city = captured.replace(/[。.!?！？,，]+$/, "").trim();
+  return city && !NOT_A_CITY.has(city.toLowerCase()) ? city : undefined;
 }
 
 function isLouder(s: string): boolean {

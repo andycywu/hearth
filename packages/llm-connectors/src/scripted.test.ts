@@ -1,12 +1,27 @@
 import { describe, it, expect } from "vitest";
-import { Agent } from "@tv-ai-agent/core";
+import { Agent, defineTool, type Tool } from "@tv-ai-agent/core";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 import { createScriptedClient } from "./scripted.js";
 
-function makeAgent() {
+function makeAgent(tools: Tool[] = []) {
   const platform = createWebAdapter();
   const llm = createScriptedClient();
-  return { platform, agent: new Agent({ platform, llm }) };
+  return { platform, agent: new Agent({ platform, llm, tools }) };
+}
+
+/** Stand-in for the example skill in packages/skills-example (no network). */
+function fakeWeatherTool(calls: Array<Record<string, unknown>>): Tool {
+  return defineTool(
+    {
+      name: "get_weather",
+      description: "Current weather for a city.",
+      parameters: { city: { type: "string", description: "City", required: true } },
+    },
+    async (args) => {
+      calls.push(args);
+      return { city: String(args.city), tempC: 21.3, summary: "Light rain" };
+    },
+  ) as Tool;
 }
 
 describe("scripted client — full agent loop (offline)", () => {
@@ -78,6 +93,41 @@ describe("scripted client — full agent loop (offline)", () => {
     const out = await agent.run("現在音量多少?");
     expect(out).toContain("42");
     expect(out).toMatch(/音量/);
+  });
+
+  it("only proposes a custom skill's tool when the host registered it", async () => {
+    // Without the skill, a weather question must fall through to the help text
+    // rather than calling a tool that doesn't exist.
+    const { agent } = makeAgent();
+    const tools: string[] = [];
+    agent.events.on("tool:call", (e) => tools.push(e.name));
+    const out = await agent.run("what's the weather in Taipei?");
+    expect(tools).toEqual([]);
+    expect(out).toMatch(/I can set volume/);
+  });
+
+  it("calls a registered custom skill and renders its result", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const { agent } = makeAgent([fakeWeatherTool(calls)]);
+    const out = await agent.run("what's the weather in Taipei?");
+    expect(calls).toEqual([{ city: "Taipei" }]);
+    expect(out).toBe("Taipei: 21.3°C, light rain.");
+  });
+
+  it("understands a Chinese weather question", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const { agent } = makeAgent([fakeWeatherTool(calls)]);
+    const out = await agent.run("台北天氣如何?");
+    expect(calls).toEqual([{ city: "台北" }]);
+    expect(out).toContain("21.3°C");
+  });
+
+  it("doesn't mistake a time word for a city", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const { agent } = makeAgent([fakeWeatherTool(calls)]);
+    await agent.run("what's the weather today?");
+    await agent.run("現在天氣如何?");
+    expect(calls).toEqual([]);
   });
 
   it("resolves 'it' to the last launched app (coreference across turns)", async () => {

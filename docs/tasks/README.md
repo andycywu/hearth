@@ -17,7 +17,8 @@ pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm bundle:all && pnp
 - [x] [A3 — Raise test coverage](A3-test-coverage.md) — done: 54 → 105 tests.
 - [x] [A4 — Wire voice + confirm into device app entries](A4-device-entries.md) —
   done via shared `createConfirmHandler()` / `speakReplies()`.
-- [A5 — Skill tutorial + example skill](A5-skill-tutorial.md)
+- [x] [A5 — Skill tutorial + example skill](A5-skill-tutorial.md) — done:
+  `docs/skills.md` + `packages/skills-example` (`?skills=weather`).
 - [A6 — Nice-to-haves (badges, bench, i18n)](A6-nice-to-haves.md)
 
 ## Group B/C/D — need emulator / browser / release

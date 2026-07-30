@@ -92,12 +92,13 @@ Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6.
   engine has one and otherwise logs and approves (configurable via `fallback`),
   so a turn can't stall on an invisible dialog. All bundles build within budget.
 
-- [ ] **A5. Skill tutorial + example skill** (was deferred by the owner —
-  confirm before doing). Write `docs/skills.md` ("write a cross-vendor skill")
-  and a runnable example (e.g. a weather or smart-home tool via `defineTool`),
-  wired into the dev harness behind a flag. *Acceptance:* example tool works in
-  `pnpm dev`; doc explains the pure-logic vs capability-gated distinction (see the
-  chat history / `docs/POC.md`).
+- [x] **A5. Skill tutorial + example skill.** *Done (owner approved 2026-07-30).*
+  `docs/skills.md` explains pure-logic vs capability-gated skills and the rules a
+  portable one follows; `packages/skills-example` implements `get_weather` over
+  keyless Open-Meteo with 13 mock-`fetch` tests. Opt-in in the harness via
+  `?skills=weather`, and it works with the **offline** brain too: the scripted
+  client now reads the registered tool list and only proposes a skill's tool when
+  the host registered it.
 
 - [ ] **A6. Nice-to-haves.** README status badges (CI), a `pnpm bench` latency
   script for the agent loop, expand i18n beyond zh/en if needed.

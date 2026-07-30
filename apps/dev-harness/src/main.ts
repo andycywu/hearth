@@ -4,6 +4,8 @@ import {
   mountAgentOverlay, mountAgentCanvas, createConfirmHandler, speakReplies,
 } from "@tv-ai-agent/ui";
 import { createScriptedClient, createOpenAiCompatibleClient } from "@tv-ai-agent/llm-connectors";
+import { createWeatherTool } from "@tv-ai-agent/skills-example";
+import type { Tool } from "@tv-ai-agent/core";
 
 declare global {
   interface Window {
@@ -44,9 +46,17 @@ async function boot(): Promise<void> {
     ? createOpenAiCompatibleClient({ baseUrl, model, apiKey: window.__AGENT_LLM_API_KEY__ })
     : createScriptedClient();
 
+  // `?skills=weather` registers the example cross-vendor skill (docs/skills.md).
+  // Opt-in because it talks to the network, which the offline demo otherwise
+  // never does. Then try: "what's the weather in Taipei?"
+  const skills: Tool[] = /(^|[?&])skills=(weather|all)/.test(location.search)
+    ? [createWeatherTool() as Tool]
+    : [];
+
   const agent = new Agent({
     platform,
     llm,
+    tools: skills,
     // Demonstrate the confirmation gate: confirm-required tools (launch app,
     // switch input) prompt before running. Same handler the device hosts use.
     confirm: createConfirmHandler(),

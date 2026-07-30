@@ -11,7 +11,8 @@
     "@tv-ai-agent/core": "workspace:*",
     "@tv-ai-agent/adapter-web": "workspace:*",
     "@tv-ai-agent/ui": "workspace:*",
-    "@tv-ai-agent/llm-connectors": "workspace:*"
+    "@tv-ai-agent/llm-connectors": "workspace:*",
+    "@tv-ai-agent/skills-example": "workspace:*"
   },
   "license": "Apache-2.0"
 }

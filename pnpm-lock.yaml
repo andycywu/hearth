@@ -53,6 +53,9 @@ importers:
       '@tv-ai-agent/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
+      '@tv-ai-agent/skills-example':
+        specifier: workspace:*
+        version: link:../../packages/skills-example
       '@tv-ai-agent/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -156,6 +159,12 @@ importers:
         version: link:../adapter-web
 
   packages/platform-api: {}
+
+  packages/skills-example:
+    dependencies:
+      '@tv-ai-agent/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/ui:
     dependencies:

@@ -34,6 +34,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   implements `draw`. Blits is now a first-class renderer without adding Vite or
   Blits to `packages/*`.
 
+- **Skill authoring guide** (`docs/skills.md`): pure-logic vs capability-gated
+  skills, why that split decides whether a vendor signature is needed, and the
+  rules a portable skill follows.
+- **Example skill** `packages/skills-example` — `get_weather` over the keyless
+  Open-Meteo API (timeout, flat result, model-readable errors), 13 tests with a
+  fake `fetch`. Opt-in in the dev harness via `?skills=weather`.
+- The offline scripted brain is now capability-aware: it reads the registered
+  tool list and only proposes a custom skill's tool when the host registered it,
+  so `?skills=weather` works with no model at all.
 - `createConfirmHandler()` and `speakReplies()` in `@tv-ai-agent/ui`, and all
   three device hosts (Tizen / AOSP / webOS) now use them: high-impact tools are
   gated before they fire on a real TV, and replies are spoken where the platform

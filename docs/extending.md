@@ -3,6 +3,10 @@
 Two common extensions need **no core changes**: adding your own tools, and
 persisting conversations.
 
+> Writing a whole feature rather than a single tool? [`skills.md`](skills.md)
+> covers what makes a skill portable across every TV target, with a runnable
+> example (`packages/skills-example`).
+
 ## Custom tools
 
 Pass extra tools when constructing the `Agent`. They are registered alongside the
@@ -75,6 +79,14 @@ const restart = defineTool(
 
 When no `confirm` handler is set, confirm-required tools run without prompting —
 so opt in to the guard in production builds.
+
+## Skills vs. new device capabilities
+
+A tool that needs only `fetch` or arithmetic is a **skill** — portable to every
+target as-is. A tool that needs a privileged platform API is a **HAL change**:
+extend `platform-api`, implement it in every adapter, add it to
+`assertProviderContract`, then expose the tool. [`skills.md`](skills.md) explains
+the split and why it decides whether you need a vendor signature.
 
 ## New OS target
 

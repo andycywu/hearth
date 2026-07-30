@@ -9,6 +9,7 @@
     { "path": "packages/adapter-web" },
     { "path": "packages/adapter-webos" },
     { "path": "packages/llm-connectors" },
-    { "path": "packages/ui" }
+    { "path": "packages/ui" },
+    { "path": "packages/skills-example" }
   ]
 }

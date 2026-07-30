@@ -1,0 +1,18 @@
+{
+  "name": "@tv-ai-agent/skills-example",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Worked example of a cross-vendor skill: a keyless weather tool that runs identically on every TV target because it needs no device privilege. See docs/skills.md.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tv-ai-agent/core": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}
