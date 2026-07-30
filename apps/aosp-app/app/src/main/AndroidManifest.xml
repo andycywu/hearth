@@ -10,8 +10,26 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
+    <!--
+      Package visibility (API 30+): without this, queryIntentActivities returns
+      only pre-installed/visible packages, so list_apps and launch_app would come
+      back near-empty. We declare the launcher intents we actually query instead
+      of asking for QUERY_ALL_PACKAGES.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
-        android:label="TV AI Agent"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.TvAiAgent"
         android:allowBackup="true"
         android:supportsRtl="true">
         <activity

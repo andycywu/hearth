@@ -26,6 +26,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   identically on web / Tizen / AOSP / webOS (mocked), asserting the same tool
   sequence and end state — hardware-free Phase 2 proof.
 - LLM connector **retry/backoff** for transient failures (network / 5xx / 429).
+- Gradle wrapper (8.7) for `apps/aosp-app` so the Android host builds with one
+  command; the debug APK now compiles against the Android SDK.
+
+### Fixed
+- AOSP host crashed on launch: `AppCompatActivity` had no `Theme.AppCompat`
+  theme. Added `Theme.TvAiAgent` (no action bar, black window background).
+- AOSP `list_apps` / `launch_app` returned almost nothing on API 30+: added the
+  `<queries>` launcher-intent declarations required by package visibility
+  (instead of `QUERY_ALL_PACKAGES`).
+- Refreshed `pnpm-lock.yaml`: it predated `apps/webos-app`, `apps/dev-harness`
+  and `packages/acceptance`, so CI's `pnpm install --frozen-lockfile` would have
+  failed.
 
 ### Security
 - WebView hardening on AOSP (`MainActivity`: file-access flags, in-origin

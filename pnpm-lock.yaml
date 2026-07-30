@@ -39,6 +39,21 @@ importers:
         specifier: workspace:*
         version: link:../../packages/llm-connectors
 
+  apps/dev-harness:
+    dependencies:
+      '@tv-ai-agent/adapter-web':
+        specifier: workspace:*
+        version: link:../../packages/adapter-web
+      '@tv-ai-agent/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@tv-ai-agent/llm-connectors':
+        specifier: workspace:*
+        version: link:../../packages/llm-connectors
+      '@tv-ai-agent/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+
   apps/tizen-app:
     dependencies:
       '@tv-ai-agent/adapter-tizen':
@@ -50,6 +65,42 @@ importers:
       '@tv-ai-agent/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
+
+  apps/webos-app:
+    dependencies:
+      '@tv-ai-agent/adapter-webos':
+        specifier: workspace:*
+        version: link:../../packages/adapter-webos
+      '@tv-ai-agent/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@tv-ai-agent/llm-connectors':
+        specifier: workspace:*
+        version: link:../../packages/llm-connectors
+
+  packages/acceptance:
+    devDependencies:
+      '@tv-ai-agent/adapter-aosp':
+        specifier: workspace:*
+        version: link:../adapter-aosp
+      '@tv-ai-agent/adapter-tizen':
+        specifier: workspace:*
+        version: link:../adapter-tizen
+      '@tv-ai-agent/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
+      '@tv-ai-agent/adapter-webos':
+        specifier: workspace:*
+        version: link:../adapter-webos
+      '@tv-ai-agent/core':
+        specifier: workspace:*
+        version: link:../core
+      '@tv-ai-agent/llm-connectors':
+        specifier: workspace:*
+        version: link:../llm-connectors
+      '@tv-ai-agent/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
 
   packages/adapter-aosp:
     dependencies:
@@ -69,21 +120,39 @@ importers:
         specifier: workspace:*
         version: link:../platform-api
 
+  packages/adapter-webos:
+    dependencies:
+      '@tv-ai-agent/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
+
   packages/core:
     dependencies:
       '@tv-ai-agent/platform-api':
         specifier: workspace:*
         version: link:../platform-api
+    devDependencies:
+      '@tv-ai-agent/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
 
   packages/llm-connectors:
     dependencies:
       '@tv-ai-agent/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@tv-ai-agent/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
 
   packages/platform-api: {}
 
-  packages/ui: {}
+  packages/ui:
+    dependencies:
+      '@tv-ai-agent/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 

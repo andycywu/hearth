@@ -22,7 +22,11 @@ class MainActivity : AppCompatActivity() {
             settings.domStorageEnabled = true
             // Hardening: the bundle is local; deny cross-origin file access and
             // block the WebView from loading arbitrary remote content itself.
+            // These setters are deprecated but still honoured, and on minSdk 26
+            // they are the only way to pin the values (defaults differ per API).
+            @Suppress("DEPRECATION")
             settings.allowFileAccessFromFileURLs = false
+            @Suppress("DEPRECATION")
             settings.allowUniversalAccessFromFileURLs = false
             @Suppress("DEPRECATION")
             settings.allowFileAccess = false

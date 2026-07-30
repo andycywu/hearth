@@ -63,12 +63,12 @@ pnpm dev                                                  # browser demo (offlin
 ### GROUP A — no hardware needed (do these first, in VS Code)
 Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6.
 
-- [ ] **A1. Verify the Android host compiles.** A small Kotlin change
-  (`MainActivity` `start` intent extra; AccessibilityService; hardening) was made
-  but never compiled in the prior environment (no Android SDK there). Run
-  `cd apps/aosp-app && ./gradlew :app:assembleDebug` and fix any Kotlin errors.
-  *Acceptance:* APK builds. *Needs:* Android SDK + JDK 17 (likely already on the
-  dev machine).
+- [x] **A1. Verify the Android host compiles.** *Done.* Added the missing Gradle
+  wrapper (8.7); `./gradlew :app:assembleDebug` produces `app-debug.apk` with no
+  warnings. Kotlin compiled clean; two real bugs found by review and fixed: the
+  `AppCompatActivity` had no `Theme.AppCompat` theme (launch crash) and API 30+
+  package visibility made `list_apps`/`launch_app` come back empty (added
+  `<queries>`).
 
 - [ ] **A2. Promote Blits to a first-class UI renderer.** Currently a standalone
   demo (`apps/blits-demo`). Create `packages/ui-blits` (or a `ui` submodule)

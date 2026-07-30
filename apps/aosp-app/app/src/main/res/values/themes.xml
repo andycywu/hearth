@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      AppCompatActivity requires a Theme.AppCompat descendant; without one the
+      host crashes on launch. No action bar and a black window background: the
+      WebView paints the whole screen, so any other backdrop flashes on start.
+    -->
+    <style name="Theme.TvAiAgent" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>
