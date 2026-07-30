@@ -55,7 +55,13 @@ pnpm dev                                                  # browser demo (offlin
 
 ## TASKS — do these in order
 
+> **Detailed, executable specs live in [`docs/tasks/`](docs/tasks/README.md)** —
+> one file per Group A task (context, files, step-by-step, code sketches,
+> acceptance, verification). The list below is the summary; open the linked spec
+> before starting each.
+
 ### GROUP A — no hardware needed (do these first, in VS Code)
+Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6.
 
 - [ ] **A1. Verify the Android host compiles.** A small Kotlin change
   (`MainActivity` `start` intent extra; AccessibilityService; hardening) was made
