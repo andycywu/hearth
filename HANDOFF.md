@@ -13,17 +13,26 @@ per-OS differences. See `README.md`.
 
 ## Current state (as of this handoff)
 
-- Monorepo, pnpm workspaces, TypeScript project references. **54 tests green.**
+> **Group A is complete** (2026-07-30) — everything that needed no hardware. Next
+> up is **Group B**, which needs an emulator: start at `docs/EMULATOR_SETUP.md`.
+
+- Monorepo, pnpm workspaces, TypeScript project references. **141 tests green.**
 - Packages: `core`, `platform-api`, `adapter-web|tizen|aosp|webos`,
-  `llm-connectors`, `ui`, `acceptance` (cross-target parity test).
+  `llm-connectors`, `ui`, `skills-example`, `acceptance` (cross-target parity
+  test).
 - App hosts: `apps/tizen-app` (.wgt), `apps/aosp-app` (WebView + Kotlin bridge),
   `apps/webos-app` (.ipk), `apps/dev-harness` (browser), `apps/blits-demo`
   (standalone Lightning 3 / Blits WebGL — **not** in the workspace).
 - CI: build → typecheck → lint → test → license → bundle → size. Release workflow
   on `v*` tags. Dependabot, SBOM, security review, WebView hardening all in place.
-- Three renderers share the same agent-event wiring: DOM overlay, 2D canvas,
-  Blits WebGL. Offline "scripted brain" makes the whole stack runnable with no
-  model. Voice (Web Speech + wake word) in the web adapter.
+- Three renderers share one tested view-model (`createAgentViewModel`): DOM
+  overlay, 2D canvas, Blits WebGL. Offline "scripted brain" (en/zh/ja) makes the
+  whole stack runnable with no model. Voice (Web Speech + wake word) in the web
+  adapter; every host gates confirm-required tools and speaks replies.
+- The Android host compiles: `apps/aosp-app` has a committed Gradle wrapper, so
+  `./gradlew :app:assembleDebug` works given JDK 17+ and the Android SDK.
+- `pnpm bench` gives a harness-latency baseline; `?skills=weather` in the harness
+  demonstrates a portable skill (`docs/skills.md`).
 
 ## Environment / how to run
 
@@ -60,8 +69,9 @@ pnpm dev                                                  # browser demo (offlin
 > acceptance, verification). The list below is the summary; open the linked spec
 > before starting each.
 
-### GROUP A — no hardware needed (do these first, in VS Code)
-Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6.
+### GROUP A — no hardware needed — **all done (2026-07-30)**
+Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6. Kept here for context; the
+notes record what changed and what was deliberately left for later.
 
 - [x] **A1. Verify the Android host compiles.** *Done.* Added the missing Gradle
   wrapper (8.7); `./gradlew :app:assembleDebug` produces `app-debug.apk` with no
@@ -106,10 +116,14 @@ Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6.
   with a `{0}`-template phrase table; a non-blocking CI job that builds
   `apps/blits-demo`.
 
-### GROUP B — needs emulator or real hardware (Phase 2 bring-up)
+### GROUP B — needs emulator or real hardware (Phase 2 bring-up) ← **start here**
 
 Follow `docs/EMULATOR_SETUP.md` (Stage A) then `docs/BRINGUP_CHECKLIST.md`.
 No vendor signatures needed for the POC — see `docs/POC.md`.
+
+The debug APK is already built at
+`apps/aosp-app/app/build/outputs/apk/debug/app-debug.apk` (rebuild with
+`pnpm bundle:aosp && cd apps/aosp-app && ./gradlew :app:assembleDebug`).
 
 - [ ] **B1. Android TV emulator** — install the debug APK, run the acceptance
   script + `?diag` (`adb shell am start -n tv.titanos.aiagent/.MainActivity -e start "index.html?diag"`).
@@ -136,17 +150,29 @@ No vendor signatures needed for the POC — see `docs/POC.md`.
 
 ## Gotchas / notes
 
-- The prior environment was a sandbox; a couple of hand-off caveats:
-  - Kotlin/Android and the Blits demo were **not compiled** there (no Android SDK
-    / it's a separate install). Verify locally (A1, A2).
-  - `apps/blits-demo` is intentionally **outside** the pnpm workspace; install it
-    separately (`cd apps/blits-demo && npm install`).
+- Both previously-uncompiled parts now build: the Android host (Gradle wrapper is
+  committed; `local.properties` with `sdk.dir=…` is git-ignored, add it if Gradle
+  can't find the SDK, and `JAVA_HOME=<Android Studio>/jbr` works as the JDK) and
+  the Blits demo.
+- `apps/blits-demo` is intentionally **outside** the pnpm workspace; install it
+  separately (`cd apps/blits-demo && npm install`). CI builds it in a separate
+  non-blocking job.
+- `apps/tizen-app/Debug/` is committed Tizen Studio output containing a stale copy
+  of `src/main.ts`; ignore it, don't edit it. (Left tracked by owner's choice.)
 - Windows line endings: `.gitattributes` normalizes to LF — expected.
+- If `pnpm` isn't on PATH, `corepack pnpm <cmd>` works, but nested scripts call
+  `pnpm` directly — put a `pnpm` shim on PATH (or run `corepack enable pnpm` from
+  an elevated shell) before `pnpm build`.
 - If `pnpm check:size` fails, a dependency bloated a bundle; investigate before
   raising the budget in `tools/check-bundle-size.mjs`.
 - Docs index: `docs/STATUS.md` (snapshot), `docs/DEVELOPMENT_PLAN.md` (roadmap),
-  `docs/api.md`, `docs/extending.md`, `docs/POC.md`, `docs/EMULATOR_SETUP.md`,
-  `docs/BRINGUP_CHECKLIST.md`, `docs/SECURITY_REVIEW.md`.
+  `docs/api.md`, `docs/extending.md`, `docs/skills.md`, `docs/POC.md`,
+  `docs/EMULATOR_SETUP.md`, `docs/BRINGUP_CHECKLIST.md`, `docs/SECURITY_REVIEW.md`.
+- Deliberately **not** done, so nobody assumes otherwise: real focusable confirm
+  dialogs per platform (`createConfirmHandler({ ask })` is the seam — today it
+  falls back to `window.confirm`), and the device hosts still mount no UI shell of
+  their own (they stash the agent on `window.__tvAgent`; only the dev harness and
+  the Blits demo render).
 
 Keep it green, keep the HAL boundary clean, and update `CHANGELOG.md` + this file
 as tasks are completed.
