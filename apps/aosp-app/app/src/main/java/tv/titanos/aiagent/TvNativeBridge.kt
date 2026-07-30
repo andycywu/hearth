@@ -38,17 +38,24 @@ class TvNativeBridge(private val ctx: Context) {
         .put("capabilities", JSONObject().put("media", true).put("voice", false))
         .toString()
 
+    /**
+     * The HAL speaks 0-100; Android speaks 0..getStreamMaxVolume (often 15 or 25
+     * steps). Round rather than truncate in both directions — integer division
+     * biased every value downwards, so "set volume to 30" read back as 28 and the
+     * error compounded across relative adjustments. Some quantization is
+     * unavoidable: with 25 steps the reachable values are multiples of 4.
+     */
     @JavascriptInterface
     fun getVolume(): Int {
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
         val cur = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
-        return (cur * 100 / max)
+        return Math.round(cur * 100f / max)
     }
 
     @JavascriptInterface
     fun setVolume(level: Int) {
-        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val target = (level.coerceIn(0, 100) * max / 100)
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        val target = Math.round(level.coerceIn(0, 100) * max / 100f)
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
     }
 

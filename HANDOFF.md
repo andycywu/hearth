@@ -125,11 +125,27 @@ The debug APK is already built at
 `apps/aosp-app/app/build/outputs/apk/debug/app-debug.apk` (rebuild with
 `pnpm bundle:aosp && cd apps/aosp-app && ./gradlew :app:assembleDebug`).
 
-- [ ] **B1. Android TV emulator** — install the debug APK, run the acceptance
-  script + `?diag` (`adb shell am start -n tv.titanos.aiagent/.MainActivity -e start "index.html?diag"`).
+- [x] **B1. Android TV emulator** — *done (2026-07-30).* Android TV 34 (x86) AVD,
+  debug APK installed, `?diag&writes` clean (12 ok / 0 errors) and the acceptance
+  script **PASSES** with the same tool sequence as CI
+  (`node tools/device-acceptance.mjs`). Four device-only bugs found and fixed on
+  the way — see the notes below. Navigation works with no signing via the
+  AccessibilityService.
 - [ ] **B2. Tizen TV emulator** — dev-signed `.wgt`, acceptance script + `?diag`.
-- [ ] **B3. Fill `docs/platform/capability-matrix.md`** from the `?diag` reports.
-- [ ] **B4. Point at a local model** (`?llm=` / globals) and re-run the script
+  **Blocked on you, not on code:** Tizen Studio is installed but has no TV
+  extension/emulator image (its package-manager CLI needs elevation) and no
+  certificate (needs an interactive Samsung-account sign-in). Details at the top
+  of `docs/EMULATOR_SETUP.md` §A2. The Tizen entry already supports `?diag`,
+  `?llm=` and `?confirm=`.
+- [x] **B3. Fill `docs/platform/capability-matrix.md`** — *done for the AOSP
+  emulator column*, including the platform behaviours that differ from the mocks
+  (volume quantization, mute zeroing the volume readback, focus-dependent keys).
+  Remaining columns need hardware or the Tizen emulator.
+- [~] **B4. Point at a local model** (`?llm=` / globals) — *plumbing done and
+  proven:* `?llm=` now works on all three device hosts, and the on-device run above
+  drove the agent through an HTTP endpoint (`tools/mock-llm-server.mjs`) rather than
+  a built-in brain. Pointing at a *real* local model (Ollama/llama.cpp) is the
+  remaining step — same command, different `--llm`/`?llm=` value
   (`docs/on-device-inference.md`).
 - [ ] **B5. Real MTK/NVT boards** (needs hardware) — repeat; for gated controls
   self-sign on your own eng board (POC Stage C) and implement the stubbed bridge

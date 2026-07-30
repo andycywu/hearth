@@ -1,21 +1,55 @@
 package tv.titanos.aiagent
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Bundle
 import android.webkit.JsResult
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.webkit.WebViewAssetLoader
 
 /**
  * Host activity. Loads the web-based agent runtime (bundled into assets) inside
  * a WebView and installs the native bridge the AOSP adapter expects.
+ *
+ * The bundle is served through [WebViewAssetLoader] on a virtual origin rather
+ * than `file:///android_asset/`. This is not cosmetic: `file://` pages have a
+ * null origin, so the engine refuses to load `main.js` as an ES module ("blocked
+ * by CORS policy: Cross origin requests are only supported for protocol schemes:
+ * http, data, chrome, https") and the runtime never starts. A real origin also
+ * makes the shipped CSP, `localStorage` and `fetch` behave as in every other host.
+ *
+ * That origin is **http**, deliberately. An on-device model server (llama.cpp,
+ * Ollama, vLLM) speaks plain http on localhost, and WebView — unlike desktop
+ * Chrome — does not exempt localhost from mixed-content blocking, so an https
+ * page cannot reach it at all: `fetch` fails with a bare "Failed to fetch", and
+ * `MIXED_CONTENT_COMPATIBILITY_MODE` doesn't help because fetch/XHR stay
+ * blockable. Serving the app over http makes those calls same-scheme, which lets
+ * us keep [WebSettings.MIXED_CONTENT_NEVER_ALLOW].
+ *
+ * The trade-off is that the page is not a secure context, so browser-level
+ * `getUserMedia`/Web Speech are unavailable — on this platform voice comes
+ * through the native bridge anyway. Requests are still constrained by the CSP in
+ * `index.html` (`script-src 'self'`, `connect-src` limited to localhost and
+ * https), by `res/xml/network_security_config.xml` (cleartext for loopback only)
+ * and by navigation being pinned to this origin in [WebViewClient].
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+
+    private val assetLoader: WebViewAssetLoader by lazy {
+        WebViewAssetLoader.Builder()
+            .setHttpAllowed(true)   // see the class comment: local model servers are http
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,14 +68,20 @@ class MainActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             settings.allowFileAccess = false
             settings.allowContentAccess = false
+            // Keep the strictest mixed-content policy. We can afford it because
+            // the app itself is served over http from the virtual origin below,
+            // so talking to a local model server is same-scheme, not mixed.
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             webViewClient = object : WebViewClient() {
-                // Keep navigation inside the bundled asset origin.
+                // Serve APP_BASE/* out of the APK's assets.
+                override fun shouldInterceptRequest(
+                    view: WebView, request: WebResourceRequest,
+                ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+
+                // Keep navigation inside our own origin.
                 override fun shouldOverrideUrlLoading(
-                    view: WebView, request: android.webkit.WebResourceRequest,
-                ): Boolean {
-                    val url = request.url.toString()
-                    return !url.startsWith("file:///android_asset/")
-                }
+                    view: WebView, request: WebResourceRequest,
+                ): Boolean = !request.url.toString().startsWith(APP_BASE)
             }
             // Without a WebChromeClient, a WebView silently cancels JS dialogs —
             // window.confirm() returns false, so every confirm-required tool
@@ -75,16 +115,42 @@ class MainActivity : AppCompatActivity() {
             addJavascriptInterface(TvNativeBridge(this@MainActivity), "TvNativeBridge")
         }
         setContentView(webView)
-        // Runtime web bundle is copied to app/src/main/assets by tools/bundle.mjs.
-        // A "start" intent extra lets you open a specific page/query without a
-        // rebuild, e.g. for the capability probe:
-        //   adb shell am start -n tv.titanos.aiagent/.MainActivity -e start "index.html?diag"
+        load(intent)
+    }
+
+    /**
+     * The activity is `singleTop`, so a second `am start` re-uses this instance
+     * and arrives here instead of onCreate. Reloading on a new intent is what
+     * lets bring-up switch pages (`?diag`, `?llm=…`) on a running app — and it
+     * matters that the process survives: force-stopping the app makes Android
+     * drop it from the enabled-accessibility-services list, which silently
+     * disables navigation.
+     */
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        load(intent)
+    }
+
+    /**
+     * Runtime web bundle is copied to app/src/main/assets by tools/bundle.mjs.
+     * A "start" intent extra opens a specific page/query without a rebuild:
+     *   adb shell am start -n tv.titanos.aiagent/.MainActivity -e start "index.html?diag"
+     * Constrained to our own index.html so an untrusted intent can't point the
+     * WebView somewhere else.
+     */
+    private fun load(intent: Intent?) {
         val start = intent?.getStringExtra("start")?.takeIf { it.startsWith("index.html") } ?: "index.html"
-        webView.loadUrl("file:///android_asset/$start")
+        webView.loadUrl(APP_BASE + start)
     }
 
     override fun onDestroy() {
         webView.destroy()
         super.onDestroy()
+    }
+
+    companion object {
+        /** Virtual origin WebViewAssetLoader serves the APK's assets on. */
+        private const val APP_BASE = "http://appassets.androidplatform.net/assets/"
     }
 }

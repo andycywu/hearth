@@ -87,6 +87,29 @@ Device bring-up (Phase 2 tooling):
   behaviour unchanged.
 
 ### Fixed
+- **AOSP: the runtime never started on a device.** `index.html` loads `main.js` as
+  an ES module, and module scripts are CORS-blocked from `file://` (null origin),
+  so the WebView only ever showed the placeholder page. Assets are now served
+  through `WebViewAssetLoader` on a virtual origin.
+- **AOSP: no request to a local model could succeed.** Android blocks cleartext
+  http from targetSdk 28, so every call to an on-device model server failed with a
+  bare "Failed to fetch". Added `network_security_config.xml` permitting cleartext
+  for loopback only (not app-wide). The app origin is http for the same reason:
+  WebView, unlike desktop Chrome, does not exempt localhost from mixed-content
+  blocking, and `MIXED_CONTENT_COMPATIBILITY_MODE` still blocks fetch/XHR.
+- **AOSP: relaunching with new flags did nothing.** `am start` on a running app
+  didn't redeliver the intent, so `?diag` / `?llm=` were ignored; the activity is
+  now `singleTop` and reloads in `onNewIntent`. This also avoids `force-stop`,
+  which makes Android drop the app from the enabled-accessibility list and thereby
+  disables navigation.
+- **AOSP: "not supported" reasons were lost across the bridge.** Android replaces
+  anything thrown inside a `@JavascriptInterface` method with a generic "Java
+  exception was raised during method invocation", so a merely-unavailable
+  capability was reported as a hard **error** in bring-up. The adapter now supplies
+  the reason (and points at the accessibility-service setup where relevant).
+- **AOSP: volume drifted.** The 0-100 ↔ device-steps conversion truncated in both
+  directions, biasing every value down and compounding across relative
+  adjustments; it now rounds.
 - AOSP: the WebView had no `WebChromeClient`, so `window.confirm()` was silently
   cancelled — every confirm-required tool (switch input, launch app) looked as if
   a user had declined it without ever being asked. The host now shows a real,

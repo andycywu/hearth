@@ -58,8 +58,12 @@ export function createAospAdapter(): PlatformProvider {
       getMute: async () => bridge.getMute(),
       setMute: async (m) => bridge.setMute(m),
       getInputSource: async () => bridge.getInputSource() as InputSource,
-      setInputSource: async (s) => bridge.setInputSource(s),
-      powerStandby: async () => bridge.powerStandby(),
+      setInputSource: async (s) => {
+        callNative("setInputSource (needs a platform signature on most builds)", () => bridge.setInputSource(s));
+      },
+      powerStandby: async () => {
+        callNative("powerStandby (needs the DEVICE_POWER system permission)", () => bridge.powerStandby());
+      },
     },
     apps: {
       listInstalledApps: async () => JSON.parse(bridge.listInstalledApps()) as AppEntry[],
@@ -72,7 +76,15 @@ export function createAospAdapter(): PlatformProvider {
         matchAppsByName(JSON.parse(bridge.listInstalledApps()) as AppEntry[], q),
     },
     navigation: {
-      sendKey: async (k: RemoteKey) => bridge.sendKey(k),
+      sendKey: async (k: RemoteKey) => {
+        const enabled = bridge.isAccessibilityEnabled?.() ?? false;
+        callNative(
+          enabled
+            ? `key '${k}' via accessibility (not every key is reachable this way)`
+            : "navigation — enable the accessibility service first (navigation.requestSetup)",
+          () => bridge.sendKey(k),
+        );
+      },
       isAvailable: async () => bridge.isAccessibilityEnabled?.() ?? false,
       requestSetup: async () => bridge.openAccessibilitySettings?.(),
     },
@@ -92,3 +104,21 @@ export function createAospAdapter(): PlatformProvider {
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+
+/**
+ * Call a bridge method that may legitimately be unavailable.
+ *
+ * Android replaces anything thrown inside a `@JavascriptInterface` method with a
+ * generic "Java exception was raised during method invocation" — the Kotlin
+ * side's message never crosses the bridge. Without this, a known-unavailable
+ * capability looks like a hard error to the agent and shows up red in the
+ * bring-up report instead of as "unsupported". So we supply the reason here,
+ * where we still know it, in the "Not supported: …" form the HAL expects.
+ */
+function callNative(reason: string, fn: () => void): void {
+  try {
+    fn();
+  } catch {
+    throw new Error(`Not supported: ${reason}`);
+  }
+}

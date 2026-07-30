@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android blocks cleartext (plain http) traffic by default from targetSdk 28, so
+  an on-device model server — llama.cpp / Ollama / vLLM, none of which do TLS —
+  is unreachable and every call fails with a bare "Failed to fetch".
+
+  We permit cleartext ONLY for loopback, not app-wide (`usesCleartextTraffic`),
+  so the agent can talk to a model running on the TV itself while any real remote
+  endpoint still has to be https.
+
+  Pointing at a model on another machine? Prefer `adb reverse tcp:8080 tcp:8080`
+  (the TV then talks to its own 127.0.0.1) over adding a LAN address here — that
+  keeps this allowlist, the app's CSP and the shipped build unchanged. 10.0.2.2 is
+  included because it is how an Android emulator reaches its host.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

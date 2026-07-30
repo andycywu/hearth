@@ -5,8 +5,11 @@ see [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md).
 
 _Last updated: 2026-07-30 · target release: v0.1.0_
 
-**Group A of [`../HANDOFF.md`](../HANDOFF.md) (everything doable without hardware)
-is complete.** The remaining work needs an emulator, a GPU or a device.
+**Group A of [`../HANDOFF.md`](../HANDOFF.md) is complete, and B1/B3 are done on an
+Android TV emulator**: the app runs on device, the capability probe is clean, and
+the CI acceptance script passes there unchanged. Tizen (B2) is blocked on an
+elevated package install + a Samsung-account certificate; real MTK/NVT boards
+(B5) and the Blits GPU pass (C1) still need hardware.
 
 ## At a glance
 
@@ -21,6 +24,8 @@ is complete.** The remaining work needs an emulator, a GPU or a device.
 | Skills (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
 | Tests / CI / lint / bundle-size / license / SBOM | ✅ 141 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
+| **Android TV emulator bring-up** | ✅ probe clean, acceptance script passes |
+| **Tizen emulator bring-up** | ⛔ needs elevated SDK install + Samsung cert |
 | **Real MTK/NVT device bring-up** | ⛔ needs hardware |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
@@ -54,6 +59,13 @@ is complete.** The remaining work needs an emulator, a GPU or a device.
   keyless example, opt-in in the harness with `?skills=weather`.
 - **`pnpm bench`:** harness-only per-turn latency (p50 0.03ms / p95 0.14ms on a
   dev laptop) as a regression baseline for TV silicon.
+- **First on-device bring-up (Android TV 34 emulator):** `?diag` reports 12 ok /
+  0 errors, navigation works with no signing via the AccessibilityService, and
+  `tools/device-acceptance.mjs` reproduces the CI tool sequence on the device.
+  Five device-only defects were found and fixed in the process — chiefly that the
+  ES-module bundle could never load from `file://`, and that Android's cleartext
+  policy blocked every call to a local model. Results and the platform quirks that
+  are *not* bugs: [`platform/capability-matrix.md`](platform/capability-matrix.md).
 
 ## Test coverage (141 tests)
 

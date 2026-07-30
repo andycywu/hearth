@@ -81,6 +81,42 @@ describe("adapter-aosp", () => {
     });
   });
 
+  describe("opaque native exceptions", () => {
+    // Android replaces whatever Kotlin throws inside a @JavascriptInterface
+    // method with a generic message, so the adapter has to supply the reason.
+    const androidStyleThrow = () => { throw new Error("Java exception was raised during method invocation"); };
+
+    it("explains an unavailable input switch", async () => {
+      bridge().setInputSource = androidStyleThrow;
+      await expect(createAospAdapter().system.setInputSource("hdmi1"))
+        .rejects.toThrow(/Not supported: setInputSource .*platform signature/);
+    });
+
+    it("explains an unavailable standby", async () => {
+      bridge().powerStandby = androidStyleThrow;
+      await expect(createAospAdapter().system.powerStandby())
+        .rejects.toThrow(/Not supported: powerStandby .*DEVICE_POWER/);
+    });
+
+    it("points at the accessibility service when navigation is off", async () => {
+      bridge().isAccessibilityEnabled = () => false;
+      bridge().sendKey = androidStyleThrow;
+      await expect(createAospAdapter().navigation.sendKey("ok"))
+        .rejects.toThrow(/Not supported: navigation — enable the accessibility service/);
+    });
+
+    it("blames the key, not the setup, once the service is on", async () => {
+      bridge().isAccessibilityEnabled = () => true;
+      bridge().sendKey = androidStyleThrow;
+      await expect(createAospAdapter().navigation.sendKey("channelup"))
+        .rejects.toThrow(/Not supported: key 'channelup' via accessibility/);
+    });
+
+    it("stays quiet when the native call succeeds", async () => {
+      await expect(createAospAdapter().navigation.sendKey("ok")).resolves.toBeUndefined();
+    });
+  });
+
   it("clamps the volume the host receives", async () => {
     const platform = createAospAdapter();
     await platform.system.setVolume(140);
