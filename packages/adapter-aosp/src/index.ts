@@ -33,10 +33,12 @@ interface NativeBridge {
   kvDelete(key: string): void;
 }
 
-declare const TvNativeBridge: NativeBridge | undefined;
-
 export function createAospAdapter(): PlatformProvider {
-  const bridge = TvNativeBridge;
+  // Read the injected interface off globalThis: a bare `TvNativeBridge`
+  // reference throws a bare ReferenceError when the host hasn't installed it
+  // (plain browser, or the bundle ran before addJavascriptInterface), which
+  // would hide the actionable message below.
+  const bridge = (globalThis as { TvNativeBridge?: NativeBridge }).TvNativeBridge;
   if (!bridge) throw new Error("TvNativeBridge not found — are you running inside the AOSP host WebView?");
 
   const info = JSON.parse(bridge.getDeviceInfo()) as Partial<DeviceInfo>;

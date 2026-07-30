@@ -57,6 +57,140 @@ describe("createOpenAiCompatibleClient retry", () => {
   });
 });
 
+describe("createOpenAiCompatibleClient request mapping", () => {
+  /** Captures the request body so the wire shape can be asserted. */
+  function capturingClient(opts: Partial<Parameters<typeof createOpenAiCompatibleClient>[0]> = {}) {
+    const seen: { url?: string; headers?: any; body?: any } = {};
+    const fetchImpl = (async (url: string, init: any) => {
+      seen.url = url;
+      seen.headers = init.headers;
+      seen.body = JSON.parse(init.body);
+      return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: "ok" } }] }) };
+    }) as unknown as typeof fetch;
+    const client = createOpenAiCompatibleClient({
+      baseUrl: "http://x/v1", model: "m", fetchImpl, ...opts,
+    });
+    return { client, seen };
+  }
+
+  it("maps an assistant tool call and its tool result to the OpenAI wire shape", async () => {
+    const { client, seen } = capturingClient();
+    await client.complete({
+      messages: [
+        { role: "system", content: "sys" },
+        { role: "user", content: "volume 30" },
+        { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "set_volume", args: { level: 30 } }] },
+        { role: "tool", toolCallId: "c1", content: '{"ok":true}' },
+      ],
+      tools: [],
+    });
+    expect(seen.body.messages).toEqual([
+      { role: "system", content: "sys" },
+      { role: "user", content: "volume 30" },
+      {
+        role: "assistant",
+        // The API rejects an empty string alongside tool_calls; it must be null.
+        content: null,
+        tool_calls: [{
+          id: "c1",
+          type: "function",
+          function: { name: "set_volume", arguments: '{"level":30}' },
+        }],
+      },
+      { role: "tool", tool_call_id: "c1", content: '{"ok":true}' },
+    ]);
+  });
+
+  it("keeps assistant text that accompanies a tool call", async () => {
+    const { client, seen } = capturingClient();
+    await client.complete({
+      messages: [{ role: "assistant", content: "Setting it now.", toolCalls: [{ id: "c2", name: "set_mute", args: { mute: true } }] }],
+      tools: [],
+    });
+    expect(seen.body.messages[0].content).toBe("Setting it now.");
+  });
+
+  it("translates tool specs into JSON-schema function definitions", async () => {
+    const { client, seen } = capturingClient();
+    await client.complete({
+      messages: [],
+      tools: [{
+        name: "set_input_source",
+        description: "Switch input",
+        confirm: true,
+        parameters: {
+          source: { type: "string", description: "Input id", required: true, enum: ["hdmi1", "tv"] },
+          force: { type: "boolean", description: "Skip checks" },
+        },
+      }],
+    });
+    expect(seen.body.tools).toEqual([{
+      type: "function",
+      function: {
+        name: "set_input_source",
+        description: "Switch input",
+        parameters: {
+          type: "object",
+          properties: {
+            source: { type: "string", description: "Input id", required: true, enum: ["hdmi1", "tv"] },
+            force: { type: "boolean", description: "Skip checks" },
+          },
+          required: ["source"],   // only the required ones, derived from the spec
+        },
+      },
+    }]);
+    expect(seen.body.tool_choice).toBe("auto");
+  });
+
+  it("posts to /chat/completions, sends the api key only when set, and flags streaming", async () => {
+    const plain = capturingClient();
+    await plain.client.complete({ messages: [], tools: [] });
+    expect(plain.seen.url).toBe("http://x/v1/chat/completions");
+    expect(plain.seen.headers.authorization).toBeUndefined();
+    expect(plain.seen.body).toMatchObject({ model: "m", stream: false, temperature: 0.2, max_tokens: 512 });
+
+    const keyed = capturingClient({ apiKey: "sk-test" });
+    await keyed.client.complete({ messages: [], tools: [], temperature: 0.9, maxTokens: 64 });
+    expect(keyed.seen.headers.authorization).toBe("Bearer sk-test");
+    expect(keyed.seen.body).toMatchObject({ temperature: 0.9, max_tokens: 64 });
+  });
+
+  it("parses tool calls out of a non-streaming response", async () => {
+    const fetchImpl = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: null,
+            tool_calls: [{ id: "c9", type: "function", function: { name: "launch_app", arguments: '{"appId":"netflix"}' } }],
+          },
+        }],
+      }),
+    })) as unknown as typeof fetch;
+    const client = createOpenAiCompatibleClient({ baseUrl: "http://x/v1", model: "m", fetchImpl });
+    const r = await client.complete({ messages: [], tools: [] });
+    expect(r.wantsToolCalls).toBe(true);
+    expect(r.message.toolCalls?.[0]).toMatchObject({ id: "c9", name: "launch_app", args: { appId: "netflix" } });
+    expect(r.message.content).toBe("");
+  });
+
+  it("treats unparseable tool arguments as empty args instead of throwing", async () => {
+    // Small local models do emit malformed JSON; the agent should get a chance
+    // to recover from a tool-validation error rather than crash the turn.
+    const fetchImpl = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { tool_calls: [{ id: "c1", function: { name: "set_volume", arguments: "{level: thirty" } }] } }],
+      }),
+    })) as unknown as typeof fetch;
+    const client = createOpenAiCompatibleClient({ baseUrl: "http://x/v1", model: "m", fetchImpl });
+    const r = await client.complete({ messages: [], tools: [] });
+    expect(r.message.toolCalls?.[0]?.args).toEqual({});
+  });
+});
+
 describe("createOpenAiCompatibleClient.completeStream", () => {
   it("streams over a mocked SSE response", async () => {
     const sse =

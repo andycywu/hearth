@@ -77,11 +77,13 @@ Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6.
   `packages/*` — the demo keeps its own install. `npm run build` in the demo is
   green. *Rendering/perf verification still needs a browser (Group C / C1).*
 
-- [ ] **A3. Raise test coverage.** Add unit tests for: media tools
-  (`media_play/pause/resume/seek`), `set_input_source` / `get_input_source`
-  tools, diagnostics `allowWrites` path per adapter, and the AOSP/webOS
-  navigation `isAvailable` behaviour. *Acceptance:* tests added and green; overall
-  count goes up.
+- [x] **A3. Raise test coverage.** *Done — 54 → 105 tests.* Added: TV tool
+  behaviour + media capability gating (`tv-tools.test.ts`), diagnostics
+  write/restore + navigation-readiness paths, AOSP accessibility gating and
+  volume clamping, webOS Luna mapping and partner-gated degradation, OpenAI
+  request/message mapping, web-adapter state and `has()` semantics. Found and
+  fixed a real bug: the AOSP adapter's "not found" guard was unreachable
+  (`ReferenceError` came first).
 
 - [ ] **A4. Wire voice + confirm into the device app entries.** `apps/tizen-app`,
   `apps/aosp-app/web`, `apps/webos-app` mains currently create the Agent without

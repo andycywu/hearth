@@ -1,6 +1,8 @@
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertProviderContract } from "@tv-ai-agent/platform-api";
 import { createAospAdapter } from "./index.js";
+
+const bridge = (): any => (globalThis as any).TvNativeBridge;
 
 /** Minimal in-memory stand-in for the Kotlin TvNativeBridge. */
 function installMockBridge(): void {
@@ -39,5 +41,59 @@ describe("adapter-aosp", () => {
 
   it("satisfies the provider contract via the native bridge", async () => {
     await assertProviderContract(() => createAospAdapter());
+  });
+
+  it("throws a useful error outside the host WebView", () => {
+    delete (globalThis as any).TvNativeBridge;
+    expect(() => createAospAdapter()).toThrow(/TvNativeBridge not found/);
+  });
+
+  describe("navigation readiness", () => {
+    // On retail Android TV, keys only work once the user enables the
+    // accessibility service — so isAvailable() must mirror the service state,
+    // letting the agent prompt for setup instead of silently doing nothing.
+    it("is unavailable while the accessibility service is off", async () => {
+      bridge().isAccessibilityEnabled = () => false;
+      expect(await createAospAdapter().navigation.isAvailable!()).toBe(false);
+    });
+
+    it("is available once the accessibility service is on", async () => {
+      bridge().isAccessibilityEnabled = () => true;
+      expect(await createAospAdapter().navigation.isAvailable!()).toBe(true);
+    });
+
+    it("is unavailable on an older host that doesn't expose the check", async () => {
+      // The bridge method is optional; assume "not ready" rather than "ready".
+      expect(bridge().isAccessibilityEnabled).toBeUndefined();
+      expect(await createAospAdapter().navigation.isAvailable!()).toBe(false);
+    });
+
+    it("routes requestSetup to the Accessibility settings screen", async () => {
+      let opened = 0;
+      bridge().openAccessibilitySettings = () => { opened++; };
+      await createAospAdapter().navigation.requestSetup!();
+      expect(opened).toBe(1);
+    });
+
+    it("doesn't blow up when the host can't open settings", async () => {
+      expect(bridge().openAccessibilitySettings).toBeUndefined();
+      await expect(createAospAdapter().navigation.requestSetup!()).resolves.toBeUndefined();
+    });
+  });
+
+  it("clamps the volume the host receives", async () => {
+    const platform = createAospAdapter();
+    await platform.system.setVolume(140);
+    expect(await platform.system.getVolume()).toBe(100);
+    await platform.system.setVolume(-10);
+    expect(await platform.system.getVolume()).toBe(0);
+  });
+
+  it("maps an absent foreground app and absent storage key to null", async () => {
+    const platform = createAospAdapter();
+    expect(await platform.apps.getForegroundApp()).toBeNull();
+    expect(await platform.storage.get("nope")).toBeNull();
+    await platform.storage.set("k", "v");
+    expect(await platform.storage.get("k")).toBe("v");
   });
 });

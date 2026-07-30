@@ -34,6 +34,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   implements `draw`. Blits is now a first-class renderer without adding Vite or
   Blits to `packages/*`.
 
+- Test coverage raised from 54 to 105: TV tool behaviour and media capability
+  gating, diagnostics write/restore and navigation-readiness paths, AOSP
+  accessibility gating, webOS Luna mapping, OpenAI request/message mapping, and
+  web-adapter state/`has()` semantics.
+
 ### Changed
 - `mountAgentOverlay` / `mountAgentCanvas` render the shared view-model instead
   of each subscribing to the agent bus themselves; public signatures and visual
@@ -42,6 +47,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 - AOSP host crashed on launch: `AppCompatActivity` had no `Theme.AppCompat`
   theme. Added `Theme.TvAiAgent` (no action bar, black window background).
+- `createAospAdapter()` threw a bare `ReferenceError: TvNativeBridge is not
+  defined` instead of its own "are you running inside the AOSP host WebView?"
+  message — the guard was unreachable because the global was read directly.
+  It now reads the bridge off `globalThis`.
 - AOSP `list_apps` / `launch_app` returned almost nothing on API 30+: added the
   `<queries>` launcher-intent declarations required by package visibility
   (instead of `QUERY_ALL_PACKAGES`).
