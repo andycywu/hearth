@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget xmlns="http://www.w3.org/ns/widgets"
         xmlns:tizen="http://tizen.org/ns/widgets"
-        id="https://aiagent.tv/harness"
+        id="http://aiagent.tv/harness"
         version="0.1.0" viewmodes="maximized">
-  <tizen:application id="tvaiagent.TvAiAgent"
-                     package="tvaiagent"
+  <!--
+    package MUST be exactly 10 alphanumeric characters. "tvaiagent" (9) is
+    silently rejected by the installer as
+      install failed[118, -4] ... Operation not allowed : :Load archive info fail
+    which says nothing about the id. Hence the trailing 0.
+  -->
+  <tizen:application id="tvaiagent0.TvAiAgent"
+                     package="tvaiagent0"
                      required_version="6.0"/>
   <content src="index.html"/>
   <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>

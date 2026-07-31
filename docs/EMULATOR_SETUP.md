@@ -147,39 +147,59 @@ export TIZEN_CORE="C:/tizen-studio/tools/tizen-core/tz.exe"
 "$TIZEN_CORE" --help
 ```
 
-### Certificates: three tiers, and which one you actually need
+### `Load archive info fail` — read this before you debug anything
 
-This tripped us up, so be precise about it:
-
-| Certificate | Get it from | Lets you |
-|---|---|---|
-| Generic Tizen author + `tizen_public_signer` | `tz cert`, offline | **Build and sign** a `.wgt` |
-| **Samsung** author + distributor | Certificate Manager, **free Samsung account** | **Install and run** on a Samsung TV *or its emulator* |
-| Samsung **partner** | Samsung partnership | The privileged APIs (input source, standby) |
-
-A locally generated Tizen certificate is enough to *produce* a signed package —
-verified — but a Samsung TV rejects it at install time with:
+The Samsung TV installer rejects a package with one message no matter what is
+wrong with it:
 
 ```
 app_id[...] install failed[118, -4], reason: Operation not allowed : :Load archive info fail
 ```
 
-That message says nothing about certificates, which is why it's worth writing
-down. It is not an API-version problem (`required_version` 6.0 and 8.0 fail
-identically) and not a filename problem (matching the `.wgt` name to the app id
-fixes the derived app id but not the install).
+For us the cause was **the `package` id in `config.xml` being 9 characters**. It
+must be **exactly 10 alphanumeric characters** — `tvaiagent` fails, `tvaiagent0`
+installs. Nothing in the message hints at this.
 
-So for anything beyond building:
+Before theorising, bisect against a **hello-world**: a `config.xml` with a
+10-character package id and a one-line `index.html`, built and signed the same
+way. If that installs and yours doesn't, the difference is in *your* config, not
+in the certificate, the emulator or the toolchain. We eliminated the API version
+(6.0 and 8.0), the `.wgt` filename, every privilege (a zero-privilege build
+failed identically), the zip's data-descriptor flag, and both certificate types
+before doing this — the hello-world would have found it in two minutes.
 
-1. Package Manager → **Extension SDK** → **Samsung Certificate Extension**
-   (if the Samsung option is missing in step 2).
-2. VS Code → `Ctrl+Shift+P` → **Tizen: Create Certificate** → type **Samsung**,
-   device **TV** → sign in with a free Samsung account.
-3. Re-package so the new profile signs it: `pnpm package:tizen --profile <name>`.
+`sdb shell`, `dlog`, `pkgcmd` and `app_launcher` all return **nothing** on a
+Samsung TV emulator image, so there is no device-side log to read. Bisecting is
+the only real tool you have.
 
-For a **real TV** the distributor certificate is additionally bound to that TV's
-DUID, so the TV has to be in Developer Mode and reachable when you create it. The
-emulator needs no DUID.
+### Certificates
+
+| Certificate | Get it from | Needed for |
+|---|---|---|
+| Generic Tizen author + `tizen_public_signer` | `tz cert`, offline | Building a signed `.wgt` |
+| **Samsung** author + distributor | Certificate Manager, **free Samsung account** | Installing on a Samsung TV or its emulator |
+| Samsung **partner** | Samsung partnership | The privileged APIs (input source, standby) |
+
+1. VS Code → `Ctrl+Shift+P` → **Tizen: Create Certificate** → certificate type
+   **Samsung**, device **TV** → sign in with a free Samsung account. Picking the
+   default *Tizen* type gives you a certificate that builds but can't install.
+2. Re-package with it: `pnpm package:tizen --profile <name>`.
+
+The distributor certificate is bound to the target's **DUID**, which the
+extension reads off the connected device — so connect the emulator (or a TV in
+Developer Mode) *before* creating the certificate. Check with:
+
+```bash
+cat ~/SamsungCertificate/<profile>/device-profile.xml   # <TestDevice> = the DUID
+```
+
+If certificate creation fails with `spawn EPERM`, the server couldn't launch a
+browser for the Samsung login. Its callback listener is already up by then, so
+you can complete the login by hand — open
+`https://account.samsung.com/mobile/account/check.do?serviceID=v285zxnl3h&actionID=StartOAuth2&accessToken=Y&redirect_uri=http://localhost:<port>/signin/callback`
+(the port is in the extension log), then retry with the same profile name: the
+token is cached to `~/SamsungCertificate/<profile>/samsung-auth-data.json` and
+the browser step is skipped.
 
 ```bash
 # Still useful offline — this is the build-only path:
