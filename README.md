@@ -59,6 +59,11 @@ pnpm install
 pnpm dev            # http://localhost:5173 — the demo above, locally
 ```
 
+Anything not working? `pnpm doctor` checks the whole toolchain — Node, pnpm,
+lockfile freshness, the Android SDK and TV image, emulator acceleration, the
+Tizen signing profile, the webOS CLI — and prints the one command that fixes each
+gap. Platform tooling you don't need is reported as "not set up", not as an error.
+
 Useful flags: `?render=canvas`, `?diag` (capability report), `?skills=weather`
 (example skill), `?llm=http://127.0.0.1:11434/v1&model=llama3.2` (real model).
 

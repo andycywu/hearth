@@ -108,6 +108,12 @@ Device bring-up (Phase 2 tooling):
   web-adapter state/`has()` semantics.
 
 Making it usable by someone who didn't write it:
+- **`pnpm doctor`** (`tools/doctor.mjs`) — checks Node, pnpm, whether the lockfile
+  still covers every workspace package, the Android SDK / TV image / AVD /
+  emulator acceleration, the Gradle wrapper, the Tizen signing profile and
+  emulator VMs, and the webOS CLI; prints the one command that fixes each gap.
+  Every check is there because it cost someone time. Platform tooling you don't
+  need reports as "not set up" rather than failing.
 - **Every device host now renders something.** `mountDeviceShell()` puts the agent
   overlay plus a status line on screen for AOSP / Tizen / webOS, which previously
   created an agent and showed a blank screen — no reply, tool call or error ever
