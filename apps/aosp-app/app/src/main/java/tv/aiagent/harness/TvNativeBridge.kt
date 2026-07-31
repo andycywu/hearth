@@ -99,15 +99,18 @@ class TvNativeBridge(private val ctx: Context) {
     @JavascriptInterface
     fun listInstalledApps(): String {
         val pm = ctx.packageManager
-        val arr = JSONArray()
         val intent = android.content.Intent(android.content.Intent.ACTION_MAIN)
             .addCategory(android.content.Intent.CATEGORY_LEANBACK_LAUNCHER)
+        // One package can expose several launcher activities (this app declares
+        // both LEANBACK_LAUNCHER and LAUNCHER), and the agent identifies apps by
+        // package, so without this the model sees the same TV twice.
+        val seen = LinkedHashMap<String, String>()
         for (ri in pm.queryIntentActivities(intent, 0)) {
-            val ai = ri.activityInfo
-            arr.put(JSONObject()
-                .put("id", ai.packageName)
-                .put("name", ri.loadLabel(pm).toString()))
+            val id = ri.activityInfo.packageName
+            if (!seen.containsKey(id)) seen[id] = ri.loadLabel(pm).toString()
         }
+        val arr = JSONArray()
+        for ((id, name) in seen) arr.put(JSONObject().put("id", id).put("name", name))
         return arr.toString()
     }
 

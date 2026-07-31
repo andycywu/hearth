@@ -117,6 +117,12 @@ Making it usable by someone who didn't write it:
   Verified on the emulator, including a Chinese command.
 - **Hosted demo**: a GitHub Pages workflow publishes the dev harness, so the
   runtime can be tried with no install, no API key and no TV.
+- **`?demo` — a self-running demo on any host.** Eight commands (absolute and
+  relative volume, a read-back, an app query, the same intents in Chinese and
+  Japanese, mute→unmute so the TV is left as found), each shown on screen as
+  `▶ … (4/8)` while it runs; `?demo=loop` for an unattended screen. It needs no
+  model — point it at `tools/mock-llm-server.mjs`. Verified end to end on the
+  Android TV emulator, driving `AudioManager` through 33 → 40 → 53.
 
 ### Changed
 - `mountAgentOverlay` / `mountAgentCanvas` render the shared view-model instead
@@ -155,6 +161,9 @@ Making it usable by someone who didn't write it:
   exception was raised during method invocation", so a merely-unavailable
   capability was reported as a hard **error** in bring-up. The adapter now supplies
   the reason (and points at the accessibility-service setup where relevant).
+- AOSP: `list_apps` could report the same app twice — one package can expose
+  several launcher activities, and the agent identifies apps by package, so the
+  model saw duplicates. Deduped in the bridge.
 - **AOSP: volume drifted.** The 0-100 ↔ device-steps conversion truncated in both
   directions, biasing every value down and compounding across relative
   adjustments; it now rounds.

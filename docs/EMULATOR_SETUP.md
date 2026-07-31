@@ -82,6 +82,26 @@ adb logcat -d -s chromium:I         # the report, as copyable text
 - The emulator has no HDMI inputs / few TV apps, so `input source` and a short
   app list are expected — that's fine for the POC.
 
+### Watch the agent work (`?demo`)
+A self-running, eight-command demo — absolute and relative volume, a read-back,
+an app query, then the same intents in Chinese and Japanese, ending muted-then-
+unmuted so the TV is left as it was found. It needs **no model**: point it at the
+offline brain.
+
+```bash
+node tools/mock-llm-server.mjs &
+adb reverse tcp:8080 tcp:8099              # if the server is on :8099
+adb shell am start -n tv.aiagent.harness/.MainActivity -e start 'index.html?demo\&confirm=auto'
+```
+
+Each command appears on screen as `▶ … (4/8)` while it runs. `?demo=loop` repeats
+it indefinitely, which is what you want on an unattended screen. Record it with
+`adb shell screenrecord --time-limit 40 /sdcard/demo.mp4 && adb pull /sdcard/demo.mp4`.
+
+Verified on the Android TV emulator: all eight commands ran, the model-free brain
+drove `AudioManager` through 33 → 40 → 53, and the Chinese and Japanese lines
+replied in kind.
+
 ### Automated acceptance run
 Instead of typing the five commands by hand, drive the app over the DevTools
 protocol and diff the result against the CI baseline:

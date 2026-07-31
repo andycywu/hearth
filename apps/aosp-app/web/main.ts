@@ -2,7 +2,7 @@ import { Agent, runDiagnostics, reportToMarkdown } from "@tv-ai-agent/core";
 import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
 import { createOpenAiCompatibleClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
-  createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, mountDeviceShell, speakReplies,
+  createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
 } from "@tv-ai-agent/ui";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 
@@ -59,7 +59,8 @@ async function boot(): Promise<void> {
   );
 
   const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl}` });
-  // `?ask=…` (repeatable) drives the agent without a keyboard.
-  for (const command of commandsFromUrl()) await ui.ask(command);
+  // `?demo` runs the built-in script, `?ask=…` runs your own — either way the TV
+  // does something without a keyboard.
+  await runStartupCommands(ui);
 }
 boot();

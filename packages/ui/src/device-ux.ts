@@ -1,6 +1,7 @@
 import type { Agent, ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
+import { runDemo, demoFromUrl } from "./demo.js";
 
 /**
  * The two bits of behaviour every device host needs and the dev harness already
@@ -127,6 +128,38 @@ export function commandsFromUrl(
     .getAll("ask")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Whatever the launch URL asked for: `?demo` runs the built-in demo script,
+ * `?ask=` runs specific commands. The command being run is echoed into the hint
+ * line, because a viewer watching a TV needs to see the question, not just the
+ * answer.
+ *
+ * Awaits `?ask=` (bring-up wants to know when it's finished) but lets `?demo`
+ * run in the background, since it may loop forever.
+ */
+export async function runStartupCommands(
+  ui: OverlayController,
+  opts: { hintId?: string; search?: string } = {},
+): Promise<void> {
+  const hint = document.getElementById(opts.hintId ?? "hint");
+  const show = (text: string): void => { if (hint) hint.textContent = text; };
+
+  const demo = demoFromUrl(opts.search);
+  if (demo) {
+    void runDemo((command) => ui.ask(command), demo.commands, {
+      loop: demo.loop,
+      onCommand: (command, i, total) => show(`▶ ${command}   (${i + 1}/${total})`),
+      onDone: () => show(demo.loop ? "" : "Demo finished — relaunch with ?demo to run it again."),
+    });
+    return;
+  }
+
+  for (const command of commandsFromUrl(opts.search)) {
+    show(`▶ ${command}`);
+    await ui.ask(command);
+  }
 }
 
 /**

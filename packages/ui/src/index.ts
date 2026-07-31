@@ -4,11 +4,18 @@ export {
   createConfirmHandler,
   confirmOverrideFromUrl,
   commandsFromUrl,
+  runStartupCommands,
   mountDeviceShell,
   speakReplies,
   type ConfirmHandlerOptions,
   type DeviceShellOptions,
 } from "./device-ux.js";
+export {
+  runDemo,
+  demoFromUrl,
+  DEFAULT_DEMO_SCRIPT,
+  type DemoOptions,
+} from "./demo.js";
 export {
   createAgentViewModel,
   type AgentViewModel,

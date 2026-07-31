@@ -63,7 +63,7 @@ Useful flags: `?render=canvas`, `?diag` (capability report), `?skills=weather`
 (example skill), `?llm=http://127.0.0.1:11434/v1&model=llama3.2` (real model).
 
 ```bash
-pnpm test           # 163 tests
+pnpm test           # 177 tests
 pnpm bench          # agent-loop latency (p50/p95 per turn)
 ```
 
@@ -99,8 +99,18 @@ pnpm package:tizen                                  # Tizen       → signed .wg
 pnpm package:webos                                  # webOS       → .ipk
 ```
 
-Then check what the device actually grants you — the probe prints a capability
-table you paste straight into
+Then watch it work. `?demo` runs an eight-command script — volume, an app query,
+then the same intents in Chinese and Japanese — against the offline brain, so no
+model is needed:
+
+```bash
+node tools/mock-llm-server.mjs &            # the offline brain over HTTP
+adb reverse tcp:8080 tcp:8080
+adb shell am start -n tv.aiagent.harness/.MainActivity -e start 'index.html?demo\&confirm=auto'
+```
+
+Check what the device actually grants you — the probe prints a capability table
+you paste straight into
 [`docs/platform/capability-matrix.md`](docs/platform/capability-matrix.md):
 
 ```bash
@@ -140,7 +150,7 @@ run on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 163 tests |
+| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 177 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
 | Real local model driving a TV | ✅ works; needs >1.5B for reliable tool chaining |
