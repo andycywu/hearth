@@ -29,6 +29,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
+import { findTizenSdk, findTizenSdks } from "./tizen-sdk.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = join(root, "apps", "tizen-app");
@@ -42,7 +43,8 @@ const opt = (name, fallback) => {
 const optAll = (name) =>
   args.reduce((acc, a, i) => (a === name && args[i + 1] ? [...acc, args[i + 1]] : acc), []);
 
-const tz = findTz(opt("--tz", process.env.TIZEN_CORE));
+const sdk = findTz(opt("--tz", process.env.TIZEN_CORE));
+const tz = sdk.tz;
 const profile = opt("--profile", null);   // null → tz uses the active profile
 /**
  * Repeatable, and commas work too:
@@ -55,19 +57,26 @@ const profile = opt("--profile", null);   // null → tz uses the active profile
 const flags = optAll("--flags").flatMap((f) => f.split(/[,&]/)).map((f) => f.trim()).filter(Boolean);
 
 function findTz(explicit) {
-  const candidates = [
-    explicit,
-    process.env.LOCALAPPDATA && join("C:", "tizen-studio", "tools", "tizen-core", "tz.exe"),
-    "C:\\tizen-studio\\tools\\tizen-core\\tz.exe",
-    process.env.HOME && join(process.env.HOME, "tizen-studio", "tools", "tizen-core", "tz"),
-    "/opt/tizen-studio/tools/tizen-core/tz",
-  ].filter(Boolean);
-  for (const c of candidates) if (existsSync(c)) return c;
-  fail(
-    "tizen-core (tz) not found.\n" +
-    "  Install the Tizen VS Code extension (Tizen Studio is EOL), then pass\n" +
-    "  --tz <path/to/tz> or set TIZEN_CORE.",
-  );
+  const chosen = findTizenSdk(explicit);
+  if (!chosen) {
+    fail(
+      "tizen-core (tz) not found.\n" +
+      "  Install the Tizen VS Code extension (Tizen Studio is EOL), then pass\n" +
+      "  --tz <path/to/tz> or set TIZEN_CORE.",
+    );
+  }
+  // Two SDKs on one machine is the trap: certificates made in VS Code live in
+  // the extension's own sdk-data, and signing with the other install's profile
+  // yields a package the device rejects — with an error that never mentions it.
+  const all = findTizenSdks();
+  if (all.length > 1 && !explicit) {
+    console.log(`[tizen] ${all.length} Tizen SDKs found; using the ${chosen.kind} one:`);
+    for (const s of all) console.log(`          ${s === all[0] ? "→" : " "} ${s.kind}  ${s.root}`);
+    console.log("          (override with --tz <path/to/tz> or TIZEN_CORE)");
+  } else {
+    console.log(`[tizen] SDK: ${chosen.kind}  ${chosen.root}`);
+  }
+  return chosen;
 }
 
 function run(label, file, argv, cwd = appDir) {
@@ -139,8 +148,9 @@ if (!match) {
 const wgt = match[1].trim();
 const size = statSync(wgt).size;
 console.log(`\n[tizen] signed package: ${wgt} (${(size / 1024).toFixed(1)} KB)`);
+// Print the paths from the SDK we actually used, so nobody mixes toolchains.
+const sdb = sdk.sdb ?? "sdb";
 console.log("[tizen] install on a device or emulator:");
-console.log("          sdb connect <TV_IP>      # or start an emulator");
-console.log("          sdb devices              # must list a target first");
-console.log(`          tz install -p "${wgt}"`);
-console.log("          tz run -p tvaiagent      # package id from config.xml");
+console.log(`          "${sdb}" devices           # must list a target first`);
+console.log(`          "${tz}" install -p "${wgt}"`);
+console.log(`          "${tz}" run -p tvaiagent   # package id from config.xml`);

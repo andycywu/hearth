@@ -17,6 +17,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
+import { findTizenSdk, findTizenSdks } from "./tizen-sdk.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const strict = process.argv.includes("--strict");
@@ -144,24 +145,55 @@ if (adb && existsSync(adb)) {
 }
 
 // --- Tizen -----------------------------------------------------------------
-const tz = [
-  process.env.TIZEN_CORE,
-  "C:\\tizen-studio\\tools\\tizen-core\\tz.exe",
-  process.env.HOME && join(process.env.HOME, "tizen-studio", "tools", "tizen-core", "tz"),
-  "/opt/tizen-studio/tools/tizen-core/tz",
-].find((p) => p && existsSync(p));
-record("Tizen", "tizen-core (tz)", tz ? OK : SKIP, tz ?? "not installed",
+const sdks = findTizenSdks();
+const sdk = findTizenSdk();
+record("Tizen", "tizen-core (tz)", sdk ? OK : SKIP,
+  sdk ? `${sdk.kind}  ${sdk.root}` : "not installed",
   "install the Tizen VS Code extension (Tizen Studio is EOL)");
 
-if (tz) {
-  const profiles = tryExec(tz, ["security-profiles", "list"]) ?? "";
-  const active = profiles.match(/Current Active Profile:\s*(\S+)/)?.[1];
-  record("Tizen", "signing profile", active ? OK : WARN, active ?? "none",
-    'tz cert -n "<name>" -p <password> -f my-dev  &&  tz security-profiles add -n my-dev -A ...');
+// Two installs is the single most confusing state this toolchain gets into:
+// each has its own profiles.xml, so a certificate made in VS Code is invisible
+// to the other, and signing with the wrong one fails at install with an error
+// that never mentions certificates.
+if (sdks.length > 1) {
+  record("Tizen", "only one SDK", WARN,
+    sdks.map((s) => `${s.kind} (${s.root})`).join("  +  "),
+    "certs made in VS Code live in the extension's SDK — uninstall the other, " +
+    "or pass --tz / TIZEN_CORE so every tool agrees");
+}
 
-  const vms = (tryExec(tz, ["emul", "list-vm"]) ?? "").trim();
-  record("Tizen", "emulator VM", vms ? OK : SKIP, vms || "none",
-    "VS Code → Tizen: Package Manager → TV extension (needs elevation), then Tizen: Emulator Manager");
+if (sdk) {
+  const profiles = tryExec(sdk.tz, ["security-profiles", "list"]) ?? "";
+  const active = profiles.match(/Current Active Profile:\s*(\S+)/)?.[1];
+  const names = [...profiles.matchAll(/^(\S+)\s*$/gm)].map((m) => m[1])
+    .filter((n) => n !== "Distributor2:" && n !== active);
+  record("Tizen", "signing profile", active ? OK : WARN,
+    active ? `${active}${names.length ? ` (also: ${names.join(", ")})` : ""}` : "none",
+    "VS Code → Tizen: Create Certificate  (its profiles.xml is the one tz reads)");
+
+  // A generic Tizen distributor builds a package a Samsung TV will not install:
+  // `install failed[118, -4] ... Load archive info fail`, which says nothing
+  // about certificates. Catch it here instead of on the device.
+  if (active && sdk.profilesXml && existsSync(sdk.profilesXml)) {
+    const xml = readFileSync(sdk.profilesXml, "utf8");
+    const block = xml.split(/<profile\s+name="/).find((b) => b.startsWith(`${active}"`)) ?? "";
+    const distributor = block.match(/distributor="1"[^>]*?key="([^"]*)"/)?.[1]
+      ?? block.match(/key="([^"]*)"[^>]*distributor="1"/)?.[1] ?? "";
+    const generic = /tizen-distributor-signer|tizen_public_signer/i.test(distributor);
+    record("Tizen", "certificate accepted by a TV", generic ? WARN : OK,
+      generic ? "generic Tizen distributor" : (distributor.split(/[/\\]/).pop() || "unknown"),
+      "a Samsung TV rejects this at install — VS Code → Tizen: Create Certificate, " +
+      "pick the SAMSUNG type and device TV (free Samsung account; DUID is read from " +
+      "the connected device)");
+  }
+
+  if (sdk.sdb) {
+    const devices = (tryExec(sdk.sdb, ["devices"]) ?? "").split(/\r?\n/).slice(1)
+      .filter((l) => /\tdevice\b/.test(l)).map((l) => l.split("\t")[0]);
+    record("Tizen", "device/emulator", devices.length ? OK : SKIP,
+      devices.length ? devices.join(", ") : "none",
+      "VS Code → Tizen: Emulator Manager, or `sdb connect <TV_IP>`");
+  }
 }
 
 // --- webOS -----------------------------------------------------------------
