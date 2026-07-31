@@ -57,7 +57,7 @@ const has = (name) => args.includes(name);
 
 const serial = opt("--serial", null);
 const appName = opt("--app", null);   // default: whatever is installed
-const pkg = opt("--package", "tv.titanos.aiagent");
+const pkg = opt("--package", "tv.aiagent.harness");
 const activity = opt("--activity", ".MainActivity");
 const llm = opt("--llm", "http://127.0.0.1:8080/v1");
 const port = Number(opt("--port", 9222));

@@ -62,7 +62,7 @@ are achievable on all four targets **with no special signing**. The advanced
 controls (system-wide input switch, standby, raw key injection into other apps)
 require a **partner/platform certificate (Tizen)** or **system signature
 (Android)** — or the non-privileged AccessibilityService/Intent fallbacks, which
-cover a useful subset. As a TV-platform vendor, TitanOS can **platform/partner
+cover a useful subset. A TV-platform vendor that owns the image can **platform/partner
 sign on its own devices** to unlock the full set; the open-source build running
 on retail TVs degrades gracefully via `has()`.
 
@@ -101,12 +101,12 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
 - **Tizen**: obtain a signing profile (author + distributor), install `.wgt` on
   MTK and NVT Tizen boards, verify each HAL capability with the `?diag` probe,
   and record which **privilege level** each firmware grants. For partner/platform
-  APIs (input source, power), use a partner/platform certificate on TitanOS-owned
+  APIs (input source, power), use a partner/platform certificate on vendor-owned
   devices. Fill `docs/platform/capability-matrix.md`.
 - **AOSP**: build the host APK; verify `AudioManager` + `PackageManager` paths
   (no special signing); enable the AccessibilityService for navigation and try
   the passthrough-input Intent for input switching. For raw key injection or
-  guaranteed input control, use a **system/platform signature** on TitanOS-owned
+  guaranteed input control, use a **system/platform signature** on vendor-owned
   devices; implement those bridge methods there.
 - Define an **acceptance demo**: a spoken/typed command → the agent changes
   volume, lists apps, launches one, and navigates — identically on all four
@@ -158,7 +158,7 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
   signature (Android)** — not a proprietary vendor SDK. *Mitigation:* ship the
   public-privilege capabilities first; use the non-privileged fallbacks
   (Android AccessibilityService + passthrough-input Intent) for the rest; keep
-  everything behind `has()` so the agent degrades gracefully. TitanOS can
+  everything behind `has()` so the agent degrades gracefully. A platform vendor can
   platform/partner-sign its own devices to unlock the full set.
 - **WebView/Chromium fragmentation across SoC firmware.** *Mitigation:* target a
   conservative ES2020 baseline (already set), test on each firmware's engine,

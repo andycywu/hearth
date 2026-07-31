@@ -23,7 +23,7 @@ signing **certificate**, not a proprietary SDK:
   `application.*` launch/info, internet. Covers the core agent.
 - **partner / platform**: input-source (`tvinfo`/`tv-control`), power. Need a
   **partner or platform certificate** issued by Samsung to partners — you cannot
-  self-sign these. On TitanOS-owned devices, sign at partner/platform level to
+  self-sign these. On devices you own, sign at partner/platform level to
   unlock them.
 
 ## MTK vs NVT notes

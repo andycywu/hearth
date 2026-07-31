@@ -64,11 +64,11 @@ pnpm bundle:aosp
 cd apps/aosp-app && ./gradlew :app:assembleDebug
 adb devices                         # emulator-5554 should be listed
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n tv.titanos.aiagent/.MainActivity           # normal launch
+adb shell am start -n tv.aiagent.harness/.MainActivity           # normal launch
 
 # Capability probe. Escape the `&` — adb hands the argv to the device's sh, which
 # would otherwise read it as "run in background" and drop the rest.
-adb shell am start -n tv.titanos.aiagent/.MainActivity -e start 'index.html?diag\&writes'
+adb shell am start -n tv.aiagent.harness/.MainActivity -e start 'index.html?diag\&writes'
 adb logcat -d -s chromium:I         # the report, as copyable text
 ```
 - Volume (AudioManager) and app list/launch work on the emulator.
@@ -76,7 +76,7 @@ adb logcat -d -s chromium:I         # the report, as copyable text
   host:
   ```bash
   adb shell settings put secure enabled_accessibility_services \
-    tv.titanos.aiagent/tv.titanos.aiagent.TvAgentAccessibilityService
+    tv.aiagent.harness/tv.aiagent.harness.TvAgentAccessibilityService
   adb shell settings put secure accessibility_enabled 1
   ```
 - The emulator has no HDMI inputs / few TV apps, so `input source` and a short

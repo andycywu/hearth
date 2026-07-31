@@ -31,7 +31,7 @@ Run the on-device capability probe by loading the app with `?diag` (escape the
 `&`, which the device shell would read as "run in background"):
 
 ```bash
-adb shell am start -n tv.titanos.aiagent/.MainActivity -e start 'index.html?diag\&writes'
+adb shell am start -n tv.aiagent.harness/.MainActivity -e start 'index.html?diag\&writes'
 adb logcat -d -s chromium:I     # the report as copyable text
 ```
 

@@ -89,7 +89,7 @@ adb connect <TV_IP>:5555
 cd apps/aosp-app
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell monkey -p tv.titanos.aiagent 1     # or launch from the launcher
+adb shell monkey -p tv.aiagent.harness 1     # or launch from the launcher
 ```
 - [ ] App launches; WebView loads; `TvNativeBridge` present.
 - [ ] Volume + list/launch app work (public APIs, no signing needed).
@@ -102,7 +102,7 @@ ON (the app can deep-link here via `openAccessibilitySettings()`).
 copy the report.
 
 **Gated controls (input switch / raw key inject / standby):** these need a
-**system/platform-signed** build. On a TitanOS-owned image, sign the APK with the
+**system/platform-signed** build. On an image you own, sign the APK with the
 platform key (or install as a privileged app) and re-test:
 - [ ] `set_input_source`, `power_standby`, raw key injection.
 
@@ -116,8 +116,8 @@ Repeat on the **NVT** AOSP board.
 npm i -g @webos-tools/cli         # one-time; no account needed to build
 pnpm package:webos                # → apps/webos-app/dist-ipk/*.ipk (verified, 34 KB)
 ares-setup-device                 # register the TV (one-time)
-ares-install apps/webos-app/dist-ipk/tv.titanos.aiagent_0.1.0_all.ipk -d <device>
-ares-launch tv.titanos.aiagent -d <device>
+ares-install apps/webos-app/dist-ipk/tv.aiagent.harness_0.1.0_all.ipk -d <device>
+ares-launch tv.aiagent.harness -d <device>
 ```
 - [ ] Launch with `?diag`; copy the report. (`ares-inspect` opens devtools.)
 

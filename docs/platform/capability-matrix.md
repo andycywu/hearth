@@ -96,7 +96,7 @@ volume set/restore and a key press):
 - AOSP: pass the page as an intent extra (note the escaped `&`, which the device
   shell would otherwise treat as "run in background"):
   ```bash
-  adb shell am start -n tv.titanos.aiagent/.MainActivity -e start 'index.html?diag\&writes'
+  adb shell am start -n tv.aiagent.harness/.MainActivity -e start 'index.html?diag\&writes'
   ```
 
 The screen renders a Markdown table (capability, status, detail) plus a summary.

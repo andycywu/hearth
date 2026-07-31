@@ -168,7 +168,7 @@ the install step:
 |---|---|---|
 | AOSP | `pnpm bundle:aosp` + `./gradlew :app:assembleDebug` | `app-debug.apk`, runs |
 | Tizen | `pnpm package:tizen` | signed `tizen-app.wgt`, 37 KB |
-| webOS | `pnpm package:webos` | `tv.titanos.aiagent_0.1.0_all.ipk`, 34 KB |
+| webOS | `pnpm package:webos` | `tv.aiagent.harness_0.1.0_all.ipk`, 34 KB |
 
 ### GROUP C — needs a browser / GPU
 

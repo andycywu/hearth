@@ -1,4 +1,4 @@
-package tv.titanos.aiagent
+package tv.aiagent.harness
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -135,7 +135,7 @@ class MainActivity : AppCompatActivity() {
     /**
      * Runtime web bundle is copied to app/src/main/assets by tools/bundle.mjs.
      * A "start" intent extra opens a specific page/query without a rebuild:
-     *   adb shell am start -n tv.titanos.aiagent/.MainActivity -e start "index.html?diag"
+     *   adb shell am start -n tv.aiagent.harness/.MainActivity -e start "index.html?diag"
      * Constrained to our own index.html so an untrusted intent can't point the
      * WebView somewhere else.
      */

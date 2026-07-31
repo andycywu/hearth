@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "tv.titanos.aiagent"
+    namespace = "tv.aiagent.harness"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "tv.titanos.aiagent"
+        applicationId = "tv.aiagent.harness"
         minSdk = 26          // Android TV / AOSP 8+
         targetSdk = 34
         versionCode = 1

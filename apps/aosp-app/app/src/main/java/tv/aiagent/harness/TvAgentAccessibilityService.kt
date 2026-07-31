@@ -1,4 +1,4 @@
-package tv.titanos.aiagent
+package tv.aiagent.harness
 
 import android.accessibilityservice.AccessibilityService
 import android.view.View

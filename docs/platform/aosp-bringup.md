@@ -34,7 +34,7 @@ See `docs/platform/aosp-accessibility.md`. The user enables
 `sendKey` through the service. Global actions (home/back/recents) and directional
 focus navigation work on most Android TV UIs.
 
-### For guaranteed control (TitanOS-owned devices)
+### For guaranteed control (devices you own)
 Sign the host app with the **platform key** (or install as a privileged app) to
 gain `INJECT_EVENTS`, TV-input ownership and `DEVICE_POWER`; then implement the
 raw paths in `TvNativeBridge`. This is the recommended route on first-party

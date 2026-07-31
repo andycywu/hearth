@@ -112,6 +112,16 @@ Device bring-up (Phase 2 tooling):
   of each subscribing to the agent bus themselves; public signatures and visual
   behaviour unchanged.
 
+### Changed
+- **Dropped the TitanOS naming.** The project is independent, so the app identity
+  is now `tv.aiagent.harness` (Android package + Kotlin source tree, webOS app id;
+  the Tizen widget URI is `https://aiagent.tv/harness`, its `tvaiagent` package id
+  unchanged), the webOS vendor is `TV AI Agent`, and `LICENSE`/`NOTICE` read
+  `Copyright 2026 TV AI Agent contributors`. Docs that framed privileged signing
+  as "TitanOS-owned devices" now say "devices you own" / "a platform vendor",
+  which is what was actually meant. Done before publishing on purpose: an app id
+  is the installed identity, so changing it later would orphan installs.
+
 ### Fixed
 - **AOSP: the runtime never started on a device.** `index.html` loads `main.js` as
   an ES module, and module scripts are CORS-blocked from `file://` (null origin),

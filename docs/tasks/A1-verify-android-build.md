@@ -50,7 +50,7 @@ ls apps/aosp-app/app/build/outputs/apk/debug/app-debug.apk
 Then (optional, Group B) install on an Android TV emulator and open the probe:
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n tv.titanos.aiagent/.MainActivity -e start "index.html?diag"
+adb shell am start -n tv.aiagent.harness/.MainActivity -e start "index.html?diag"
 ```
 
 ## Notes

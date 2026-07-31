@@ -1,7 +1,7 @@
 {
-  "id": "tv.titanos.aiagent",
+  "id": "tv.aiagent.harness",
   "version": "0.1.0",
-  "vendor": "TitanOS",
+  "vendor": "TV AI Agent",
   "type": "web",
   "main": "index.html",
   "title": "TV AI Agent",

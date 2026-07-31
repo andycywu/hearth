@@ -46,7 +46,7 @@ without a rebuild — that is `resolveLlmEndpoint()`, shared with the harness:
 
 ```bash
 # AOSP: note the escaped & (the device shell would background the command)
-adb shell am start -n tv.titanos.aiagent/.MainActivity \
+adb shell am start -n tv.aiagent.harness/.MainActivity \
   -e start 'index.html?llm=http://127.0.0.1:8080/v1\&model=qwen2.5'
 ```
 

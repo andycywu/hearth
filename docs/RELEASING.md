@@ -32,7 +32,7 @@ generic CI:
   the signed `.wgt` to the release.
 - **Android `.apk`:** on tooling with the Android SDK —
   `pnpm bundle:aosp`, then `./gradlew :app:assembleRelease` with your keystore
-  (see `apps/aosp-app/README.md`). For first-party TitanOS devices, sign with the
+  (see `apps/aosp-app/README.md`). For first-party devices you own, sign with the
   platform key to unlock privileged controls.
 
 ## Versioning

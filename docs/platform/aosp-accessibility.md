@@ -30,7 +30,7 @@ probe marks the capability accordingly).
 - `TvNativeBridge.sendKey()` calls `TvAgentAccessibilityService.tryPressKey()`
   first; if the service is off it throws so the UI can prompt to enable it.
 
-## First-party alternative (TitanOS devices)
+## First-party alternative (devices you own)
 On hardware you control, platform-sign the host app (or install it as a
 privileged app) to obtain `INJECT_EVENTS` for full raw key injection and drop
 the AccessibilityService requirement. The web runtime is unchanged — only the

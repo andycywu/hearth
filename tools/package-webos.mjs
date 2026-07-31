@@ -106,5 +106,5 @@ console.log(`\n[webos] package: ${produced}`);
 console.log("[webos] install on a TV in Developer Mode:");
 console.log("          ares-setup-device            # one-time device registration");
 console.log(`          ares-install "${produced}" -d <device>`);
-console.log("          ares-launch tv.titanos.aiagent -d <device>");
-console.log("          ares-inspect tv.titanos.aiagent -d <device>   # devtools, for ?diag output");
+console.log("          ares-launch tv.aiagent.harness -d <device>");
+console.log("          ares-inspect tv.aiagent.harness -d <device>   # devtools, for ?diag output");
