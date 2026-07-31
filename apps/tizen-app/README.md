@@ -9,8 +9,9 @@ Packages the agent runtime as a Tizen web app (`.wgt`).
 and Emulator Manager.
 
 ```bash
-# One-time: author certificate + signing profile. No Samsung account needed for
-# public-level capabilities — see docs/EMULATOR_SETUP.md §A2 for the exact flags.
+# One-time: author certificate + signing profile. This BUILDS a signed .wgt;
+# installing on a Samsung TV or its emulator additionally needs a Samsung
+# certificate — see docs/EMULATOR_SETUP.md §A2.
 tz cert -n "Your Name" -p <password> -f my-dev
 tz security-profiles add -n my-dev -A -a <author.p12> -p <password> \
   -d <tizen-core>/certificates/distributor/tizen_public_signer.p12 \
@@ -28,10 +29,12 @@ tz run -p tvaiagent                  # -p is the package ID from config.xml,
                                      #    not the application id
 ```
 
-A **partner** certificate (the Samsung-account flow) is only required for the
-privileged capabilities the POC defers — input switching, standby. Everything in
-the ✅ column of [`docs/POC.md`](../../docs/POC.md) signs with the public
-distributor certificate bundled with `tz`.
+Three certificate tiers, and mixing them up costs an afternoon: a locally
+generated Tizen cert (`tz cert`) **builds** a signed package; a **Samsung**
+certificate (Certificate Manager, free Samsung account) is required to **install**
+on a Samsung TV or its emulator; a Samsung **partner** certificate is only for the
+privileged capabilities the POC defers (input switching, standby). See
+[`docs/EMULATOR_SETUP.md`](../../docs/EMULATOR_SETUP.md) §A2.
 
 ## Notes
 - `tizen_web_project.yaml` is the project manifest `tz` reads. `node_modules` is

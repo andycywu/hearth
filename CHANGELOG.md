@@ -25,12 +25,18 @@ Device bring-up (Phase 2 tooling):
   distinction that run made concrete.
 - **Tizen packaging moved to `tizen-core` (`tz`)** — Tizen Studio is EOL and the
   toolchain is now the Tizen VS Code extension. `pnpm package:tizen`
-  (`tools/package-tizen.mjs`) bundles, builds and signs a `.wgt` in one command;
-  the author certificate is created locally with `tz cert`, so **no Samsung
-  account is needed** for public-level capabilities (partner certs remain
-  required only for the privileged rows the POC defers). Docs updated across
-  `EMULATOR_SETUP`, `POC`, `BRINGUP_CHECKLIST`, `RELEASING`, `platform/tizen-bringup`
-  and the app README.
+  (`tools/package-tizen.mjs`) bundles, builds and signs a `.wgt` in one command,
+  with `--flags` to bake `?demo` / `?diag` / `?llm=` into the start page (Tizen
+  has no equivalent of Android's `-e start`). Docs updated across
+  `EMULATOR_SETUP`, `POC`, `BRINGUP_CHECKLIST`, `RELEASING`,
+  `platform/tizen-bringup` and the app README.
+- Documented the three Tizen certificate tiers, after an earlier claim here that
+  **no Samsung account was needed** turned out to be wrong: a locally generated
+  `tz cert` is enough to *build* a signed `.wgt`, but a Samsung TV (including its
+  emulator) rejects it at install with `Operation not allowed : :Load archive
+  info fail` — that needs a **Samsung** certificate from Certificate Manager
+  (free account). A Samsung *partner* certificate remains a third tier, needed
+  only for the privileged capabilities the POC defers.
 - **App icon** (`pnpm icon`, `tools/make-icon.mjs`): both `config.xml` (Tizen) and
   `appinfo.json` (webOS) referenced an `icon.png` that didn't exist, which breaks
   packaging on both. Drawn in code — no image dependencies — so it can be

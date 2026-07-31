@@ -11,7 +11,10 @@
  * get `?demo` / `?diag` / `?llm=` onto Tizen — it has no equivalent of Android's
  * `-e start` intent extra.
  *
- * One-time setup, no Samsung account required for a public-level app:
+ * One-time setup. This is enough to BUILD a signed .wgt; installing it on a
+ * Samsung TV or its emulator additionally requires a **Samsung** certificate from
+ * Certificate Manager (free Samsung account) — a generic Tizen cert is rejected
+ * with "Operation not allowed : :Load archive info fail":
  *
  *   tz cert -n "<your name>" -p <password≥8> -f my-dev            # author cert
  *   tz security-profiles add -n my-dev -A \
@@ -19,8 +22,8 @@
  *     -d <tizen-core>/certificates/distributor/tizen_public_signer.p12 \
  *     -P tizenpkcs12passfordsigner
  *
- * A **partner**-level certificate (the Samsung-account flow) is only needed for
- * the privileged capabilities the POC deliberately leaves out — see docs/POC.md.
+ * A **partner**-level certificate is a third, separate tier, needed only for the
+ * privileged capabilities the POC deliberately leaves out — see docs/POC.md.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";

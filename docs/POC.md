@@ -56,8 +56,10 @@ pnpm dev            # http://localhost:5173  — offline scripted brain
 ### A2. Tizen TV (VS Code extension + `tz`)
 Tizen Studio is EOL; the toolchain is now the **Tizen VS Code extension** and its
 `tizen-core` CLI. An author certificate is generated **locally** (`tz cert`) and
-signed with the bundled public distributor cert — no Samsung account, no partner
-deal, which is exactly the POC's premise.
+signed with the bundled public distributor cert — enough to **build**. To
+**install** on a Samsung TV or its emulator you also need a **Samsung**
+certificate (Certificate Manager, free Samsung account). Still no partner deal,
+which is the POC's premise — partner certs are only for the privileged rows.
 
 1. One-time: `tz cert` + `tz security-profiles add`
    ([`EMULATOR_SETUP.md`](EMULATOR_SETUP.md) §A2 has the flags).

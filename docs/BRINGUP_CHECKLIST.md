@@ -24,8 +24,9 @@ in CI (`packages/acceptance`): the on-device run must match it.
       gateway. On-device pass: a localhost server on the TV (see §6).
 - [ ] Per platform:
   - **Tizen:** the **Tizen VS Code extension** (Tizen Studio is EOL), which ships
-    the `tz` CLI; an author certificate created locally with `tz cert` — no
-    Samsung account for public-level capabilities. Samsung TV in Developer Mode.
+    the `tz` CLI; a local `tz cert` author certificate to build, **plus a Samsung
+    certificate** (Certificate Manager, free Samsung account) to install on a TV
+    or its emulator. Samsung TV in Developer Mode.
     Docs: https://docs.tizen.org/
   - **AOSP/Android TV:** Android SDK (adb) + JDK 17; device with ADB debugging.
   - **webOS:** `@webos-tools/cli` (`ares-*`); TV Developer Mode + session.
@@ -64,8 +65,9 @@ sdb devices                      # confirm the TV is listed
 tz install -p apps/tizen-app/Debug/tizen-app.wgt   # -p = package path
 tz run -p tvaiagent                                # -p = package id (config.xml)
 ```
-One-time certificate setup (no Samsung account for public capabilities) is in
-[`EMULATOR_SETUP.md`](EMULATOR_SETUP.md) §A2.
+One-time certificate setup is in [`EMULATOR_SETUP.md`](EMULATOR_SETUP.md) §A2.
+Building needs only a local `tz cert`; **installing on a Samsung TV or emulator
+needs a Samsung certificate** (free Samsung account).
 - [ ] App installs and launches; on-screen status shows `model` + `soc`.
 - [ ] Note the reported **soc** = mediatek / novatek (from `productinfo`).
 

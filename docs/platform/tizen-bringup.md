@@ -2,9 +2,10 @@
 
 ## Prerequisites
 - The **Tizen VS Code extension** and its `tz` CLI (Tizen Studio is EOL), plus a
-  signing profile — `tz cert` + `tz security-profiles add` create one locally with
-  no Samsung account for public-level capabilities. Flags:
-  [`EMULATOR_SETUP.md`](../EMULATOR_SETUP.md) §A2.
+  signing profile. `tz cert` + `tz security-profiles add` create one offline and
+  that is enough to **build** a signed `.wgt`; **installing** on a Samsung TV or
+  its emulator needs a **Samsung** certificate from Certificate Manager (free
+  Samsung account). Details: [`EMULATOR_SETUP.md`](../EMULATOR_SETUP.md) §A2.
 - TV in Developer Mode; note its IP.
 
 ## Steps

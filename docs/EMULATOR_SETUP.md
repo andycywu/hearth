@@ -147,21 +147,47 @@ export TIZEN_CORE="C:/tizen-studio/tools/tizen-core/tz.exe"
 "$TIZEN_CORE" --help
 ```
 
-### Create a dev certificate — no Samsung account needed
-`tz` generates an author certificate locally and signs with the bundled **public**
-distributor certificate. That covers every capability in the POC's ✅ column; a
-**partner** certificate (which does need the Samsung-account flow) is only
-required for the privileged rows we deliberately defer — see [`POC.md`](POC.md).
+### Certificates: three tiers, and which one you actually need
+
+This tripped us up, so be precise about it:
+
+| Certificate | Get it from | Lets you |
+|---|---|---|
+| Generic Tizen author + `tizen_public_signer` | `tz cert`, offline | **Build and sign** a `.wgt` |
+| **Samsung** author + distributor | Certificate Manager, **free Samsung account** | **Install and run** on a Samsung TV *or its emulator* |
+| Samsung **partner** | Samsung partnership | The privileged APIs (input source, standby) |
+
+A locally generated Tizen certificate is enough to *produce* a signed package —
+verified — but a Samsung TV rejects it at install time with:
+
+```
+app_id[...] install failed[118, -4], reason: Operation not allowed : :Load archive info fail
+```
+
+That message says nothing about certificates, which is why it's worth writing
+down. It is not an API-version problem (`required_version` 6.0 and 8.0 fail
+identically) and not a filename problem (matching the `.wgt` name to the app id
+fixes the derived app id but not the install).
+
+So for anything beyond building:
+
+1. Package Manager → **Extension SDK** → **Samsung Certificate Extension**
+   (if the Samsung option is missing in step 2).
+2. VS Code → `Ctrl+Shift+P` → **Tizen: Create Certificate** → type **Samsung**,
+   device **TV** → sign in with a free Samsung account.
+3. Re-package so the new profile signs it: `pnpm package:tizen --profile <name>`.
+
+For a **real TV** the distributor certificate is additionally bound to that TV's
+DUID, so the TV has to be in Developer Mode and reachable when you create it. The
+emulator needs no DUID.
 
 ```bash
+# Still useful offline — this is the build-only path:
 tz cert -n "Your Name" -p <password, ≥8 chars> -f my-dev
-#   → <tizen-studio-data>/keystore/author/my-dev.p12
-
 tz security-profiles add -n my-dev -A \
   -a "C:/tizen-studio-data/keystore/author/my-dev.p12" -p <password> \
   -d "C:/tizen-studio/tools/tizen-core/certificates/distributor/tizen_public_signer.p12" \
   -P tizenpkcs12passfordsigner
-
 tz security-profiles list        # confirms the active profile
 ```
 
@@ -187,18 +213,27 @@ Verified working: a 37 KB signed package containing `config.xml`, `icon.png`,
 `index.html`, `main.js`, `style.css`, `author-signature.xml`, `signature1.xml`.
 
 ### Install and run
-```bash
-sdb connect <TV_IP>              # a real TV in Developer Mode, or an emulator
-sdb devices
-tz install -p apps/tizen-app/Debug/tizen-app.wgt   # -p = package path
-tz run -p tvaiagent                                # -p = PACKAGE id, not app id
-```
-The self-running demo, packaged in:
+Requires a **Samsung** certificate (see above) — a generic Tizen one builds but
+won't install.
 
 ```bash
-node tools/mock-llm-server.mjs &
-sdb reverse tcp:8080 tcp:8080     # the TV's own 127.0.0.1 → this host
-pnpm package:tizen --flags demo --flags confirm=auto
+sdb connect <TV_IP>              # a real TV in Developer Mode; an emulator
+sdb devices                      #   registers itself automatically
+tz install -p apps/tizen-app/Debug/tizen-app.wgt   # -p = package PATH
+tz run -p tvaiagent                                # -p = PACKAGE id, not app id
+```
+
+The self-running demo, with the flags packaged in:
+
+```bash
+node tools/mock-llm-server.mjs &          # host :8080
+
+# NOTE the argument order — sdb is `reverse <remote> <local>`, the opposite of
+# adb — and the device already uses :8080 (Web Inspector), so pick another
+# remote port or you get "cannot bind socket".
+sdb reverse tcp:9090 tcp:8080             # device :9090 → this host :8080
+
+pnpm package:tizen --flags demo --flags confirm=auto --flags llm=http://127.0.0.1:9090/v1
 tz install -p apps/tizen-app/Debug/tizen-app.wgt
 tz run -p tvaiagent
 ```
@@ -206,12 +241,9 @@ tz run -p tvaiagent
 The `?diag` report is also written to the console, so the Web Inspector gives you
 copyable text rather than a screenshot.
 
-### Getting a TV emulator (as of 2026-07-31)
-Nothing is installed out of the box: `tz emul list-vm` is empty, there is no
-`platforms/*/emulator-images`, and `sdb devices` lists nothing. The image exists
-and is current — `tv-samsung-public-emulator-image-x86-64` **10.0.6** in
-[the TV extension repo](http://download.tizen.org/sdk/extensions/tv_extensions/) —
-it just has to be installed:
+### Getting a TV emulator
+The image is `tv-samsung-public-emulator-image-x86-64` (10.0.6 as of 2026-07) in
+[the TV extension repo](http://download.tizen.org/sdk/extensions/tv_extensions/):
 
 1. VS Code → `Ctrl+Shift+P` → **Tizen: Package Manager**
 2. **Extension SDK** tab → install the **TV extension** (`TV-SAMSUNG-Public`,
@@ -219,7 +251,10 @@ it just has to be installed:
    `package-manager-cli.exe` refuses to run without it, so the GUI is the path.
 3. VS Code → **Tizen: Emulator Manager** → create a **tv** VM. In *HW Support*
    turn **CPU VT** and **GPU** on and give it ≥ 1024 MB, or it won't launch.
-4. Launch it, then `sdb devices` should list it.
+4. Launch it, then `sdb devices` should list it (e.g. `emulator-26101`).
+
+Note that `tz emul list-vm` can print nothing even when an emulator is running
+and visible to `sdb` — trust `sdb devices`.
 
 Two other things that are declared but not installed, so don't be surprised:
 - **`tz run --simulator` doesn't work for TV.** It answers "simulator is
