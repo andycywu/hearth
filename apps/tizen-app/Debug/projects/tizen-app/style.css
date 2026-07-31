@@ -1,3 +1,6 @@
 html, body { margin: 0; height: 100%; background: #05060a; color: #e8eefc; font-family: sans-serif; }
-#app { display: flex; align-items: center; justify-content: center; height: 100%; }
-#status { font-size: 32px; opacity: 0.9; }
+/* Left-aligned and vertically centred: the agent overlay owns the bottom of the
+   screen, so the status block sits above it rather than fighting for the middle. */
+#app { display: flex; flex-direction: column; justify-content: center; height: 100%; padding: 0 64px; box-sizing: border-box; }
+#status { font-size: 30px; opacity: 0.85; }
+#hint { font-size: 22px; opacity: 0.45; margin-top: 16px; line-height: 1.5; }

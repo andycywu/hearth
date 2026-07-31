@@ -9,8 +9,9 @@
 
 ## Steps
 1. Build & sign in one step: `pnpm package:tizen` → `apps/tizen-app/Debug/tizen-app.wgt`.
-2. Install: `sdb connect <TV_IP> && tz install -n apps/tizen-app/Debug/tizen-app.wgt`.
-3. Launch (`tz run -n tvaiagent.TvAiAgent`), open the on-screen status, confirm
+2. Install: `sdb connect <TV_IP> && tz install -p apps/tizen-app/Debug/tizen-app.wgt`.
+3. Launch (`tz run -p tvaiagent` — `-p` takes the **package** id from
+   `config.xml`, not the application id), open the on-screen status, confirm
    `device.model` / `device.soc`.
 4. Walk the HAL: volume, list/launch app, network. Record results in
    `capability-matrix.md`. Use `?diag` for the capability probe — the report goes

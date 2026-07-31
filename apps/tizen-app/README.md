@@ -22,8 +22,10 @@ pnpm package:tizen               # → Debug/tizen-app.wgt
 
 # Install on a target (MTK/NVT Tizen TV in Developer Mode, or an emulator)
 sdb connect <TV_IP>
-tz install -n Debug/tizen-app.wgt
-tz run -n tvaiagent.TvAiAgent
+sdb devices                      # nothing listed = nothing to install to
+tz install -p Debug/tizen-app.wgt    # -p is the package PATH
+tz run -p tvaiagent                  # -p is the package ID from config.xml,
+                                     #    not the application id
 ```
 
 A **partner** certificate (the Samsung-account flow) is only required for the

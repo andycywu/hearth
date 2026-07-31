@@ -69,8 +69,8 @@ deal, which is exactly the POC's premise.
    the acceptance script:
    ```bash
    sdb connect <TV_IP> && sdb devices
-   tz install -n apps/tizen-app/Debug/tizen-app.wgt
-   tz run -n tvaiagent.TvAiAgent
+   tz install -p apps/tizen-app/Debug/tizen-app.wgt
+   tz run -p tvaiagent
    ```
    A **TV emulator image** still comes from the Package Manager (needs elevation);
    see the status note in `EMULATOR_SETUP.md` §A2.

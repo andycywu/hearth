@@ -61,8 +61,8 @@ ON → enter your host PC IP → reboot.
 pnpm package:tizen               # bundle + tz build + tz pack (signed .wgt)
 sdb connect <TV_IP>
 sdb devices                      # confirm the TV is listed
-tz install -n apps/tizen-app/Debug/tizen-app.wgt
-tz run -n tvaiagent.TvAiAgent
+tz install -p apps/tizen-app/Debug/tizen-app.wgt   # -p = package path
+tz run -p tvaiagent                                # -p = package id (config.xml)
 ```
 One-time certificate setup (no Samsung account for public capabilities) is in
 [`EMULATOR_SETUP.md`](EMULATOR_SETUP.md) §A2.

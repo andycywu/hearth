@@ -172,7 +172,16 @@ missing, then runs `tz build` + `tz pack`:
 ```bash
 pnpm package:tizen               # → apps/tizen-app/Debug/tizen-app.wgt (signed)
 pnpm package:tizen --profile my-dev     # or name a profile explicitly
+
+# Tizen has no equivalent of Android's `-e start`: the start page is fixed in
+# config.xml. `--flags` bakes a query string in at package time instead.
+pnpm package:tizen --flags demo --flags confirm=auto
+pnpm package:tizen --flags diag --flags writes
 ```
+`--flags` is repeatable (and accepts commas). Avoid a bare `&` when going through
+`pnpm run` — on Windows that passes through cmd, which treats it as a command
+separator. Your `config.xml` is patched only for the duration of the build and
+restored afterwards.
 
 Verified working: a 37 KB signed package containing `config.xml`, `icon.png`,
 `index.html`, `main.js`, `style.css`, `author-signature.xml`, `signature1.xml`.
@@ -181,26 +190,51 @@ Verified working: a 37 KB signed package containing `config.xml`, `icon.png`,
 ```bash
 sdb connect <TV_IP>              # a real TV in Developer Mode, or an emulator
 sdb devices
-tz install -n apps/tizen-app/Debug/tizen-app.wgt
-tz run -n tvaiagent.TvAiAgent    # app id from config.xml
+tz install -p apps/tizen-app/Debug/tizen-app.wgt   # -p = package path
+tz run -p tvaiagent                                # -p = PACKAGE id, not app id
 ```
-For the capability probe, set the app's start page to `index.html?diag`. The
-report is also written to the console, so the Web Inspector gives you copyable
-text rather than a screenshot.
+The self-running demo, packaged in:
 
-### What's still missing here (as of 2026-07-30)
-- **No TV emulator image is installed** (`tz emul list-vm` is empty, and
-  `platforms/*/emulator-images` doesn't exist). Images come from the **Package
-  Manager**, whose CLI needs **elevation** — run *Tizen: Package Manager* from the
-  VS Code command palette, or `package-manager-cli.exe` from an elevated prompt,
-  and install the **TV extension** + a TV emulator image.
-- **Web app templates are declared but not installed**
-  (`templates/web_app/tizen-10.0/` is empty), so `tz new -T web_app` fails. It
-  doesn't matter for us — `apps/tizen-app` is an existing project with its own
-  `tizen_web_project.yaml` — but it will bite anyone starting from a template.
-- With no emulator, the fastest path to a real check is a **Samsung TV in
-  Developer Mode** (Apps → `12345` → Developer Mode ON → host PC IP → reboot),
-  then `sdb connect <TV_IP>` and the install commands above.
+```bash
+node tools/mock-llm-server.mjs &
+sdb reverse tcp:8080 tcp:8080     # the TV's own 127.0.0.1 → this host
+pnpm package:tizen --flags demo --flags confirm=auto
+tz install -p apps/tizen-app/Debug/tizen-app.wgt
+tz run -p tvaiagent
+```
+
+The `?diag` report is also written to the console, so the Web Inspector gives you
+copyable text rather than a screenshot.
+
+### Getting a TV emulator (as of 2026-07-31)
+Nothing is installed out of the box: `tz emul list-vm` is empty, there is no
+`platforms/*/emulator-images`, and `sdb devices` lists nothing. The image exists
+and is current — `tv-samsung-public-emulator-image-x86-64` **10.0.6** in
+[the TV extension repo](http://download.tizen.org/sdk/extensions/tv_extensions/) —
+it just has to be installed:
+
+1. VS Code → `Ctrl+Shift+P` → **Tizen: Package Manager**
+2. **Extension SDK** tab → install the **TV extension** (`TV-SAMSUNG-Public`,
+   which pulls in the emulator image). This needs **elevation**:
+   `package-manager-cli.exe` refuses to run without it, so the GUI is the path.
+3. VS Code → **Tizen: Emulator Manager** → create a **tv** VM. In *HW Support*
+   turn **CPU VT** and **GPU** on and give it ≥ 1024 MB, or it won't launch.
+4. Launch it, then `sdb devices` should list it.
+
+Two other things that are declared but not installed, so don't be surprised:
+- **`tz run --simulator` doesn't work for TV.** It answers "simulator is
+  deprecated for tv-6.0" — and for tv-9.0 too, so it isn't a version problem.
+  The VS Code command *Tizen: Run as TV Web Simulator Application* runs exactly
+  that, so it hits the same wall. (`tv-samsung-websimulator-core` does exist in
+  the repo; whether installing it changes tz's answer is untested.)
+- **Web app templates are declared but absent** (`templates/web_app/tizen-10.0/`
+  is empty), so `tz new -T web_app` fails. Doesn't affect us — `apps/tizen-app`
+  is an existing project with its own `tizen_web_project.yaml` — but it will bite
+  anyone starting from a template.
+
+Without an emulator, the fastest real check is a **Samsung TV in Developer Mode**
+(Apps → `12345` → Developer Mode ON → enter your host PC's IP → reboot), then
+`sdb connect <TV_IP>` and the install commands above.
 
 ---
 
