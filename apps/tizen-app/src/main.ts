@@ -1,7 +1,9 @@
 import { Agent, runDiagnostics, reportToMarkdown } from "@tv-ai-agent/core";
 import { createTizenAdapter } from "@tv-ai-agent/adapter-tizen";
 import { createOpenAiCompatibleClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
-import { createConfirmHandler, confirmOverrideFromUrl, speakReplies } from "@tv-ai-agent/ui";
+import {
+  createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, mountDeviceShell, speakReplies,
+} from "@tv-ai-agent/ui";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 
 declare global {
@@ -41,12 +43,12 @@ async function boot(): Promise<void> {
     const confirm = confirmOverrideFromUrl() ?? createConfirmHandler();
     const agent = new Agent({ platform, llm, confirm });
     speakReplies(agent, platform);
-    window.__tvAgent = agent; // UI shell attaches here
+    window.__tvAgent = agent;
     window.__tvPlatform = platform;
-    if (status) {
-      status.textContent =
-        `Ready on ${platform.device.model} (${platform.device.soc}) · llm=${endpoint.baseUrl}`;
-    }
+
+    const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl}` });
+    // `?ask=…` (repeatable) drives the agent without a keyboard.
+    for (const command of commandsFromUrl()) await ui.ask(command);
   } catch (e) {
     if (status) status.textContent = "Boot error: " + (e as Error).message;
   }

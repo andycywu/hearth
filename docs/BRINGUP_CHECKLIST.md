@@ -19,7 +19,7 @@ in CI (`packages/acceptance`): the on-device run must match it.
 ## 0. Prerequisites (one-time)
 
 - [ ] Repo builds on your workstation: `pnpm install && pnpm build && pnpm test`
-      (should be green — 54 tests).
+      (should be green — 163 tests).
 - [ ] An LLM endpoint to point at. Easiest first pass: a cloud OpenAI-compatible
       gateway. On-device pass: a localhost server on the TV (see §6).
 - [ ] Per platform:

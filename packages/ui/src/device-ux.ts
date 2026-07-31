@@ -1,5 +1,6 @@
 import type { Agent, ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 
 /**
  * The two bits of behaviour every device host needs and the dev harness already
@@ -57,6 +58,75 @@ export function speakReplies(agent: Agent, platform: PlatformProvider): () => vo
       void Promise.resolve(voice.speak(output)).catch(() => { /* ignore */ });
     } catch { /* ignore */ }
   });
+}
+
+export interface DeviceShellOptions {
+  /** Element to write the status line into. Default: `#status`. */
+  statusId?: string;
+  /** Element to write the hint into. Default: `#hint`. */
+  hintId?: string;
+  /** Appended to the status line — the endpoint in use, typically. */
+  detail?: string;
+  /** Override the hint text (pass "" to leave the hint empty). */
+  hint?: string;
+}
+
+/**
+ * The standard device screen: the agent overlay, plus a status line saying what
+ * the runtime decided about this device.
+ *
+ * Every host shipped the same shell markup (`#status`, `#hint`) and then rendered
+ * nothing into it, so a freshly installed app looked broken — the agent existed
+ * but no reply, tool call or error ever reached the screen. This is the one place
+ * that fixes that for all of them.
+ */
+export function mountDeviceShell(
+  agent: Agent,
+  platform: PlatformProvider,
+  opts: DeviceShellOptions = {},
+): OverlayController {
+  const ui = mountAgentOverlay(agent);
+  const { device } = platform;
+
+  const status = document.getElementById(opts.statusId ?? "status");
+  if (status) {
+    status.textContent =
+      `Ready · ${device.model} · ${device.os} ${device.osVersion} · soc=${device.soc}` +
+      (opts.detail ? ` · ${opts.detail}` : "");
+  }
+
+  const hint = document.getElementById(opts.hintId ?? "hint");
+  if (hint) {
+    // Say what's actually true: these hosts ship no input surface yet, so
+    // whoever just installed this needs to know how to make it do something.
+    hint.textContent = opts.hint ?? (
+      platform.has("voice")
+        ? "Say a command, or launch with ?ask=… to run one."
+        : "No input surface on this host yet — launch with ?ask=… to run a command, " +
+          "or ?diag for the capability report."
+    );
+  }
+
+  return ui;
+}
+
+/**
+ * Commands to run at startup, from `?ask=` in the page URL (repeatable):
+ *
+ *   index.html?ask=set%20volume%20to%2030&ask=mute
+ *
+ * A TV has no keyboard, so without this a freshly installed app just sits there
+ * looking broken. It also gives bring-up and demos a way to drive the agent with
+ * nothing but a launch command, and it is the same entry point a native "ask"
+ * intent would call into later.
+ */
+export function commandsFromUrl(
+  search = typeof location !== "undefined" ? location.search : "",
+): string[] {
+  return new URLSearchParams(search)
+    .getAll("ask")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }
 
 /**

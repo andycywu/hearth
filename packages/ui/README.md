@@ -84,5 +84,5 @@ cd apps/blits-demo && npm install && npm run dev
 ```
 
 Making Blits the default renderer with a DOM fallback is Group C in
-`HANDOFF.md` — it needs GPU verification on the weakest target panel first. See
+`docs/internal/HANDOFF.md` — it needs GPU verification on the weakest target panel first. See
 also `docs/DEVELOPMENT_PLAN.md` (Phase 3).

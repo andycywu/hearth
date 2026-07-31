@@ -2,7 +2,9 @@ import { describe, it, expect, afterEach } from "vitest";
 import { EventBus, type AgentEvents } from "@tv-ai-agent/core";
 import type { Agent, ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider, VoicePipeline } from "@tv-ai-agent/platform-api";
-import { createConfirmHandler, confirmOverrideFromUrl, speakReplies } from "./device-ux.js";
+import {
+  createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, speakReplies,
+} from "./device-ux.js";
 
 const request = (over: Partial<ConfirmRequest> = {}): ConfirmRequest => ({
   name: "set_input_source",
@@ -90,6 +92,31 @@ describe("confirmOverrideFromUrl", () => {
     // Falling back to the real handler is the safe reading of ?confirm=yes.
     expect(confirmOverrideFromUrl("?confirm=yes")).toBeUndefined();
     expect(confirmOverrideFromUrl("?confirm=")).toBeUndefined();
+  });
+});
+
+describe("commandsFromUrl", () => {
+  it("returns nothing when no ?ask= is present", () => {
+    expect(commandsFromUrl("")).toEqual([]);
+    expect(commandsFromUrl("?diag&llm=http://x/v1")).toEqual([]);
+  });
+
+  it("reads a single command, url-decoded", () => {
+    expect(commandsFromUrl("?ask=set%20volume%20to%2030")).toEqual(["set volume to 30"]);
+  });
+
+  it("reads several in order, so a launch can drive a whole demo", () => {
+    expect(commandsFromUrl("?ask=mute&llm=http://x/v1&ask=open+Netflix"))
+      .toEqual(["mute", "open Netflix"]);
+  });
+
+  it("drops blank entries rather than running an empty turn", () => {
+    expect(commandsFromUrl("?ask=&ask=%20%20&ask=mute")).toEqual(["mute"]);
+  });
+
+  it("handles non-Latin commands", () => {
+    expect(commandsFromUrl("?ask=" + encodeURIComponent("音量調到 30")))
+      .toEqual(["音量調到 30"]);
   });
 });
 

@@ -16,7 +16,7 @@ per-OS differences. See `README.md`.
 > **Group A is complete** (2026-07-30) — everything that needed no hardware. Next
 > up is **Group B**, which needs an emulator: start at `docs/EMULATOR_SETUP.md`.
 
-- Monorepo, pnpm workspaces, TypeScript project references. **141 tests green.**
+- Monorepo, pnpm workspaces, TypeScript project references. **163 tests green.**
 - Packages: `core`, `platform-api`, `adapter-web|tizen|aosp|webos`,
   `llm-connectors`, `ui`, `skills-example`, `acceptance` (cross-target parity
   test).
@@ -64,13 +64,13 @@ pnpm dev                                                  # browser demo (offlin
 
 ## TASKS — do these in order
 
-> **Detailed, executable specs live in [`docs/tasks/`](docs/tasks/README.md)** —
+> **Detailed, executable specs live in [`tasks/`](tasks/README.md)** —
 > one file per Group A task (context, files, step-by-step, code sketches,
 > acceptance, verification). The list below is the summary; open the linked spec
 > before starting each.
 
 ### GROUP A — no hardware needed — **all done (2026-07-30)**
-Specs: [`docs/tasks/`](docs/tasks/README.md) — A1…A6. Kept here for context; the
+Specs: [`tasks/`](tasks/README.md) — A1…A6. Kept here for context; the
 notes record what changed and what was deliberately left for later.
 
 - [x] **A1. Verify the Android host compiles.** *Done.* Added the missing Gradle

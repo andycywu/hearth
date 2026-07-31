@@ -24,7 +24,7 @@ today on a retail TV with no vendor relationship — the ✅ column of
 skill: extend `platform-api`, implement it in **every** adapter, add it to
 `assertProviderContract`, then expose a tool. That path is
 [`extending.md`](extending.md) → "New OS target" and the rules in
-[`../HANDOFF.md`](../HANDOFF.md).
+[`internal/HANDOFF.md`](internal/HANDOFF.md).
 
 The two mix cleanly: a skill may *use* a device capability as long as it checks
 first, so the same bundle degrades instead of breaking.

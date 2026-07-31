@@ -107,12 +107,24 @@ Device bring-up (Phase 2 tooling):
   accessibility gating, webOS Luna mapping, OpenAI request/message mapping, and
   web-adapter state/`has()` semantics.
 
+Making it usable by someone who didn't write it:
+- **Every device host now renders something.** `mountDeviceShell()` puts the agent
+  overlay plus a status line on screen for AOSP / Tizen / webOS, which previously
+  created an agent and showed a blank screen — no reply, tool call or error ever
+  reached the display.
+- **`?ask=…` (repeatable)** runs commands at startup, so a TV with no keyboard and
+  no voice wiring can still be driven — by a launch command, a demo, or bring-up.
+  Verified on the emulator, including a Chinese command.
+- **Hosted demo**: a GitHub Pages workflow publishes the dev harness, so the
+  runtime can be tried with no install, no API key and no TV.
+
 ### Changed
 - `mountAgentOverlay` / `mountAgentCanvas` render the shared view-model instead
   of each subscribing to the agent bus themselves; public signatures and visual
   behaviour unchanged.
-
-### Changed
+- **README rewritten for people who don't already know the project**, and the
+  internal working notes (`HANDOFF.md`, task specs) moved to `docs/internal/` so
+  the front page isn't someone else's to-do list.
 - **Dropped the TitanOS naming.** The project is independent, so the app identity
   is now `tv.aiagent.harness` (Android package + Kotlin source tree, webOS app id;
   the Tizen widget URI is `https://aiagent.tv/harness`, its `tvaiagent` package id

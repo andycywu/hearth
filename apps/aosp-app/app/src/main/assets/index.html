@@ -1,9 +1,20 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'">
-<title>TV AI Agent</title></head>
-<body style="background:#05060a;color:#e8eefc;font-family:sans-serif">
-  <h2 style="padding:24px">TV AI Agent — bundle placeholder</h2>
-  <p style="padding:0 24px">Run <code>node tools/bundle.mjs aosp</code> to copy the built runtime here.</p>
+<title>TV AI Agent</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05060a; color: #e8eefc; font-family: sans-serif; }
+  #app { display: flex; flex-direction: column; justify-content: center; height: 100%; padding: 0 64px; box-sizing: border-box; }
+  #status { font-size: 30px; opacity: .85; }
+  #hint { font-size: 22px; opacity: .45; margin-top: 16px; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div id="status">TV AI Agent — starting…</div>
+    <div id="hint"></div>
+  </div>
+  <!-- Bundled runtime: `pnpm bundle:aosp` writes main.js next to this file. -->
   <script type="module" src="main.js"></script>
 </body></html>

@@ -3,8 +3,11 @@ export { mountAgentCanvas, type CanvasOptions, type CanvasController } from "./c
 export {
   createConfirmHandler,
   confirmOverrideFromUrl,
+  commandsFromUrl,
+  mountDeviceShell,
   speakReplies,
   type ConfirmHandlerOptions,
+  type DeviceShellOptions,
 } from "./device-ux.js";
 export {
   createAgentViewModel,

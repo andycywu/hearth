@@ -23,7 +23,7 @@ MTK/NVT boards (B5) and the Blits GPU pass (C1) still need hardware.
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
 | Voice (ASR/TTS + wake word) | ✅ web adapter (Web Speech); spoken replies on every host |
 | Skills (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
-| Tests / CI / lint / bundle-size / license / SBOM | ✅ 141 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM | ✅ 163 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
 | **Android TV emulator bring-up** | ✅ probe clean, acceptance script passes |
 | **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
@@ -70,9 +70,9 @@ MTK/NVT boards (B5) and the Blits GPU pass (C1) still need hardware.
   policy blocked every call to a local model. Results and the platform quirks that
   are *not* bugs: [`platform/capability-matrix.md`](platform/capability-matrix.md).
 
-## Test coverage (141 tests)
+## Test coverage (163 tests)
 
-core 37 · llm-connectors 34 · ui 30 · skills-example 13 · adapter-aosp 9 ·
+core 37 · llm-connectors 42 · ui 39 · skills-example 13 · adapter-aosp 14 ·
 adapter-webos 6 · adapter-web 5 · acceptance 5 · adapter-tizen 2.
 
 ## Remaining — needs external resources

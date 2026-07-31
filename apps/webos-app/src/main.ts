@@ -1,7 +1,9 @@
 import { Agent, runDiagnostics, reportToMarkdown } from "@tv-ai-agent/core";
 import { createWebosAdapter } from "@tv-ai-agent/adapter-webos";
 import { createOpenAiCompatibleClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
-import { createConfirmHandler, confirmOverrideFromUrl, speakReplies } from "@tv-ai-agent/ui";
+import {
+  createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, mountDeviceShell, speakReplies,
+} from "@tv-ai-agent/ui";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 
 declare global {
@@ -17,6 +19,14 @@ declare global {
 async function boot(): Promise<void> {
   const status = document.getElementById("status");
   try {
+    // The Luna bridge lives in LG's webOSTV.js, which this repo doesn't ship.
+    // Say so plainly instead of failing later with "webOS is not defined".
+    if ((window as unknown as Record<string, unknown>).__WEBOSTV_MISSING__) {
+      throw new Error(
+        "webOSTV.js is missing — drop LG's library in as webOSTVjs/webOSTV.js " +
+        "before packaging (see apps/webos-app/README.md)",
+      );
+    }
     const platform = createWebosAdapter();
     await platform.init();
 
@@ -53,10 +63,10 @@ async function boot(): Promise<void> {
     speakReplies(agent, platform);
     window.__tvAgent = agent;
     window.__tvPlatform = platform;
-    if (status) {
-      status.textContent =
-        `Ready on ${platform.device.model} (${platform.device.soc}) · llm=${endpoint.baseUrl}`;
-    }
+
+    const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl}` });
+    // `?ask=…` (repeatable) drives the agent without a keyboard.
+    for (const command of commandsFromUrl()) await ui.ask(command);
   } catch (e) {
     if (status) status.textContent = "Boot error: " + (e as Error).message;
   }

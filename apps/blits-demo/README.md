@@ -35,4 +35,4 @@ would come from the voice pipeline or the remote.
 
 Because the view-model is shared, promoting Blits to the default renderer is a
 view-layer decision only: it needs GPU verification on the weakest target panel
-(Group C in `HANDOFF.md`), not another integration.
+(Group C in `docs/internal/HANDOFF.md`), not another integration.

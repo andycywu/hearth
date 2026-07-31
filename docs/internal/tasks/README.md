@@ -23,11 +23,11 @@ pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm bundle:all && pnp
   badges, `pnpm bench`, `ja` locale, Blits CI job.
 
 ## Group B/C/D — need emulator / browser / release
-See [`HANDOFF.md`](../../HANDOFF.md), [`docs/EMULATOR_SETUP.md`](../EMULATOR_SETUP.md),
-[`docs/BRINGUP_CHECKLIST.md`](../BRINGUP_CHECKLIST.md), [`docs/RELEASING.md`](../RELEASING.md).
+See [`HANDOFF.md`](../HANDOFF.md), [`EMULATOR_SETUP.md`](../../EMULATOR_SETUP.md),
+[`docs/BRINGUP_CHECKLIST.md`](../../BRINGUP_CHECKLIST.md), [`docs/RELEASING.md`](../../RELEASING.md).
 
 ## Conventions reminder
 - Core stays platform-agnostic; new capability → `platform-api` → every adapter →
-  contract test → tool. See [`docs/extending.md`](../extending.md).
+  contract test → tool. See [`docs/extending.md`](../../extending.md).
 - Test files are excluded from package builds (per-package `tsconfig` `exclude`).
 - Update `CHANGELOG.md` (Unreleased) and check the box here when done.

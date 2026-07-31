@@ -1,7 +1,9 @@
 import { Agent, runDiagnostics, reportToMarkdown } from "@tv-ai-agent/core";
 import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
 import { createOpenAiCompatibleClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
-import { createConfirmHandler, confirmOverrideFromUrl, speakReplies } from "@tv-ai-agent/ui";
+import {
+  createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, mountDeviceShell, speakReplies,
+} from "@tv-ai-agent/ui";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 
 declare global {
@@ -55,5 +57,9 @@ async function boot(): Promise<void> {
     `[aosp] agent ready on ${platform.device.model} (${platform.device.soc}) · ` +
     `llm=${llm.id} via ${endpoint.source} ${endpoint.baseUrl}`,
   );
+
+  const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl}` });
+  // `?ask=…` (repeatable) drives the agent without a keyboard.
+  for (const command of commandsFromUrl()) await ui.ask(command);
 }
 boot();
