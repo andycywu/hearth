@@ -1,0 +1,19 @@
+{
+  "name": "create-tv-agent-skill",
+  "version": "0.1.0",
+  "description": "Scaffold a TV AI Agent skill: a tool, a test with fetch mocked, and the two lines that register it. `npm create tv-agent-skill my-skill`.",
+  "type": "module",
+  "bin": {
+    "create-tv-agent-skill": "index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "echo \"create-skill: plain JS generator\" && exit 0",
+    "test": "node --test test.mjs"
+  },
+  "keywords": ["tizen", "android-tv", "webos", "smart-tv", "ai-agent", "skill"],
+  "license": "Apache-2.0"
+}

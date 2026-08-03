@@ -114,6 +114,13 @@ Device bring-up (Phase 2 tooling):
   web-adapter state/`has()` semantics.
 
 Making it usable by someone who didn't write it:
+- **`npm create tv-agent-skill <name>`** (`packages/create-skill`, also
+  `pnpm new:skill`) — scaffolds a skill package whose tests already pass, so the
+  first run is green rather than a compile error. `--http` generates the
+  fetch variant with the two things a TV skill needs and a server-side one
+  doesn't: an `AbortController` timeout and tests with `fetch` mocked. Inside the
+  monorepo it lands in `packages/` and links by `workspace:*`; outside it's
+  standalone. 8 tests of its own.
 - **`pnpm doctor`** (`tools/doctor.mjs`) — checks Node, pnpm, whether the lockfile
   still covers every workspace package, the Android SDK / TV image / AVD /
   emulator acceleration, the Gradle wrapper, the Tizen signing profile and

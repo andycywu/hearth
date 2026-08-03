@@ -148,6 +148,8 @@ importers:
         specifier: workspace:*
         version: link:../adapter-web
 
+  packages/create-skill: {}
+
   packages/llm-connectors:
     dependencies:
       '@tv-ai-agent/core':

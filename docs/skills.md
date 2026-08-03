@@ -34,6 +34,19 @@ first, so the same bundle degrades instead of breaking.
 if (platform.has("media") && platform.media) await platform.media.pause();
 ```
 
+## Start from a scaffold
+
+```bash
+npm create tv-agent-skill sleep-timer        # pure logic, no network
+npm create tv-agent-skill sports-scores --http   # calls an HTTP API
+```
+
+Both generate a package whose tests already pass, so your first run is green and
+you edit from there. Inside this repo it lands in `packages/` and links with
+`workspace:*`; outside, it's a standalone package. `--http` includes the two
+things a TV skill needs that a server-side one doesn't: an `AbortController`
+timeout and tests with `fetch` mocked.
+
 ## Anatomy of a skill
 
 One tool = a spec the model reads plus an `execute` you write. `defineTool` gives

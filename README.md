@@ -68,11 +68,19 @@ Useful flags: `?render=canvas`, `?diag` (capability report), `?skills=weather`
 (example skill), `?llm=http://127.0.0.1:11434/v1&model=llama3.2` (real model).
 
 ```bash
-pnpm test           # 177 tests
+pnpm test           # 185 tests
 pnpm bench          # agent-loop latency (p50/p95 per turn)
 ```
 
 ## Add a skill
+
+```bash
+npm create tv-agent-skill sleep-timer          # or --http for the fetch variant
+```
+
+You get a package that already passes its own tests — edit the description, the
+parameters and the body. Run it inside this repo and it lands in `packages/` and
+wires itself up; run it anywhere else and it's standalone.
 
 A skill is one or more tools. Pure-logic skills — weather, sports, smart home —
 need no device privilege, so the same code runs on every TV:
@@ -155,7 +163,7 @@ run on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 177 tests |
+| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 185 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
 | Real local model driving a TV | ✅ works; needs >1.5B for reliable tool chaining |
