@@ -91,9 +91,15 @@ export function mountDeviceShell(
 
   const status = document.getElementById(opts.statusId ?? "status");
   if (status) {
+    // The raw launch query is worth a few characters on screen: on a TV you
+    // can't attach a debugger to, it's the only way to tell "the flag did
+    // nothing" from "the flag never arrived" — and every host bakes its start
+    // page differently (Tizen's config.xml, Android's -e start, webOS's params).
+    const search = typeof location !== "undefined" ? location.search : "";
     status.textContent =
       `Ready · ${device.model} · ${device.os} ${device.osVersion} · soc=${device.soc}` +
-      (opts.detail ? ` · ${opts.detail}` : "");
+      (opts.detail ? ` · ${opts.detail}` : "") +
+      ` · url${search || "(no query)"}`;
   }
 
   const hint = document.getElementById(opts.hintId ?? "hint");

@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertProviderContract } from "@tv-ai-agent/platform-api";
 import { createTizenAdapter } from "./index.js";
 
@@ -46,5 +46,22 @@ describe("adapter-tizen", () => {
     if (p.device.soc !== "mediatek") {
       throw new Error(`expected mediatek, got ${p.device.soc}`);
     }
+  });
+
+  it("names the cause when the host page didn't load webapis", async () => {
+    // The real failure on the emulator: `webapis` is loaded by a $WEBAPIS script
+    // tag, not injected like `tizen`. Without it the adapter used to die with
+    // "cannot read property of undefined", which tells you nothing from a TV.
+    delete (globalThis as any).webapis;
+    const p = createTizenAdapter();
+
+    // Device info degrades quietly — that's the "unknown" on screen.
+    expect(p.device.osVersion).toBe("unknown");
+    expect(p.device.model).toBe("unknown");
+
+    // Anything that actually needs webapis says why.
+    await expect(p.system.getVolume()).rejects.toThrow(/webapis is not loaded.*\$WEBAPIS/s);
+    await expect(p.system.setVolume(20)).rejects.toThrow(/webapis is not loaded/);
+    await expect(p.system.setMute(true)).rejects.toThrow(/webapis is not loaded/);
   });
 });

@@ -153,4 +153,7 @@ const sdb = sdk.sdb ?? "sdb";
 console.log("[tizen] install on a device or emulator:");
 console.log(`          "${sdb}" devices           # must list a target first`);
 console.log(`          "${tz}" install -p "${wgt}"`);
-console.log(`          "${tz}" run -p tvaiagent   # package id from config.xml`);
+// Read it rather than hardcode it — this hint went stale the moment the package
+// id changed, and a wrong id here costs a confusing debugging session on the TV.
+const packageId = readFileSync(configPath, "utf8").match(/package="([^"]+)"/)?.[1] ?? "<package-id>";
+console.log(`          "${tz}" run -p ${packageId}   # package id from config.xml`);

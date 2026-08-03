@@ -3,7 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=1920, height=1080" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'" />
+    <!-- `file:` in script-src is for $WEBAPIS below: the runtime resolves that
+         alias to a path outside the app origin, so 'self' alone would block it. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' file:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'" />
     <title>TV AI Agent</title>
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -12,6 +14,15 @@
       <div id="status">TV AI Agent — starting…</div>
       <div id="hint"></div>
     </div>
+    <!--
+      Samsung's `webapis.*` (audiocontrol, productinfo, tvinfo, network) is NOT an
+      injected global the way `tizen.*` is — the app has to load it, and `$WEBAPIS`
+      is an alias the web runtime resolves to the platform's copy. Without this
+      line every webapis call is a TypeError, which is why device info read
+      "unknown" and volume control could never have worked. Classic script, not a
+      module, so it runs before the deferred module below.
+    -->
+    <script src="$WEBAPIS/webapis/webapis.js"></script>
     <!-- Bundled runtime: `pnpm build` output copied here by tools/bundle.mjs -->
     <script type="module" src="main.js"></script>
   </body>

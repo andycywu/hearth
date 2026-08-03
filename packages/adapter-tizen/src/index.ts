@@ -32,10 +32,10 @@ export function createTizenAdapter(): PlatformProvider {
   const provider: PlatformProvider = {
     device,
     system: {
-      getVolume: async () => Number(webapis.audiocontrol.getVolume()),
-      setVolume: async (l) => webapis.audiocontrol.setVolume(clamp(l)),
+      getVolume: async () => Number(audio().getVolume()),
+      setVolume: async (l) => audio().setVolume(clamp(l)),
       getMute: async () => Boolean(safe(() => webapis?.audiocontrol?.getMute?.()) ?? false),
-      setMute: async (m) => webapis.audiocontrol.setMute(m),
+      setMute: async (m) => audio().setMute(m),
       getInputSource: async () => mapTizenSource(safe(() => webapis?.tvinfo?.getCurrentSource?.())),
       setInputSource: async (s) => { notSupported("setInputSource on this firmware", s); },
       powerStandby: async () => { notSupported("powerStandby"); },
@@ -89,6 +89,23 @@ export function createTizenAdapter(): PlatformProvider {
       );
     });
   }
+}
+
+/**
+ * `webapis` is loaded by the host page, not injected like `tizen` — see the
+ * `$WEBAPIS` script tag in each Tizen host's index.html. When that tag is
+ * missing the old code failed with "cannot read property of undefined", which
+ * says nothing useful from a TV you can't attach a debugger to. Say the actual
+ * cause instead; `?diag` then reports it verbatim.
+ */
+function audio(): any {
+  if (typeof webapis === "undefined" || !webapis?.audiocontrol) {
+    throw new Error(
+      "Samsung webapis is not loaded — the host page needs " +
+      '<script src="$WEBAPIS/webapis/webapis.js"></script> before the bundle',
+    );
+  }
+  return webapis.audiocontrol;
 }
 
 function detectSoc(): string {
