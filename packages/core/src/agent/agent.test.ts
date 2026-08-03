@@ -162,6 +162,31 @@ describe("Agent", () => {
     expect(names).not.toContain("help");
   });
 
+  it("restores history in a brand-new adapter — i.e. across an app restart", async () => {
+    // The original bug: every adapter backed platform.storage with an in-memory
+    // Map, so `persistKey` was a no-op on real devices. A test that reuses one
+    // adapter instance can't see that; this one builds a second adapter, which
+    // is what happens when the app is relaunched.
+    const data = new Map<string, string>();
+    (globalThis as any).localStorage = {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => { data.set(k, v); },
+      removeItem: (k: string) => { data.delete(k); },
+    };
+    try {
+      const before = new Agent({ platform: createWebAdapter(), llm: finalLlm, persistKey: "sess-restart" });
+      await before.run("remember this");
+      expect(before.historyLength).toBeGreaterThan(0);
+
+      const afterRestart = new Agent({ platform: createWebAdapter(), llm: finalLlm, persistKey: "sess-restart" });
+      expect(afterRestart.historyLength).toBe(0);
+      expect(await afterRestart.restore()).toBe(true);
+      expect(afterRestart.historyLength).toBe(before.historyLength);
+    } finally {
+      delete (globalThis as any).localStorage;
+    }
+  });
+
   it("persists history and restores it in a new agent sharing storage", async () => {
     const platform = createWebAdapter(); // shared in-memory storage
     const a1 = new Agent({ platform, llm: finalLlm, persistKey: "sess-1" });

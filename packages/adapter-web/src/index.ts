@@ -1,5 +1,5 @@
 import {
-  matchAppsByName,
+  matchAppsByName, createLocalStorageStore,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey, type VoicePipeline,
 } from "@tv-ai-agent/platform-api";
@@ -14,7 +14,6 @@ export function createWebAdapter(): PlatformProvider {
     volume: 20,
     muted: false,
     input: "tv" as InputSource,
-    kv: new Map<string, string>(),
     apps: [
       { id: "com.netflix.ninja", name: "Netflix" },
       { id: "com.google.android.youtube.tv", name: "YouTube" },
@@ -51,11 +50,9 @@ export function createWebAdapter(): PlatformProvider {
       isAvailable: async () => true,
     },
     network: { isOnline: async () => true, connectionType: async () => "ethernet" },
-    storage: {
-      get: async (k) => state.kv.get(k) ?? null,
-      set: async (k, v) => { state.kv.set(k, v); },
-      delete: async (k) => { state.kv.delete(k); },
-    },
+    // localStorage in a browser, memory in Node — so the harness keeps a
+    // session across reloads while tests stay isolated.
+    storage: createLocalStorageStore("tv-ai-agent"),
     media: {
       play: async (uri) => { console.info("[web] play", uri); },
       pause: async () => { console.info("[web] pause"); },

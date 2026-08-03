@@ -160,6 +160,14 @@ Making it usable by someone who didn't write it:
   is the installed identity, so changing it later would orphan installs.
 
 ### Fixed
+- **`platform.storage` never persisted anything, on any platform.** All four
+  adapters backed it with an in-memory `Map` (AOSP with a Kotlin `HashMap`), so
+  `Agent`'s `persistKey` — whose entire promise is that a conversation survives
+  an app reload — silently lost everything on restart. Nothing errored; the data
+  just wasn't there. Now: `SharedPreferences` on AOSP, `tizen.preference` (with a
+  localStorage then memory fallback) on Tizen, `localStorage` on webOS and web.
+  The existing test couldn't catch it because it reused one adapter instance;
+  the new one builds a second adapter, which is what a restart actually is.
 - **AOSP: the runtime never started on a device.** `index.html` loads `main.js` as
   an ES module, and module scripts are CORS-blocked from `file://` (null origin),
   so the WebView only ever showed the placeholder page. Assets are now served

@@ -1,7 +1,7 @@
 import {
-  matchAppsByName,
+  matchAppsByName, createLocalStorageStore,
   type PlatformProvider, type DeviceInfo, type AppEntry,
-  type InputSource, type RemoteKey,
+  type InputSource, type RemoteKey, type KeyValueStore,
 } from "@tv-ai-agent/platform-api";
 
 /**
@@ -109,12 +109,42 @@ function dispatchKey(k: RemoteKey): void {
   document.dispatchEvent(new KeyboardEvent("keydown", { keyCode } as any));
 }
 function mapTizenSource(_raw: unknown): InputSource { return "tv"; }
-function tizenKeyValueStore() {
-  const mem = new Map<string, string>();
+/**
+ * Prefer Tizen's own `preference` API — it is the only store that survives an
+ * app *reinstall* as well as a restart — and fall back to localStorage, then
+ * memory. This used to be a bare `Map`, which meant `Agent`'s `persistKey`
+ * quietly did nothing on a real TV.
+ */
+function tizenKeyValueStore(): KeyValueStore {
+  const fallback = createLocalStorageStore("tv-ai-agent");
+  const preference = safe(() => tizen?.preference) as
+    | { setValue(k: string, v: string): void; getValue(k: string): unknown;
+        remove(k: string): void; exists(k: string): boolean }
+    | undefined;
+  if (!preference) return fallback;
+
   return {
-    get: async (k: string) => mem.get(k) ?? null,
-    set: async (k: string, v: string) => { mem.set(k, v); },
-    delete: async (k: string) => { mem.delete(k); },
+    get: async (k) => {
+      try {
+        return preference.exists(k) ? String(preference.getValue(k)) : null;
+      } catch {
+        return fallback.get(k);
+      }
+    },
+    set: async (k, v) => {
+      try {
+        preference.setValue(k, v);
+      } catch {
+        await fallback.set(k, v);
+      }
+    },
+    delete: async (k) => {
+      try {
+        if (preference.exists(k)) preference.remove(k);
+      } catch {
+        await fallback.delete(k);
+      }
+    },
   };
 }
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));

@@ -1,5 +1,5 @@
 import {
-  matchAppsByName,
+  matchAppsByName, createLocalStorageStore,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey,
 } from "@tv-ai-agent/platform-api";
@@ -47,7 +47,9 @@ export function createWebosAdapter(): PlatformProvider {
     capabilities: { media: true, voice: false },
   };
 
-  const kv = new Map<string, string>();
+  // webOS web apps get a normal localStorage; a bare Map here meant
+  // `persistKey` silently lost the conversation on every restart.
+  const kv = createLocalStorageStore("tv-ai-agent");
 
   const provider: PlatformProvider = {
     device,
@@ -83,11 +85,7 @@ export function createWebosAdapter(): PlatformProvider {
         return "none";
       },
     },
-    storage: {
-      get: async (key) => kv.get(key) ?? null,
-      set: async (key, value) => { kv.set(key, value); },
-      delete: async (key) => { kv.delete(key); },
-    },
+    storage: kv,
     media: {
       // webOS media is app-managed (MediaController / <video>); inject transport keys.
       play: async (_uri) => dispatchKey("playpause"),

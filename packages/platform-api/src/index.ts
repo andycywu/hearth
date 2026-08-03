@@ -106,6 +106,7 @@ export interface KeyValueStore {
 
 export { assertProviderContract } from "./contract.js";
 export type { ContractOptions } from "./contract.js";
+export { createLocalStorageStore, createMemoryStore } from "./storage.js";
 
 /** Shared helper: case-insensitive substring match over app display names. */
 export function matchAppsByName(apps: AppEntry[], query: string): AppEntry[] {

@@ -158,10 +158,17 @@ class TvNativeBridge(private val ctx: Context) {
 
     @JavascriptInterface fun connectionType(): String = "ethernet"
 
-    private val kv = HashMap<String, String>()
-    @JavascriptInterface fun kvGet(key: String): String = kv[key] ?: ""
-    @JavascriptInterface fun kvSet(key: String, value: String) { kv[key] = value }
-    @JavascriptInterface fun kvDelete(key: String) { kv.remove(key) }
+    /**
+     * SharedPreferences, not a HashMap: this backs `platform.storage`, and the
+     * agent's `persistKey` promises a conversation survives an app reload. An
+     * in-memory map made that silently false on every device.
+     */
+    private val prefs by lazy { ctx.getSharedPreferences("tv-ai-agent", Context.MODE_PRIVATE) }
+    @JavascriptInterface fun kvGet(key: String): String = prefs.getString(key, "") ?: ""
+    @JavascriptInterface fun kvSet(key: String, value: String) {
+        prefs.edit().putString(key, value).apply()
+    }
+    @JavascriptInterface fun kvDelete(key: String) { prefs.edit().remove(key).apply() }
 
     private fun detectSoc(): String {
         val h = (android.os.Build.HARDWARE + " " + android.os.Build.BOARD).lowercase()
