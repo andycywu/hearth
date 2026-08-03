@@ -36,6 +36,14 @@ export interface DiagnosticsReport {
 export interface DiagnosticsOptions {
   /** Allow mutating probes (volume set/restore, key press). Default false. */
   allowWrites?: boolean;
+  /**
+   * URLs to actually fetch, to prove the device has a route rather than
+   * trusting an adapter's `isOnline`. Opt-in: a diagnostics run shouldn't
+   * reach the network unless the caller asked it to.
+   */
+  reachUrls?: readonly string[];
+  /** Per-URL budget for the above. Default 5000ms. */
+  reachTimeoutMs?: number;
 }
 
 export async function runDiagnostics(
@@ -102,6 +110,25 @@ export async function runDiagnostics(
   await probe(results, "network.isOnline", async () => `${await platform.network.isOnline()}`);
   await probe(results, "network.connectionType", async () => `${await platform.network.connectionType()}`);
 
+  // An adapter that can't detect connectivity answers `true` and hopes, so the
+  // two probes above can both be green on a device with no route to anything.
+  // Actually reaching for a URL is the only honest answer, and "can I reach my
+  // model?" is the question bring-up is really asking.
+  for (const url of opts.reachUrls ?? []) {
+    await probe(results, `network.reach ${shorten(url)}`, async () => {
+      if (typeof fetch !== "function") return unsupported();
+      const started = Date.now();
+      const res = await withTimeout(
+        fetch(url, { method: "GET" }),
+        opts.reachTimeoutMs ?? 5000,
+        `no answer within ${opts.reachTimeoutMs ?? 5000}ms`,
+      );
+      // Any HTTP status means the packets got there and back, which is what
+      // this probe is asking — 404 from a real server still proves the route.
+      return `HTTP ${res.status} in ${Date.now() - started}ms`;
+    });
+  }
+
   // --- storage (safe round-trip) ---
   await probe(results, "storage.roundTrip", async () => {
     const key = "__diag__";
@@ -152,6 +179,28 @@ export function reportToMarkdown(report: DiagnosticsReport): string {
 // --- internals ---
 const SKIP = Symbol("skip");
 const UNSUPPORTED = Symbol("unsupported");
+/** Keep the report readable on a TV: origin plus a hint of the path. */
+function shorten(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.origin + (u.pathname === "/" ? "" : u.pathname);
+  } catch {
+    return url;
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 function skip(detail: string): { [SKIP]: string } { return { [SKIP]: detail }; }
 function unsupported(): { [UNSUPPORTED]: true } { return { [UNSUPPORTED]: true }; }
 

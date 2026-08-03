@@ -102,6 +102,27 @@ describe("adapter-tizen", () => {
     expect(p.device.soc).toBe("mediatek");
   });
 
+  it("doesn't claim to be online just because it can't tell", async () => {
+    // The emulator reported "isOnline: true" while every fetch failed. The
+    // agent uses this to decide whether to try the model, so a confident wrong
+    // answer is worse than a cautious one.
+    delete (globalThis as any).webapis;
+    // `navigator` is a getter-only global in Node, so swap the descriptor.
+    const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    Object.defineProperty(globalThis, "navigator", { value: { onLine: false }, configurable: true });
+    try {
+      expect(await createTizenAdapter().network.isOnline()).toBe(false);
+    } finally {
+      if (original) Object.defineProperty(globalThis, "navigator", original);
+      else delete (globalThis as any).navigator;
+    }
+  });
+
+  it("still prefers Samsung's gateway check when it exists", async () => {
+    (globalThis as any).webapis.network = { isConnectedToGateway: () => false };
+    expect(await createTizenAdapter().network.isOnline()).toBe(false);
+  });
+
   it("survives systeminfo being unavailable", async () => {
     delete (globalThis as any).webapis;
     delete (globalThis as any).tizen.systeminfo;

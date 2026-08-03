@@ -60,7 +60,18 @@ export function createTizenAdapter(): PlatformProvider {
       },
     },
     network: {
-      isOnline: async () => safe(() => webapis?.network?.isConnectedToGateway?.()) ?? true,
+      // Without Samsung's webapis this used to answer a hardcoded `true`, which
+      // reported "online" on an emulator that couldn't reach anything at all —
+      // exactly the wrong answer, since the agent uses it to decide whether to
+      // try the model. `navigator.onLine` is the standard fallback and is at
+      // least measuring something.
+      isOnline: async () => {
+        const gateway = safe(() => webapis?.network?.isConnectedToGateway?.());
+        if (typeof gateway === "boolean") return gateway;
+        return typeof navigator !== "undefined" && typeof navigator.onLine === "boolean"
+          ? navigator.onLine
+          : true;
+      },
       connectionType: async () => {
         const t = safe(() => webapis?.network?.getActiveConnectionType?.());
         return t === 0 ? "wifi" : t === 1 ? "ethernet" : "none";

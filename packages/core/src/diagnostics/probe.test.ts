@@ -87,6 +87,55 @@ describe("runDiagnostics", () => {
     expect(report.summary.error).toBe(1);
   });
 
+  describe("network reachability", () => {
+    const withFetch = async <T>(impl: unknown, run: () => Promise<T>): Promise<T> => {
+      const original = (globalThis as Record<string, unknown>).fetch;
+      (globalThis as Record<string, unknown>).fetch = impl;
+      try { return await run(); } finally { (globalThis as Record<string, unknown>).fetch = original; }
+    };
+
+    it("doesn't touch the network unless asked", async () => {
+      // A capability report must not phone home on its own.
+      let called = false;
+      const report = await withFetch(async () => { called = true; return { status: 200 }; },
+        () => runDiagnostics(createWebAdapter()));
+      expect(called).toBe(false);
+      expect(report.results.some((r) => r.capability.startsWith("network.reach"))).toBe(false);
+    });
+
+    it("counts any HTTP status as reachable — the route is what's being tested", async () => {
+      const report = await withFetch(async () => ({ status: 404 }),
+        () => runDiagnostics(createWebAdapter(), { reachUrls: ["https://api.example.com/v1/models"] }));
+      expect(status(report, "network.reach https://api.example.com/v1/models")).toBe("ok");
+      expect(detail(report, "network.reach https://api.example.com/v1/models")).toMatch(/HTTP 404/);
+    });
+
+    it("records a refused connection as an error, with the reason", async () => {
+      // This is the case that matters: isOnline can say true while nothing routes.
+      const report = await withFetch(async () => { throw new TypeError("Failed to fetch"); },
+        () => runDiagnostics(createWebAdapter(), { reachUrls: ["http://127.0.0.1:9090/v1/models"] }));
+      expect(status(report, "network.reach http://127.0.0.1:9090/v1/models")).toBe("error");
+      expect(detail(report, "network.reach http://127.0.0.1:9090/v1/models")).toMatch(/Failed to fetch/);
+    });
+
+    it("times out rather than hanging the whole report", async () => {
+      const report = await withFetch(() => new Promise(() => {}),
+        () => runDiagnostics(createWebAdapter(), { reachUrls: ["https://slow.example.com"], reachTimeoutMs: 20 }));
+      expect(status(report, "network.reach https://slow.example.com")).toBe("error");
+      expect(detail(report, "network.reach https://slow.example.com")).toMatch(/no answer within 20ms/);
+    });
+
+    it("probes each URL, so 'host unreachable' and 'no network' are separable", async () => {
+      const seen: string[] = [];
+      const report = await withFetch(async (url: string) => { seen.push(url); return { status: 200 }; },
+        () => runDiagnostics(createWebAdapter(), {
+          reachUrls: ["http://127.0.0.1:9090/v1/models", "https://api.open-meteo.com/v1/forecast"],
+        }));
+      expect(seen).toHaveLength(2);
+      expect(report.results.filter((r) => r.capability.startsWith("network.reach"))).toHaveLength(2);
+    });
+  });
+
   it("renders a markdown table", async () => {
     const md = reportToMarkdown(await runDiagnostics(createWebAdapter()));
     expect(md).toContain("| Capability | Status | Detail |");

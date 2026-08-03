@@ -149,9 +149,18 @@ The debug APK is already built at
   build; Samsung cert (Certificate Manager, *free* account) = install on TV /
   emulator; Samsung *partner* = privileged APIs. Earlier notes here claimed no
   Samsung account was needed at all; that was wrong and is corrected throughout.
-  *Remaining:* create a Samsung cert (VS Code → **Tizen: Create Certificate** →
-  Samsung → TV), repackage with `--profile <name>`, then
-  `tz install -p …` → `tz run -p tvaiagent` → `?diag` + acceptance script.
+  *Update (2026-08-03): installs and runs.* The Samsung cert exists, the package
+  id is 10 chars, and `?diag&writes` on the TV 10.0 emulator reports volume and
+  mute working, 84 apps, `sendKey`, and storage round-trip. Three emulator
+  findings and their fixes are written up in
+  [`platform/capability-matrix.md`](../platform/capability-matrix.md): the query
+  string never reaches the app (flags now travel as `__AGENT_FLAGS__`), Samsung's
+  `webapis` is absent from the image (adapter falls back to `tizen.tvaudiocontrol`
+  / `tizen.systeminfo`), and the emulator has **no outbound network** — both a
+  tunnelled loopback port and a public HTTPS endpoint fail, so a real model can't
+  be reached from it. `?diag&reach` proves that in one screen.
+  *Remaining:* the acceptance script against a model, which needs either a
+  network-capable image or a real TV in Developer Mode.
 - [x] **B3. Fill `docs/platform/capability-matrix.md`** — *done for the AOSP
   emulator column*, including the platform behaviours that differ from the mocks
   (volume quantization, mute zeroing the volume readback, focus-dependent keys).

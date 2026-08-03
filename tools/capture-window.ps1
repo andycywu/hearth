@@ -11,7 +11,11 @@
 
 param(
   [Parameter(Mandatory = $true)][string]$Title,
-  [Parameter(Mandatory = $true)][string]$Out
+  [Parameter(Mandatory = $true)][string]$Out,
+  # Narrow the match to one process, e.g. -Process emulator-x86_64. Worth using:
+  # a browser tab about the emulator matches the title too, and capturing a
+  # Google search result instead of the TV is a confusing five minutes.
+  [string]$Process
 )
 
 Add-Type -AssemblyName System.Drawing
@@ -29,8 +33,12 @@ public class Win {
 }
 "@
 
-$proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*$Title*" } | Select-Object -First 1
-if (-not $proc) { Write-Error "no window matching '$Title'"; exit 1 }
+$candidates = Get-Process | Where-Object { $_.MainWindowTitle -like "*$Title*" }
+if ($Process) { $candidates = $candidates | Where-Object { $_.ProcessName -like "*$Process*" } }
+# An exact title beats a substring, so a browser tab mentioning the emulator
+# loses to the emulator itself.
+$proc = @($candidates | Sort-Object { if ($_.MainWindowTitle -eq $Title) { 0 } else { 1 } })[0]
+if (-not $proc) { Write-Error "no window matching '$Title'$(if ($Process) { " in process '$Process'" })"; exit 1 }
 
 $h = $proc.MainWindowHandle
 # A minimized window has no pixels to copy — restore it first (9 = SW_RESTORE).

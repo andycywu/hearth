@@ -82,6 +82,38 @@ Chinese, and no agent errors were raised.
   `navigation.available` still reports ready.
 - **`getInputSource` returns `app`** — the emulator has no HDMI inputs.
 
+## Tizen — Samsung TV 10.0 emulator (verified 2026-08-03)
+
+Everything under `tizen.*` works: 84 apps listed, `getForegroundApp`, `sendKey`,
+storage round-trip, and — after the fallbacks below — volume and mute.
+`?diag&writes` reports `system.setVolume ✅ round-trip ok`.
+
+Three things about this image are worth knowing before you lose a day to them.
+
+- **The query string never reaches the app.** `<content src="index.html?demo"/>`
+  in config.xml is silently stripped by the web runtime, so `location.search` is
+  empty and every launch flag is ignored — with no error anywhere. Flags travel
+  as `__AGENT_FLAGS__` instead (`packages/core/src/launch-flags.ts`), written by
+  `pnpm package:tizen --flags …`. The status line prints `flags:baked…` or
+  `flags:none` so you can see which happened.
+- **Samsung's `webapis` is absent.** Not a CSP problem (identical with the meta
+  tag removed) and not the app profile (Samsung's own SDK template also uses
+  `<tizen:profile name="tv"/>`). It ships on the device, not in the SDK, and
+  this image doesn't have it — so `webapis.audiocontrol`, `productinfo` and
+  `tvinfo` are all undefined. The adapter prefers them where present, since
+  retail Samsung TVs have them, and falls back to `tizen.tvaudiocontrol` and
+  `tizen.systeminfo`.
+- **The emulator has no outbound network.** Both a loopback port tunnelled with
+  `sdb reverse` and a public HTTPS endpoint fail with `TypeError: Failed to
+  fetch`; `?diag&reach` shows both. So a model endpoint can't be reached from
+  this image and the agent can only run against the scripted brain here. Note
+  `network.isOnline` still reports `true`: `navigator.onLine` doesn't know about
+  routes, which is exactly why the reach probe exists.
+
+`sdb shell` answers `closed` on this image and the Web Inspector port refuses
+connections, so the screen is the only way to read anything back — hence
+`tools/capture-window.ps1`.
+
 ## Generating results with the self-diagnostic
 
 Don't fill this by hand — run the built-in capability probe on the device and

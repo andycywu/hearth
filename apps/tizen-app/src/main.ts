@@ -22,16 +22,24 @@ async function boot(): Promise<void> {
     const platform = createTizenAdapter();
     await platform.init();
 
-    // Bring-up mode: open the app with `?diag` to render a capability report.
-    if (/(^|[?&])diag/.test(launchSearch())) {
-      const report = await runDiagnostics(platform, { allowWrites: launchSearch().includes("writes") });
-      renderDiagnostics(report);
-      return;
-    }
-
     // ?llm=/?model= → window globals → default, so a packaged .wgt can be
     // repointed at another endpoint without a rebuild.
     const endpoint = resolveLlmEndpoint({ defaultBaseUrl: "http://127.0.0.1:8080/v1" });
+
+    // Bring-up mode: open the app with `?diag` to render a capability report.
+    if (/(^|[?&])diag/.test(launchSearch())) {
+      const report = await runDiagnostics(platform, {
+        allowWrites: launchSearch().includes("writes"),
+        // `?diag&reach` also proves the device has a route: its own model
+        // endpoint, and a public one to tell "can't reach the host" apart from
+        // "no network at all". Opt-in, so a plain ?diag stays offline.
+        ...(launchSearch().includes("reach")
+          ? { reachUrls: [`${endpoint.baseUrl}/models`, "https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&current=temperature_2m"] }
+          : {}),
+      });
+      renderDiagnostics(report);
+      return;
+    }
     const llm = createOpenAiCompatibleClient({
       baseUrl: endpoint.baseUrl!,
       model: endpoint.model,
