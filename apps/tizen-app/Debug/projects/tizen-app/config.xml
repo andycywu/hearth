@@ -12,7 +12,7 @@
   <tizen:application id="tvaiagent0.TvAiAgent"
                      package="tvaiagent0"
                      required_version="6.0"/>
-  <content src="index.html?demo&amp;confirm=auto&amp;llm=http://127.0.0.1:9090/v1"/>
+  <content src="index.html"/>
   <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
   <icon src="icon.png"/>
   <name>TV AI Agent</name>

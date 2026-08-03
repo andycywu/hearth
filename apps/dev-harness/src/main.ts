@@ -1,4 +1,4 @@
-import { Agent, runDiagnostics, reportToMarkdown, type LlmClient } from "@tv-ai-agent/core";
+import { Agent, runDiagnostics, reportToMarkdown, launchSearch, type LlmClient } from "@tv-ai-agent/core";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 import {
   mountAgentOverlay, mountAgentCanvas, createConfirmHandler, speakReplies,
@@ -28,8 +28,8 @@ async function boot(): Promise<void> {
 
   // `?diag` renders the on-device capability report (same probe as the device
   // builds) instead of the chat UI.
-  if (/(^|[?&])diag/.test(location.search)) {
-    const report = await runDiagnostics(platform, { allowWrites: location.search.includes("writes") });
+  if (/(^|[?&])diag/.test(launchSearch())) {
+    const report = await runDiagnostics(platform, { allowWrites: launchSearch().includes("writes") });
     const pre = document.createElement("pre");
     pre.style.cssText = "padding:24px;white-space:pre-wrap;font-size:15px;line-height:1.5";
     pre.textContent = reportToMarkdown(report) + "\nsummary: " + JSON.stringify(report.summary);
@@ -44,7 +44,7 @@ async function boot(): Promise<void> {
   // no code edit, e.g. ?llm=http://127.0.0.1:11434/v1&model=llama3.2
   // Same resolver the device hosts use — no default here, so with nothing
   // configured we fall back to the offline brain instead of a dead endpoint.
-  const params = new URLSearchParams(location.search);
+  const params = new URLSearchParams(launchSearch());
   const endpoint = resolveLlmEndpoint();
 
   const llm: LlmClient = endpoint.baseUrl

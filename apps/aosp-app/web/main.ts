@@ -1,4 +1,4 @@
-import { Agent, runDiagnostics, reportToMarkdown } from "@tv-ai-agent/core";
+import { Agent, runDiagnostics, reportToMarkdown, launchSearch } from "@tv-ai-agent/core";
 import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
 import { createOpenAiCompatibleClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
@@ -21,8 +21,8 @@ async function boot(): Promise<void> {
   await platform.init();
 
   // Bring-up mode: load with `?diag` to render an on-screen capability report.
-  if (typeof location !== "undefined" && /(^|[?&])diag/.test(location.search)) {
-    const report = await runDiagnostics(platform, { allowWrites: location.search.includes("writes") });
+  if (/(^|[?&])diag/.test(launchSearch())) {
+    const report = await runDiagnostics(platform, { allowWrites: launchSearch().includes("writes") });
     const markdown = reportToMarkdown(report) + "\nsummary: " + JSON.stringify(report.summary);
     const pre = document.createElement("pre");
     pre.style.cssText = "padding:24px;color:#e8eefc;white-space:pre-wrap;text-align:left";

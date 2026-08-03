@@ -1,4 +1,4 @@
-import { Agent, runDiagnostics, reportToMarkdown } from "@tv-ai-agent/core";
+import { Agent, runDiagnostics, reportToMarkdown, launchSearch } from "@tv-ai-agent/core";
 import { createWebosAdapter } from "@tv-ai-agent/adapter-webos";
 import { createOpenAiCompatibleClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
@@ -31,8 +31,8 @@ async function boot(): Promise<void> {
     await platform.init();
 
     // Bring-up mode: open with `?diag` to render a capability report.
-    if (typeof location !== "undefined" && /(^|[?&])diag/.test(location.search)) {
-      const report = await runDiagnostics(platform, { allowWrites: location.search.includes("writes") });
+    if (/(^|[?&])diag/.test(launchSearch())) {
+      const report = await runDiagnostics(platform, { allowWrites: launchSearch().includes("writes") });
       const markdown = reportToMarkdown(report) + "\nsummary: " + JSON.stringify(report.summary);
       // Console too, so `ares-inspect` gives you copyable text (no OCR).
       console.info(markdown);

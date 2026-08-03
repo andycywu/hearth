@@ -11,6 +11,8 @@
  *   3. the caller's defaults
  */
 
+import { launchSearch } from "@tv-ai-agent/core";
+
 export interface LlmEndpoint {
   /** Undefined when nothing configured one — the host decides what to do. */
   baseUrl?: string;
@@ -21,7 +23,7 @@ export interface LlmEndpoint {
 }
 
 export interface ResolveLlmEndpointOptions {
-  /** Query string to read. Defaults to `location.search` when in a browser. */
+  /** Query string to read. Defaults to the launch flags (`launchSearch()`). */
   search?: string;
   /** Global bag to read. Defaults to `window`. */
   globals?: Record<string, unknown>;
@@ -32,7 +34,7 @@ export interface ResolveLlmEndpointOptions {
 const DEFAULT_MODEL = "local-tv-agent";
 
 export function resolveLlmEndpoint(opts: ResolveLlmEndpointOptions = {}): LlmEndpoint {
-  const search = opts.search ?? (typeof location !== "undefined" ? location.search : "");
+  const search = opts.search ?? launchSearch();
   const globals = opts.globals ?? (typeof window !== "undefined" ? (window as unknown as Record<string, unknown>) : {});
   const params = new URLSearchParams(search);
 

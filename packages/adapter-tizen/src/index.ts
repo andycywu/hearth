@@ -77,7 +77,13 @@ export function createTizenAdapter(): PlatformProvider {
       seek: async (_ms) => { /* app-managed; no generic Tizen seek API */ },
     },
     has: (cap) => cap in provider && (provider as any)[cap] !== undefined,
-    init: async () => { /* register key listeners, privileges assumed in config.xml */ },
+    init: async () => {
+      // Fill in the device info Samsung's webapis would have given us. This is
+      // the standard Tizen API, so it works on builds without the proprietary
+      // extension — including the TV emulator, where webapis is absent and the
+      // status line otherwise reads "unknown · tizen unknown · soc=unknown".
+      await refreshDeviceInfo(device);
+    },
   };
   return provider;
 
@@ -92,27 +98,79 @@ export function createTizenAdapter(): PlatformProvider {
 }
 
 /**
- * `webapis` is loaded by the host page, not injected like `tizen` — see the
- * `$WEBAPIS` script tag in each Tizen host's index.html. When that tag is
- * missing the old code failed with "cannot read property of undefined", which
- * says nothing useful from a TV you can't attach a debugger to. Say the actual
- * cause instead; `?diag` then reports it verbatim.
+ * Volume control, from whichever API this build actually has.
+ *
+ * `webapis.audiocontrol` is Samsung's, and it is the one that works on retail
+ * Samsung TVs — but it is a proprietary extension loaded by the host page from
+ * `$WEBAPIS`, and it is simply absent on some builds, the TV emulator included.
+ * `tizen.tvaudiocontrol` is the standard Tizen TV API and covers those.
+ *
+ * Prefer Samsung's where present, since that's the retail target, and say
+ * something useful when neither exists rather than dying with "cannot read
+ * property of undefined" — a message that tells you nothing from a TV you can't
+ * attach a debugger to. `?diag` reports this sentence verbatim.
  */
 function audio(): any {
-  if (typeof webapis === "undefined" || !webapis?.audiocontrol) {
-    throw new Error(
-      "Samsung webapis is not loaded — the host page needs " +
-      '<script src="$WEBAPIS/webapis/webapis.js"></script> before the bundle',
-    );
+  const samsung = typeof webapis !== "undefined" ? webapis?.audiocontrol : undefined;
+  if (samsung) return samsung;
+  const standard = typeof tizen !== "undefined" ? (tizen as any)?.tvaudiocontrol : undefined;
+  if (standard) return standard;
+  throw new Error(
+    "no audio control API on this build — neither Samsung's webapis.audiocontrol " +
+    '(host page needs <script src="$WEBAPIS/webapis/webapis.js">) nor tizen.tvaudiocontrol',
+  );
+}
+
+/**
+ * Device model and OS version via the standard `tizen.systeminfo`, which exists
+ * whether or not the proprietary webapis does. Best-effort: an unnamed TV is
+ * not worth failing a boot over, so anything missing just stays "unknown".
+ */
+async function refreshDeviceInfo(device: DeviceInfo): Promise<void> {
+  const build = await systemInfo("BUILD");
+  if (build) {
+    const model = str(build.model) ?? str(build.buildVersion);
+    if (model) {
+      device.model = model;
+      device.soc = socFromModel(model) ?? device.soc;
+    }
+    const version = str(build.buildVersion);
+    if (version) device.osVersion = version;
   }
-  return webapis.audiocontrol;
+  // Samsung's own numbers are better when they're there.
+  const samsungModel = safe(() => webapis?.productinfo?.getModel?.());
+  if (str(samsungModel)) {
+    device.model = String(samsungModel);
+    device.soc = socFromModel(String(samsungModel)) ?? device.soc;
+  }
+  const samsungVersion = safe(() => webapis?.productinfo?.getVersion?.());
+  if (str(samsungVersion)) device.osVersion = String(samsungVersion);
+}
+
+function systemInfo(property: string): Promise<any | undefined> {
+  return new Promise((resolve) => {
+    try {
+      tizen.systeminfo.getPropertyValue(property, (v: unknown) => resolve(v), () => resolve(undefined));
+    } catch {
+      resolve(undefined);
+    }
+  });
+}
+
+function str(v: unknown): string | undefined {
+  const s = typeof v === "string" ? v.trim() : "";
+  return s ? s : undefined;
 }
 
 function detectSoc(): string {
-  const m = (safe(() => webapis?.productinfo?.getModel?.()) ?? "").toLowerCase();
+  return socFromModel(safe(() => webapis?.productinfo?.getModel?.()) ?? "") ?? "unknown";
+}
+
+function socFromModel(model: string): string | undefined {
+  const m = model.toLowerCase();
   if (m.includes("mtk") || m.includes("mediatek")) return "mediatek";
   if (m.includes("nvt") || m.includes("novatek")) return "novatek";
-  return "unknown";
+  return undefined;
 }
 
 const TIZEN_KEYCODES: Partial<Record<RemoteKey, number>> = {

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=1920, height=1080" />
     <!-- `file:` in script-src is for $WEBAPIS below: the runtime resolves that
          alias to a path outside the app origin, so 'self' alone would block it. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' file:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' file:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https:; connect-src 'self' http://127.0.0.1:* http://localhost:* http://10.0.2.2:* https:; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'" />
     <title>TV AI Agent</title>
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -23,6 +23,12 @@
       module, so it runs before the deferred module below.
     -->
     <script src="$WEBAPIS/webapis/webapis.js"></script>
+    <!--
+      Launch flags (?demo, ?diag, ?llm=…), written by tools/package-tizen.mjs.
+      Tizen drops the query string from config.xml's <content src>, so they can't
+      travel in the URL. Absent in an unflagged build; a 404 here is harmless.
+    -->
+    <script src="launch-flags.js"></script>
     <!-- Bundled runtime: `pnpm build` output copied here by tools/bundle.mjs -->
     <script type="module" src="main.js"></script>
   </body>

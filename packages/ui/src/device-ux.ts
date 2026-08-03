@@ -1,4 +1,4 @@
-import type { Agent, ConfirmRequest } from "@tv-ai-agent/core";
+import { launchSearch, launchSearchSource, type Agent, type ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { runDemo, demoFromUrl } from "./demo.js";
@@ -91,15 +91,15 @@ export function mountDeviceShell(
 
   const status = document.getElementById(opts.statusId ?? "status");
   if (status) {
-    // The raw launch query is worth a few characters on screen: on a TV you
-    // can't attach a debugger to, it's the only way to tell "the flag did
-    // nothing" from "the flag never arrived" — and every host bakes its start
-    // page differently (Tizen's config.xml, Android's -e start, webOS's params).
-    const search = typeof location !== "undefined" ? location.search : "";
+    // The launch flags are worth a few characters on screen, *and where they
+    // came from*: on a TV you can't attach a debugger to, "the flag did
+    // nothing" and "the flag never arrived" look identical. Telling those two
+    // apart is what finally explained the Tizen build ignoring every flag.
+    const search = launchSearch();
     status.textContent =
       `Ready · ${device.model} · ${device.os} ${device.osVersion} · soc=${device.soc}` +
       (opts.detail ? ` · ${opts.detail}` : "") +
-      ` · url${search || "(no query)"}`;
+      ` · flags:${launchSearchSource()}${search || "(none)"}`;
   }
 
   const hint = document.getElementById(opts.hintId ?? "hint");
@@ -128,7 +128,7 @@ export function mountDeviceShell(
  * intent would call into later.
  */
 export function commandsFromUrl(
-  search = typeof location !== "undefined" ? location.search : "",
+  search = launchSearch(),
 ): string[] {
   return new URLSearchParams(search)
     .getAll("ask")
@@ -178,7 +178,7 @@ export async function runStartupCommands(
  * logged: an auto-approving build must never be mistaken for the default.
  */
 export function confirmOverrideFromUrl(
-  search = typeof location !== "undefined" ? location.search : "",
+  search = launchSearch(),
 ): ((req: ConfirmRequest) => boolean) | undefined {
   const mode = new URLSearchParams(search).get("confirm");
   if (mode !== "auto" && mode !== "deny") return undefined;

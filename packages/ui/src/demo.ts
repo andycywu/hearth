@@ -1,3 +1,5 @@
+import { launchSearch } from "@tv-ai-agent/core";
+
 /**
  * A self-running demo: the agent driving a TV, with nothing but a launch flag.
  *
@@ -79,7 +81,7 @@ export async function runDemo(
  * bring-up run pick its own lines.
  */
 export function demoFromUrl(
-  search = typeof location !== "undefined" ? location.search : "",
+  search = launchSearch(),
 ): { commands: readonly string[]; loop: boolean } | undefined {
   const params = new URLSearchParams(search);
   if (!params.has("demo")) return undefined;

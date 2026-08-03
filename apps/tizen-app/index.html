@@ -23,6 +23,12 @@
       module, so it runs before the deferred module below.
     -->
     <script src="$WEBAPIS/webapis/webapis.js"></script>
+    <!--
+      Launch flags (?demo, ?diag, ?llm=…), written by tools/package-tizen.mjs.
+      Tizen drops the query string from config.xml's <content src>, so they can't
+      travel in the URL. Absent in an unflagged build; a 404 here is harmless.
+    -->
+    <script src="launch-flags.js"></script>
     <!-- Bundled runtime: `pnpm build` output copied here by tools/bundle.mjs -->
     <script type="module" src="main.js"></script>
   </body>
