@@ -101,8 +101,32 @@ const agent = new Agent({ platform, llm, tools: [sleepTimer] });
 
 Arguments are schema-validated before your code runs, thrown errors are fed back
 to the model so it can recover, and `confirm: true` routes through the host's
-confirmation UI. Full guide: [**docs/skills.md**](docs/skills.md) · runnable
-example: [`packages/skills-example`](packages/skills-example).
+confirmation UI.
+
+When a skill is only "call this URL, keep these fields", skip the code and ship
+JSON instead — a **manifest** the runtime interprets, never code it loads. It can
+be added to a TV that already shipped, and reviewed by someone who doesn't read
+TypeScript:
+
+```json
+{
+  "name": "get_current_weather",
+  "description": "Current temperature at a latitude/longitude.",
+  "parameters": { "latitude":  { "type": "number", "description": "Decimal degrees", "required": true },
+                  "longitude": { "type": "number", "description": "Decimal degrees", "required": true } },
+  "request":  { "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m" },
+  "response": { "temperatureC": "current.temperature_2m" }
+}
+```
+
+The host keeps the allowlist of origins any manifest may reach, a manifest can't
+send headers or pick its own host, and anything but a GET is forced to ask first
+— the reasoning is in [ADR-0002](docs/adr/0002-declarative-skill-manifests.md).
+Try it: `pnpm dev` then `?skills=manifest`.
+
+Full guide: [**docs/skills.md**](docs/skills.md) · runnable examples:
+[`packages/skills-example`](packages/skills-example) (code) and
+[`packages/skill-manifest`](packages/skill-manifest) (data).
 
 ## Put it on a TV
 

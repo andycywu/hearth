@@ -138,6 +138,70 @@ Nothing in that tool is platform-specific, which is the whole point: bundle it
 into the Tizen `.wgt`, the Android APK or the webOS `.ipk` and it behaves the
 same on all three.
 
+## Without writing code: a skill manifest
+
+Some skills are nothing but "call this URL, keep these three fields." For those
+you can skip TypeScript entirely and ship a JSON **manifest** — data the runtime
+interprets, never code it runs. That means a skill can be added to a TV that has
+already shipped, and reviewed by someone who doesn't read TypeScript.
+
+```json
+{
+  "name": "get_current_weather",
+  "description": "Current temperature and wind at a latitude/longitude.",
+  "parameters": {
+    "latitude":  { "type": "number", "description": "Decimal degrees", "required": true },
+    "longitude": { "type": "number", "description": "Decimal degrees", "required": true }
+  },
+  "request": {
+    "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m",
+    "timeoutMs": 8000
+  },
+  "response": { "temperatureC": "current.temperature_2m" }
+}
+```
+
+That is the whole format: a schema the model chooses on, one HTTP request whose
+`{placeholders}` are filled from validated arguments, and paths that reduce the
+response to something small enough to put back in a prompt. The shipped copy is
+[`examples/open-meteo-weather.json`](../packages/skill-manifest/examples/open-meteo-weather.json).
+
+Two ways in, and the host decides which origins any of them may reach:
+
+```ts
+import { loadBundledSkills, loadInstalledSkills } from "@tv-ai-agent/skill-manifest";
+import weather from "./skills/weather.json";
+
+const allowOrigins = ["https://api.open-meteo.com"];   // the host owns this list
+const tools = [
+  ...await loadBundledSkills([weather], { allowOrigins }),        // (a) in the app bundle
+  ...await loadInstalledSkills(platform.storage, { allowOrigins,  // (b) installed on the device
+      onSkipped: (name, why) => console.warn(`skipping ${name}: ${why}`) }),
+];
+new Agent({ platform, llm, tools });
+```
+
+Installing at run time is `installManifest(platform.storage, json)`, which
+validates first and returns every problem at once. There is deliberately no
+third source: the runtime never fetches a skill on its own.
+
+**What a manifest cannot do**, and why — the reasoning is in
+[ADR-0002](adr/0002-declarative-skill-manifests.md):
+
+| It can't… | Because |
+|---|---|
+| reach an origin the host didn't allowlist | a manifest must not widen its own reach; checked at load, not first call |
+| put a `{placeholder}` in the host | an allowlist is worthless if an argument picks the destination |
+| send headers | otherwise a skill could attach the host's credentials to a request of its choosing |
+| use plain HTTP to a remote host | https, or loopback for a service on the TV itself |
+| interpolate anything but a declared parameter | the registry validated those against the schema; conversation text was never validated |
+| do a non-GET without asking | `confirm` is forced true for POST, whatever the manifest says |
+| evaluate an expression in `response` | paths only (`a.b[0].c`), so there is no evaluator to escape from — and paths can't walk the prototype chain |
+
+Unknown fields are rejected rather than ignored, so a typo can't quietly turn a
+guardrail off. Reach for a real `defineTool` skill when you need arithmetic,
+more than one request, a device capability, or anything conditional.
+
 ## Checklist before you ship a skill
 
 - [ ] No `tizen.*`, no Android bridge, no `webOS.*` outside an adapter.

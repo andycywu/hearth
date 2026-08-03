@@ -24,6 +24,24 @@ function fakeWeatherTool(calls: Array<Record<string, unknown>>): Tool {
   ) as Tool;
 }
 
+/** Stand-in for examples/open-meteo-weather.json — coordinates, not a city. */
+function fakeManifestWeatherTool(calls: Array<Record<string, unknown>>): Tool {
+  return defineTool(
+    {
+      name: "get_current_weather",
+      description: "Current temperature at a latitude/longitude.",
+      parameters: {
+        latitude: { type: "number", description: "Decimal degrees", required: true },
+        longitude: { type: "number", description: "Decimal degrees", required: true },
+      },
+    },
+    async (args) => {
+      calls.push(args);
+      return { temperatureC: 21.3 };
+    },
+  ) as Tool;
+}
+
 describe("scripted client — full agent loop (offline)", () => {
   it("sets volume from a natural-language request", async () => {
     const { platform, agent } = makeAgent();
@@ -120,6 +138,23 @@ describe("scripted client — full agent loop (offline)", () => {
     const out = await agent.run("台北天氣如何?");
     expect(calls).toEqual([{ city: "台北" }]);
     expect(out).toContain("21.3°C");
+  });
+
+  it("calls the manifest weather skill with coordinates instead", async () => {
+    // Same question, the declarative version of the skill. A manifest makes one
+    // request, so it takes lat/lon rather than a city name.
+    const calls: Array<Record<string, unknown>> = [];
+    const { agent } = makeAgent([fakeManifestWeatherTool(calls)]);
+    await agent.run("what's the weather in Taipei?");
+    expect(calls).toEqual([{ latitude: 25.03, longitude: 121.57 }]);
+  });
+
+  it("says why it can't, rather than guessing coordinates", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const { agent } = makeAgent([fakeManifestWeatherTool(calls)]);
+    const out = await agent.run("what's the weather in Reykjavik?");
+    expect(calls).toEqual([]);
+    expect(out).toMatch(/only knows coordinates for a few demo cities/);
   });
 
   it("doesn't mistake a time word for a city", async () => {

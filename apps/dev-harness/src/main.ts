@@ -7,6 +7,8 @@ import {
   createScriptedClient, createOpenAiCompatibleClient, resolveLlmEndpoint,
 } from "@tv-ai-agent/llm-connectors";
 import { createWeatherTool } from "@tv-ai-agent/skills-example";
+import { loadBundledSkills, loadInstalledSkills } from "@tv-ai-agent/skill-manifest";
+import weatherManifest from "@tv-ai-agent/skill-manifest/examples/open-meteo-weather.json";
 import type { Tool } from "@tv-ai-agent/core";
 
 declare global {
@@ -56,9 +58,23 @@ async function boot(): Promise<void> {
   // `?skills=weather` registers the example cross-vendor skill (docs/skills.md).
   // Opt-in because it talks to the network, which the offline demo otherwise
   // never does. Then try: "what's the weather in Taipei?"
-  const skills: Tool[] = /(^|[?&])skills=(weather|all)/.test(location.search)
-    ? [createWeatherTool() as Tool]
-    : [];
+  const requested = params.get("skills") ?? "";
+  const skills: Tool[] = /^(weather|all)$/.test(requested) ? [createWeatherTool() as Tool] : [];
+
+  // The same capability again, but declared rather than written — `?skills=manifest`
+  // loads the example JSON through the manifest runtime (docs/skills.md). The
+  // allowlist lives here, in the host, because a manifest must not widen its own
+  // reach; anything installed into storage is held to the same list.
+  const allowOrigins = ["https://api.open-meteo.com", "loopback"];
+  if (/^(manifest|all)$/.test(requested)) {
+    skills.push(...await loadBundledSkills([weatherManifest], { allowOrigins, onSkipped: warnSkipped }));
+  }
+  skills.push(...await loadInstalledSkills(platform.storage, { allowOrigins, onSkipped: warnSkipped }));
+
+  // One unusable skill must not stop the agent from starting — say so and go on.
+  function warnSkipped(name: string, reason: string): void {
+    console.warn(`[skills] skipping ${name}: ${reason}`);
+  }
 
   const agent = new Agent({
     platform,

@@ -62,6 +62,16 @@ function fromUser(
     const city = matchWeatherCity(raw);
     if (city) return toolCall("get_weather", { city });
   }
+  // Same question, answered by the *manifest* version of the skill. A manifest
+  // makes one request, so it can't geocode first — it needs coordinates, and
+  // offline that means a short table. A real model knows them; this is the
+  // seam where the scripted brain shows its limits, not the manifest's.
+  if (available.has("get_current_weather")) {
+    const city = matchWeatherCity(raw);
+    const at = city && DEMO_CITIES[city.toLowerCase()];
+    if (at) return toolCall("get_current_weather", { latitude: at[0], longitude: at[1] });
+    if (city) return finalText(t("noCoords", lang));
+  }
 
   // Coreference: "launch it again", "open that", "再開一次" → relaunch the last
   // app, resolved from conversation history. Only fires when no app name is
@@ -186,6 +196,11 @@ const STRINGS = {
   done: { en: "Done.", zh: "完成。", ja: "完了しました。" },
   notFound: { en: "I couldn't find that app.", zh: "找不到那個應用程式。", ja: "そのアプリが見つかりません。" },
   whatOpen: { en: "What should I open?", zh: "你想開啟什麼?", ja: "何を開きますか?" },
+  noCoords: {
+    en: "The offline brain only knows coordinates for a few demo cities. Point at a real model to ask about anywhere.",
+    zh: "離線模式只認得幾個示範城市的座標。接上真實模型就能問任何地方。",
+    ja: "オフラインでは数都市の座標しか持っていません。実際のモデルに接続すればどこでも尋ねられます。",
+  },
   muted: { en: "Muted.", zh: "已靜音。", ja: "ミュートしました。" },
   unmuted: { en: "Unmuted.", zh: "已取消靜音。", ja: "ミュートを解除しました。" },
   help: {
@@ -233,6 +248,20 @@ function matchWeatherCity(raw: string): string | undefined {
 
   return undefined;
 }
+/**
+ * Coordinates for the cities the offline demo talks about, so the manifest
+ * weather skill has something to be called with. Not a geocoder — deliberately
+ * small, because the offline brain is a demo prop, not a product.
+ */
+const DEMO_CITIES: Record<string, [number, number]> = {
+  taipei: [25.03, 121.57], 台北: [25.03, 121.57], 台北市: [25.03, 121.57],
+  hsinchu: [24.81, 120.97], 新竹: [24.81, 120.97],
+  kaohsiung: [22.62, 120.31], 高雄: [22.62, 120.31],
+  tokyo: [35.68, 139.69], 東京: [35.68, 139.69],
+  london: [51.51, -0.13], "new york": [40.71, -74.01],
+  singapore: [1.35, 103.82], seoul: [37.57, 126.98], 首爾: [37.57, 126.98],
+};
+
 /** Reject time words and other non-places the loose patterns can capture. */
 const NOT_A_CITY = new Set([
   "today", "tomorrow", "tonight", "now", "outside", "here", "there",

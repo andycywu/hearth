@@ -10,6 +10,7 @@
     { "path": "packages/adapter-webos" },
     { "path": "packages/llm-connectors" },
     { "path": "packages/ui" },
-    { "path": "packages/skills-example" }
+    { "path": "packages/skills-example" },
+    { "path": "packages/skill-manifest" }
   ]
 }

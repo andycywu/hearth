@@ -8,6 +8,33 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+Skills as data:
+
+- **`@tv-ai-agent/skill-manifest`** — a skill can now be a JSON document the
+  runtime interprets rather than TypeScript it loads: a schema the model chooses
+  on, one HTTP request whose `{placeholders}` come from validated arguments, and
+  paths that reduce the response. That keeps the app's "no remote code" property
+  intact while making a skill installable onto a TV that already shipped, and
+  reviewable by someone who doesn't read TypeScript. Two sources, both offline:
+  `loadBundledSkills` for manifests in the app bundle and `loadInstalledSkills`
+  for ones written into `platform.storage`. There is deliberately no third — the
+  runtime never fetches a skill on its own.
+- The trust model is the interesting part, and it's argued in
+  [ADR-0002](docs/adr/0002-declarative-skill-manifests.md): the **host** owns the
+  origin allowlist and a manifest cannot widen it or put a placeholder in its own
+  host; no manifest-supplied headers, so a skill can't attach someone else's
+  credentials; https or loopback only; only declared parameters interpolate;
+  non-GET forces confirmation whatever the manifest says; the response mapping is
+  paths, not expressions, so there's no evaluator to escape and no route to the
+  prototype chain. Unknown fields are rejected rather than ignored, so a typo
+  can't quietly disable one of those. 56 tests, most of them asserting a refusal.
+- A worked example, [`open-meteo-weather.json`](packages/skill-manifest/examples/open-meteo-weather.json),
+  wired into the dev harness as `?skills=manifest` — the same capability as the
+  hand-written `?skills=weather` skill, for comparison. The offline brain answers
+  it from a small coordinate table and says so when a city isn't in it: a
+  manifest makes one request, so it can't geocode first. That limit is real and
+  worth seeing rather than hiding.
+
 Device bring-up (Phase 2 tooling):
 - **webOS `.ipk` packaging** — `pnpm package:webos` (`tools/package-webos.mjs`).
   Works around two `ares-package` behaviours: it minifies with an old uglify-js

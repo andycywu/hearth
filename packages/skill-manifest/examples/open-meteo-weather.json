@@ -1,0 +1,17 @@
+{
+  "name": "get_current_weather",
+  "description": "Current temperature and wind at a latitude/longitude. Use when the viewer asks about the weather somewhere.",
+  "parameters": {
+    "latitude": { "type": "number", "description": "Latitude in decimal degrees, e.g. 25.03 for Taipei", "required": true },
+    "longitude": { "type": "number", "description": "Longitude in decimal degrees, e.g. 121.57 for Taipei", "required": true }
+  },
+  "request": {
+    "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,wind_speed_10m",
+    "timeoutMs": 8000
+  },
+  "response": {
+    "temperatureC": "current.temperature_2m",
+    "windKph": "current.wind_speed_10m",
+    "measuredAt": "current.time"
+  }
+}
