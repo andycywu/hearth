@@ -68,7 +68,7 @@ Useful flags: `?render=canvas`, `?diag` (capability report), `?skills=weather`
 (example skill), `?llm=http://127.0.0.1:11434/v1&model=llama3.2` (real model).
 
 ```bash
-pnpm test           # 185 tests
+pnpm test           # 194 tests
 pnpm bench          # agent-loop latency (p50/p95 per turn)
 ```
 
@@ -163,7 +163,7 @@ run on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 185 tests |
+| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 194 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
 | Real local model driving a TV | ✅ works; needs >1.5B for reliable tool chaining |

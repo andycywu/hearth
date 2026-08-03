@@ -3,7 +3,7 @@
 A snapshot of what's built, what's verified, and what remains. For the full plan
 see [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md).
 
-_Last updated: 2026-07-30 · target release: v0.1.0_
+_Last updated: 2026-08-03 · target release: v0.1.0_
 
 **Group A is complete; B1, B3 and B4 are done on an Android TV emulator** — the app
 runs on device, the capability probe is clean, the CI acceptance script passes
@@ -23,7 +23,7 @@ MTK/NVT boards (B5) and the Blits GPU pass (C1) still need hardware.
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
 | Voice (ASR/TTS + wake word) | ✅ web adapter (Web Speech); spoken replies on every host |
 | Skills (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
-| Tests / CI / lint / bundle-size / license / SBOM | ✅ 163 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM | ✅ 194 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
 | **Android TV emulator bring-up** | ✅ probe clean, acceptance script passes |
 | **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
@@ -70,10 +70,11 @@ MTK/NVT boards (B5) and the Blits GPU pass (C1) still need hardware.
   policy blocked every call to a local model. Results and the platform quirks that
   are *not* bugs: [`platform/capability-matrix.md`](platform/capability-matrix.md).
 
-## Test coverage (163 tests)
+## Test coverage (194 tests)
 
-core 37 · llm-connectors 42 · ui 39 · skills-example 13 · adapter-aosp 14 ·
-adapter-webos 6 · adapter-web 5 · acceptance 5 · adapter-tizen 2.
+core 38 · ui 53 · llm-connectors 42 · adapter-aosp 14 · skills-example 13 ·
+platform-api 8 · create-skill 8 · adapter-webos 6 · adapter-web 5 ·
+acceptance 5 · adapter-tizen 2.
 
 ## Remaining — needs external resources
 
