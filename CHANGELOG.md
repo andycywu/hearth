@@ -8,6 +8,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+The device hosts run offline:
+
+- **`?demo` no longer needs a network on a TV.** The offline scripted brain was
+  already in every bundle, but the Tizen, AOSP and webOS hosts always built an
+  HTTP client against a hardcoded `http://127.0.0.1:8080/v1`, so a freshly
+  installed app on a TV whose network isn't set up yet — or on an emulator image
+  whose NAT is broken — could not run the demo it ships with. With no `?llm=`
+  configured they now fall back to the scripted brain, and the status line says
+  `llm=offline` so nobody mistakes it for a real model. `?llm=` still wins, so
+  bring-up against a real endpoint is unchanged.
+- Verified end-to-end on **both** emulators with no network at all: the Tizen TV
+  emulator ran all eight demo commands and `?diag` afterwards read
+  `getVolume ✅ 50`, the value the demo's Japanese step set — so the offline
+  agent parsed 音量を50にして and changed real device state through the HAL.
+  Android did the same and answered 現在音量多少? with the device's own volume.
+  The Android acceptance script still PASSes against the HTTP path.
+
 Skills as data:
 
 - **`@tv-ai-agent/skill-manifest`** — a skill can now be a JSON document the

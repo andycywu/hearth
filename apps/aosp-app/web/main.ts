@@ -1,6 +1,6 @@
 import { Agent, runDiagnostics, reportToMarkdown, launchSearch } from "@tv-ai-agent/core";
 import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
-import { createOpenAiCompatibleClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
+import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
 } from "@tv-ai-agent/ui";
@@ -35,15 +35,20 @@ async function boot(): Promise<void> {
     return;
   }
 
-  // Endpoint from ?llm=/?model=, then window globals, then the default — so a
-  // shipped APK can be repointed at another model without a rebuild:
+  // Endpoint from ?llm=/?model=, then window globals — so a shipped APK can be
+  // repointed at another model without a rebuild:
   //   adb shell am start -n … -e start "index.html?llm=http://127.0.0.1:8080/v1"
-  const endpoint = resolveLlmEndpoint({ defaultBaseUrl: "http://127.0.0.1:8080/v1" });
-  const llm = createOpenAiCompatibleClient({
-    baseUrl: endpoint.baseUrl!,
-    model: endpoint.model,
-    ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
-  });
+  // No default endpoint: with nothing configured, fall back to the offline brain
+  // that is already in this bundle rather than to a dead address. That is what
+  // lets `?demo` run on a TV with no network set up yet.
+  const endpoint = resolveLlmEndpoint();
+  const llm = endpoint.baseUrl
+    ? createOpenAiCompatibleClient({
+        baseUrl: endpoint.baseUrl,
+        model: endpoint.model,
+        ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
+      })
+    : createScriptedClient();
 
   // Parity with the dev harness: gate the high-impact tools and speak replies
   // when the device has a voice pipeline. `?confirm=auto|deny` is the bring-up
@@ -58,7 +63,7 @@ async function boot(): Promise<void> {
     `llm=${llm.id} via ${endpoint.source} ${endpoint.baseUrl}`,
   );
 
-  const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl}` });
+  const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl ?? "offline"}` });
   // `?demo` runs the built-in script, `?ask=…` runs your own — either way the TV
   // does something without a keyboard.
   await runStartupCommands(ui);

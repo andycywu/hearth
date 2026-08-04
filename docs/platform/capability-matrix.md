@@ -204,11 +204,17 @@ templates, and the proxy is only ever injected as guest environment variables,
 which the guest log shows empty. So it is not the cause; nothing here is
 misconfigured.
 
-**What this means in practice:** use the Samsung image for capability work
-(volume, mute, apps, storage all pass there) and the scripted brain for the
-agent loop. A real model needs either a network-capable image or a retail TV in
-Developer Mode — which is worth doing anyway, since that is also where
-`webapis` actually exists.
+**What this means in practice: nothing, for the demo.** `?demo` with no `?llm=`
+runs the whole agent loop against the offline brain in the bundle, so the broken
+NAT costs nothing there — verified on the Samsung image, all eight commands,
+with `?diag` afterwards reading `getVolume ✅ 50`, the value the demo's Japanese
+step set. Only pointing at a *real* model needs the network, and that needs
+either a network-capable image or a retail TV in Developer Mode — worth doing
+anyway, since that is also where `webapis` actually exists.
+
+Chasing this fault was mostly wasted effort: the demo never needed the network,
+our own hosts did. Check whether the thing you're trying to demo actually
+requires the broken capability before spending a day on the capability.
 
 ## Generating results with the self-diagnostic
 

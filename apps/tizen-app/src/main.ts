@@ -1,6 +1,6 @@
 import { Agent, runDiagnostics, reportToMarkdown, launchSearch } from "@tv-ai-agent/core";
 import { createTizenAdapter } from "@tv-ai-agent/adapter-tizen";
-import { createOpenAiCompatibleClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
+import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
 } from "@tv-ai-agent/ui";
@@ -22,9 +22,11 @@ async function boot(): Promise<void> {
     const platform = createTizenAdapter();
     await platform.init();
 
-    // ?llm=/?model= → window globals → default, so a packaged .wgt can be
-    // repointed at another endpoint without a rebuild.
-    const endpoint = resolveLlmEndpoint({ defaultBaseUrl: "http://127.0.0.1:8080/v1" });
+    // ?llm=/?model= → window globals → nothing, so a packaged .wgt can be
+    // repointed at another endpoint without a rebuild. Deliberately no default
+    // endpoint: with nothing configured we fall back to the offline brain below
+    // rather than to a dead address.
+    const endpoint = resolveLlmEndpoint();
 
     // Bring-up mode: open the app with `?diag` to render a capability report.
     if (/(^|[?&])diag/.test(launchSearch())) {
@@ -34,17 +36,29 @@ async function boot(): Promise<void> {
         // endpoint, and a public one to tell "can't reach the host" apart from
         // "no network at all". Opt-in, so a plain ?diag stays offline.
         ...(launchSearch().includes("reach")
-          ? { reachUrls: [`${endpoint.baseUrl}/models`, "https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&current=temperature_2m"] }
+          ? {
+              reachUrls: [
+                ...(endpoint.baseUrl ? [`${endpoint.baseUrl}/models`] : []),
+                "https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&current=temperature_2m",
+              ],
+            }
           : {}),
       });
       renderDiagnostics(report);
       return;
     }
-    const llm = createOpenAiCompatibleClient({
-      baseUrl: endpoint.baseUrl!,
-      model: endpoint.model,
-      ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
-    });
+    // The offline brain is already in this bundle, so a freshly installed TV can
+    // run the whole agent loop with no network, no endpoint and no API key —
+    // which is the point of `?demo`. Requiring HTTP for it meant the demo could
+    // not run on a TV whose network wasn't set up yet, or on an emulator image
+    // whose NAT is broken.
+    const llm = endpoint.baseUrl
+      ? createOpenAiCompatibleClient({
+          baseUrl: endpoint.baseUrl,
+          model: endpoint.model,
+          ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
+        })
+      : createScriptedClient();
 
     // Parity with the dev harness: gate the high-impact tools and speak replies
     // when the device has a voice pipeline.
@@ -54,7 +68,9 @@ async function boot(): Promise<void> {
     window.__tvAgent = agent;
     window.__tvPlatform = platform;
 
-    const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl}` });
+    // Say which brain is answering: "it works but the model isn't real" is a
+    // distinction someone watching a TV has no other way to make.
+    const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl ?? "offline"}` });
     // `?demo` runs the built-in script, `?ask=…` runs your own.
     await runStartupCommands(ui);
   } catch (e) {

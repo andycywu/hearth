@@ -1,6 +1,6 @@
 import { Agent, runDiagnostics, reportToMarkdown, launchSearch } from "@tv-ai-agent/core";
 import { createWebosAdapter } from "@tv-ai-agent/adapter-webos";
-import { createOpenAiCompatibleClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
+import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
 } from "@tv-ai-agent/ui";
@@ -47,14 +47,18 @@ async function boot(): Promise<void> {
       return;
     }
 
-    // ?llm=/?model= → window globals → default, so a packaged .ipk can be
-    // repointed at another endpoint without a rebuild.
-    const endpoint = resolveLlmEndpoint({ defaultBaseUrl: "http://127.0.0.1:8080/v1" });
-    const llm = createOpenAiCompatibleClient({
-      baseUrl: endpoint.baseUrl!,
-      model: endpoint.model,
-      ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
-    });
+    // ?llm=/?model= → window globals, so a packaged .ipk can be repointed at
+    // another endpoint without a rebuild. No default: with nothing configured,
+    // fall back to the offline brain already in this bundle rather than to a
+    // dead address, so `?demo` runs on a TV with no network set up yet.
+    const endpoint = resolveLlmEndpoint();
+    const llm = endpoint.baseUrl
+      ? createOpenAiCompatibleClient({
+          baseUrl: endpoint.baseUrl,
+          model: endpoint.model,
+          ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
+        })
+      : createScriptedClient();
 
     // Parity with the dev harness: gate the high-impact tools and speak replies
     // when the device has a voice pipeline.
@@ -64,7 +68,7 @@ async function boot(): Promise<void> {
     window.__tvAgent = agent;
     window.__tvPlatform = platform;
 
-    const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl}` });
+    const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl ?? "offline"}` });
     // `?demo` runs the built-in script, `?ask=…` runs your own.
     await runStartupCommands(ui);
   } catch (e) {
