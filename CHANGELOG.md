@@ -8,6 +8,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+An avatar:
+
+- **`mountAgentAvatar()` — the agent has a face.** An abstract form drawn in
+  code: no artwork to license or download, sharp from 720p to 4K, and a handful
+  of arcs is cheap enough for the weakest MTK/NVT GPU. Four states that read from
+  across a room — still when idle, rings travelling outward when listening,
+  turning inward when thinking, wobbling when speaking. `?render=avatar` on any
+  host, verified on the Android TV emulator.
+- The motion is `avatarFrame()`, a **pure function** of phase and time, so it is
+  unit-tested without a canvas and can be reused by the WebGL renderer later.
+  It self-drives when speaking rather than requiring an audio envelope, because
+  Tizen and webOS both hand playback to the platform and may never expose one.
+  Honours `prefers-reduced-motion`, where the phases stay distinguishable by
+  colour and shape rather than movement.
+- The view-model now derives a single `phase` (idle / listening / thinking /
+  speaking) so no renderer has to re-derive it. Listening outranks everything,
+  including mid-turn: an open microphone changes what the viewer does, and that
+  is a privacy signal as much as a UI state.
+
 The device hosts run offline:
 
 - **`?demo` no longer needs a network on a TV.** The offline scripted brain was

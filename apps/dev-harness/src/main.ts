@@ -1,7 +1,7 @@
 import { Agent, runDiagnostics, reportToMarkdown, launchSearch, type LlmClient } from "@tv-ai-agent/core";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 import {
-  mountAgentOverlay, mountAgentCanvas, createConfirmHandler, speakReplies,
+  mountAgentOverlay, mountAgentCanvas, mountAgentAvatar, createConfirmHandler, speakReplies,
 } from "@tv-ai-agent/ui";
 import {
   createScriptedClient, createOpenAiCompatibleClient, resolveLlmEndpoint,
@@ -84,10 +84,13 @@ async function boot(): Promise<void> {
     // switch input) prompt before running. Same handler the device hosts use.
     confirm: createConfirmHandler(),
   });
-  // ?render=canvas uses the single-surface canvas renderer instead of the DOM overlay.
-  const ui = params.get("render") === "canvas"
-    ? mountAgentCanvas(agent, { width: window.innerWidth, height: Math.round(window.innerHeight * 0.45) })
-    : mountAgentOverlay(agent);
+  // ?render=canvas uses the single-surface canvas renderer instead of the DOM
+  // overlay; ?render=avatar draws the agent's face on the same canvas path.
+  const renderer = params.get("render");
+  const surface = { width: window.innerWidth, height: Math.round(window.innerHeight * 0.45) };
+  const avatar = renderer === "avatar" ? mountAgentAvatar(agent, surface) : undefined;
+  const ui = avatar
+    ?? (renderer === "canvas" ? mountAgentCanvas(agent, surface) : mountAgentOverlay(agent));
 
   // Scrolling transcript of the session.
   const log = document.getElementById("log");
@@ -109,26 +112,33 @@ async function boot(): Promise<void> {
   }
 
   // Optional voice: speak replies and accept spoken commands when supported.
-  speakReplies(agent, platform);
+  // The avatar needs to know about both, since the agent doesn't.
+  speakReplies(agent, platform, { onSpeaking: (s) => avatar?.setSpeaking(s) });
   if (platform.has("voice") && platform.voice) {
     const voice = platform.voice;
     const mic = document.getElementById("mic") as HTMLButtonElement | null;
     let listening = false;
+    // One place that owns "the mic is open", because it drives three things now
+    // and they must not drift apart.
+    const setListening = (next: boolean): void => {
+      listening = next;
+      if (mic) mic.textContent = next ? "● Listening…" : "🎤 Speak";
+      avatar?.setListening(next);
+    };
     async function startCapture(): Promise<void> {
       if (listening) return;
-      listening = true;
-      if (mic) mic.textContent = "● Listening…";
+      setListening(true);
       try { await voice.startListening(); }
-      catch { listening = false; if (mic) mic.textContent = "🎤 Speak"; }
+      catch { setListening(false); }
     }
     if (mic) {
       mic.hidden = false;
       voice.onTranscript((text, isFinal) => {
         if (input) input.value = text;
-        if (isFinal) { listening = false; mic.textContent = "🎤 Speak"; void ui.ask(text); }
+        if (isFinal) { setListening(false); void ui.ask(text); }
       });
       mic.addEventListener("click", async () => {
-        if (listening) { await voice.stopListening(); listening = false; mic.textContent = "🎤 Speak"; return; }
+        if (listening) { await voice.stopListening(); setListening(false); return; }
         await startCapture();
       });
     }

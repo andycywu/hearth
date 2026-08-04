@@ -1,6 +1,7 @@
 import { launchSearch, launchSearchSource, type Agent, type ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
+import { mountAgentAvatar } from "./avatar.js";
 import { runDemo, demoFromUrl } from "./demo.js";
 
 /**
@@ -45,20 +46,69 @@ export function createConfirmHandler(
   };
 }
 
+export interface SpeakRepliesOptions {
+  /**
+   * Called with `true` when playback starts and `false` when it ends or fails.
+   * This is how the avatar knows it is speaking — the agent has no idea TTS
+   * exists, and `speak()` is fire-and-forget so nothing else could tell.
+   *
+   * Note that `false` means "we stopped awaiting it", which on platforms that
+   * hand playback to the OS is when the call resolved rather than when the sound
+   * actually stopped. Better than nothing, and honest about it.
+   */
+  onSpeaking?: (speaking: boolean) => void;
+}
+
 /**
  * Speak every final reply when the platform advertises a voice pipeline.
  * Returns an unsubscribe function; a no-op when the device has no voice.
  */
-export function speakReplies(agent: Agent, platform: PlatformProvider): () => void {
+export function speakReplies(
+  agent: Agent,
+  platform: PlatformProvider,
+  opts: SpeakRepliesOptions = {},
+): () => void {
   if (!platform.has("voice") || !platform.voice) return () => {};
   const voice = platform.voice;
   return agent.events.on("turn:end", ({ output }) => {
     // Fire-and-forget: TTS must never delay or fail a turn. The try/catch covers
     // engines whose speak() throws synchronously instead of rejecting.
+    const done = (): void => opts.onSpeaking?.(false);
     try {
-      void Promise.resolve(voice.speak(output)).catch(() => { /* ignore */ });
-    } catch { /* ignore */ }
+      opts.onSpeaking?.(true);
+      void Promise.resolve(voice.speak(output)).then(done, done);
+    } catch {
+      done();
+    }
   });
+}
+
+/**
+ * A full-screen layer for the avatar canvas, behind the shell's own text.
+ *
+ * Created here rather than in each host's markup and CSS: the avatar has to
+ * work on four hosts whose stylesheets were written before it existed, so it
+ * brings its own layer and lifts `#app` above it instead of asking them all to
+ * add a z-index.
+ */
+function avatarMount(): HTMLElement {
+  const existing = document.getElementById("avatar-layer");
+  if (existing) return existing;
+  const layer = document.createElement("div");
+  layer.id = "avatar-layer";
+  layer.style.cssText = "position:fixed;inset:0;z-index:0";
+  document.body.insertBefore(layer, document.body.firstChild);
+  const app = document.getElementById("app");
+  if (app) {
+    app.style.position = app.style.position || "relative";
+    app.style.zIndex = "1";
+    // Every host centres `#app` vertically, which is exactly where the avatar's
+    // face is — the status line landed on top of it. Push the shell's text to
+    // the top and let the avatar own the middle and the subtitle area.
+    app.style.justifyContent = "flex-start";
+    app.style.paddingTop = "3vh";
+  }
+  return layer;
 }
 
 export interface DeviceShellOptions {
@@ -70,6 +120,24 @@ export interface DeviceShellOptions {
   detail?: string;
   /** Override the hint text (pass "" to leave the hint empty). */
   hint?: string;
+  /**
+   * Which renderer to show. `"avatar"` draws the agent's face; the default DOM
+   * overlay stays the bring-up view because it puts text on screen unstyled and
+   * works with no canvas at all.
+   */
+  render?: "overlay" | "avatar";
+}
+
+/**
+ * A device shell, with the avatar's extra controls when that renderer is active.
+ *
+ * Optional rather than always-present so a host can wire voice once and let the
+ * renderer choice decide whether anything listens — `ui.setSpeaking?.(true)` is
+ * a no-op under the overlay.
+ */
+export interface DeviceShellController extends OverlayController {
+  setListening?(listening: boolean): void;
+  setSpeaking?(speaking: boolean): void;
 }
 
 /**
@@ -85,8 +153,10 @@ export function mountDeviceShell(
   agent: Agent,
   platform: PlatformProvider,
   opts: DeviceShellOptions = {},
-): OverlayController {
-  const ui = mountAgentOverlay(agent);
+): DeviceShellController {
+  const ui: DeviceShellController = opts.render === "avatar"
+    ? mountAgentAvatar(agent, { mount: avatarMount() })
+    : mountAgentOverlay(agent);
   const { device } = platform;
 
   const status = document.getElementById(opts.statusId ?? "status");

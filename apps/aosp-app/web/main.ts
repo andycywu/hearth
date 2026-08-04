@@ -55,7 +55,6 @@ async function boot(): Promise<void> {
   // override for automated runs that can't press a native dialog.
   const confirm = confirmOverrideFromUrl() ?? createConfirmHandler();
   const agent = new Agent({ platform, llm, confirm });
-  speakReplies(agent, platform);
   window.__tvAgent = agent;
   window.__tvPlatform = platform;
   console.info(
@@ -63,7 +62,13 @@ async function boot(): Promise<void> {
     `llm=${llm.id} via ${endpoint.source} ${endpoint.baseUrl}`,
   );
 
-  const ui = mountDeviceShell(agent, platform, { detail: `llm=${endpoint.baseUrl ?? "offline"}` });
+  const ui = mountDeviceShell(agent, platform, {
+    detail: `llm=${endpoint.baseUrl ?? "offline"}`,
+    // `?render=avatar` draws the agent's face instead of the plain overlay.
+    ...(/(^|[?&])render=avatar/.test(launchSearch()) ? { render: "avatar" as const } : {}),
+  });
+  // After the shell exists, so the avatar can be told when it's speaking.
+  speakReplies(agent, platform, { onSpeaking: (s) => ui.setSpeaking?.(s) });
   // `?demo` runs the built-in script, `?ask=…` runs your own — either way the TV
   // does something without a keyboard.
   await runStartupCommands(ui);
