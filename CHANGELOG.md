@@ -10,6 +10,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 You can talk to it:
 
+- **Voice on Android TV** — `TextToSpeech` and `SpeechRecognizer` through the
+  native bridge, exposed as the HAL's existing `VoicePipeline`. Android first
+  because both are public SDK: TTS needs no permission at all and recognition
+  needs RECORD_AUDIO, an ordinary runtime permission the user grants from a
+  dialog. No platform signature, no vendor agreement — which is not true of
+  Samsung's or LG's voice stacks.
+- The mic key only appears when the platform actually has a pipeline, and voice
+  shares the keyboard's field, so a transcript can be corrected before it's sent
+  and both input methods live in one place on screen.
+- Verified on the Android TV emulator: pressing 🎤 Speak drove the permission
+  dialog, and once granted logcat shows `RecognitionService#onMicrophoneOpened`
+  for `callingApp: tv.aiagent.harness` with the avatar in its listening state and
+  Android's own green microphone indicator lit — the OS confirming the mic is
+  open rather than our code claiming it.
+
 - **An on-screen keyboard a remote can drive** (`?keyboard`). Until now the
   device hosts had no input surface at all — they said so on screen — so a TV
   could only run whatever was baked into the launch flags. Now it can be typed

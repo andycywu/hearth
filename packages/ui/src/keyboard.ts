@@ -14,7 +14,7 @@
 export type KeyDirection = "up" | "down" | "left" | "right";
 
 /** A key's effect. Anything without an `action` inserts `value ?? label`. */
-export type KeyAction = "space" | "delete" | "clear" | "submit";
+export type KeyAction = "space" | "delete" | "clear" | "submit" | "mic";
 
 export interface KeyboardKey {
   label: string;
@@ -37,8 +37,12 @@ export interface KeyboardModel {
   /** The key under the cursor. */
   focused(): KeyboardKey;
   move(dir: KeyDirection): void;
-  /** Activate the focused key. Returns the text when it was a submit. */
-  press(): { submitted: string } | undefined;
+  /**
+   * Activate the focused key. Returns what the caller has to act on: text to
+   * submit, or a request to start listening. Everything else only edits the
+   * field, which the model handles itself.
+   */
+  press(): { submitted: string } | { mic: true } | undefined;
   setText(text: string): void;
   subscribe(cb: (state: KeyboardModelState) => void): () => void;
 }
@@ -124,6 +128,10 @@ export function createKeyboardModel(
     press: () => {
       const key = rows[row]![col]!;
       switch (key.action) {
+        case "mic":
+          // The model doesn't own the microphone — capture is the host's, and it
+          // pushes any transcript back through `setText`.
+          return { mic: true };
         case "submit": {
           const submitted = text.trim();
           if (!submitted) return undefined;
@@ -166,6 +174,11 @@ export interface OnScreenKeyboardOptions {
   rows?: readonly (readonly KeyboardKey[])[];
   /** Called with the trimmed text when Send is pressed. */
   onSubmit: (text: string) => void | Promise<void>;
+  /**
+   * Supply this to add a microphone key. Only pass it when the platform actually
+   * has a voice pipeline — a dead mic key is worse than no mic key.
+   */
+  onMic?: () => void;
   /** Start hidden and wait for `show()`. Default false. */
   hidden?: boolean;
 }
@@ -193,7 +206,15 @@ export function mountOnScreenKeyboard(
   if (typeof document === "undefined") {
     throw new Error("mountOnScreenKeyboard requires a DOM environment");
   }
-  const model = createKeyboardModel(opts.rows);
+  // The mic key is added here rather than baked into the default layout, so a
+  // platform with no voice pipeline never shows a key that can't work.
+  const rows = opts.rows ?? (opts.onMic
+    ? DEFAULT_TV_KEYBOARD.map((row, i) =>
+        i === DEFAULT_TV_KEYBOARD.length - 1
+          ? [{ label: "🎤 Speak", action: "mic" as const, width: 2 }, ...row]
+          : row)
+    : DEFAULT_TV_KEYBOARD);
+  const model = createKeyboardModel(rows);
   const mount = opts.mount ?? document.body;
 
   const root = document.createElement("div");
@@ -258,7 +279,8 @@ export function mountOnScreenKeyboard(
     }
     if (intent === "press") {
       const result = model.press();
-      if (result) void opts.onSubmit(result.submitted);
+      if (result && "submitted" in result) void opts.onSubmit(result.submitted);
+      else if (result) opts.onMic?.();
       return;
     }
     model.move(intent);

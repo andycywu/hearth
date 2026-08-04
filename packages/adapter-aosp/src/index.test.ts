@@ -132,4 +132,124 @@ describe("adapter-aosp", () => {
     await platform.storage.set("k", "v");
     expect(await platform.storage.get("k")).toBe("v");
   });
+
+  describe("voice", () => {
+    /** Add the speech methods a newer host APK provides. */
+    const addVoice = () => {
+      const calls: string[] = [];
+      let stt = true;
+      Object.assign(bridge(), {
+        ttsAvailable: () => true,
+        speak: (t: string) => calls.push(`speak:${t}`),
+        stopSpeaking: () => calls.push("stopSpeaking"),
+        sttAvailable: () => stt,
+        sttUnavailableReason: () => (stt ? "" : "microphone permission not granted"),
+        requestMicPermission: () => calls.push("requestMicPermission"),
+        startListening: () => calls.push("startListening"),
+        stopListening: () => calls.push("stopListening"),
+      });
+      return { calls, denyStt: () => { stt = false; } };
+    };
+    const fire = (event: unknown) => (globalThis as any).__tvVoice.onEvent(event);
+    afterEach(() => { delete (globalThis as any).__tvVoice; });
+
+    it("has no voice when the host APK doesn't offer it", () => {
+      // An older APK with a newer bundle must degrade to text, not throw on the
+      // first spoken command.
+      const platform = createAospAdapter();
+      expect(platform.has("voice")).toBe(false);
+      expect(platform.device.capabilities.voice).toBe(false);
+    });
+
+    it("advertises voice once the bridge has it", () => {
+      addVoice();
+      const platform = createAospAdapter();
+      expect(platform.has("voice")).toBe(true);
+      expect(platform.device.capabilities.voice).toBe(true);
+    });
+
+    it("delivers partial and final transcripts to subscribers", () => {
+      addVoice();
+      const platform = createAospAdapter();
+      const seen: Array<[string, boolean]> = [];
+      platform.voice!.onTranscript((text, isFinal) => seen.push([text, isFinal]));
+      fire({ type: "transcript", text: "set vol", isFinal: false });
+      fire({ type: "transcript", text: "set volume to 30", isFinal: true });
+      expect(seen).toEqual([["set vol", false], ["set volume to 30", true]]);
+    });
+
+    it("stops delivering after unsubscribe", () => {
+      addVoice();
+      const platform = createAospAdapter();
+      let n = 0;
+      const off = platform.voice!.onTranscript(() => { n++; });
+      fire({ type: "transcript", text: "a", isFinal: true });
+      off();
+      fire({ type: "transcript", text: "b", isFinal: true });
+      expect(n).toBe(1);
+    });
+
+    it("shares one recognizer between several listeners", () => {
+      // Android allows only one at a time, so the agent and the avatar can't each
+      // open their own.
+      addVoice();
+      const platform = createAospAdapter();
+      const hits: string[] = [];
+      platform.voice!.onTranscript(() => hits.push("a"));
+      platform.voice!.onTranscript(() => hits.push("b"));
+      fire({ type: "transcript", text: "x", isFinal: true });
+      expect(hits).toEqual(["a", "b"]);
+    });
+
+    it("asks for the microphone when it isn't granted yet", async () => {
+      const { calls, denyStt } = addVoice();
+      denyStt();
+      await createAospAdapter().voice!.startListening();
+      expect(calls).toEqual(["requestMicPermission", "startListening"]);
+    });
+
+    it("doesn't ask again once granted", async () => {
+      const { calls } = addVoice();
+      await createAospAdapter().voice!.startListening();
+      expect(calls).toEqual(["startListening"]);
+    });
+
+    it("resolves speak() when the TV has actually stopped talking", async () => {
+      // This is what drives the avatar's mouth, so resolving early would leave it
+      // moving after the sound ended.
+      const { calls } = addVoice();
+      const platform = createAospAdapter();
+      let done = false;
+      const speaking = platform.voice!.speak("Done.").then(() => { done = true; });
+      expect(calls).toEqual(["speak:Done."]);
+      expect(done).toBe(false);
+      fire({ type: "speakDone", spoken: true });
+      await speaking;
+      expect(done).toBe(true);
+    });
+
+    it("resolves speak() even when the engine couldn't say it", async () => {
+      // Otherwise the avatar sticks in the speaking state on a device with no
+      // working TTS engine.
+      addVoice();
+      const platform = createAospAdapter();
+      const speaking = platform.voice!.speak("hello");
+      fire({ type: "speakDone", spoken: false });
+      await expect(speaking).resolves.toBeUndefined();
+    });
+
+    it("logs a recognition error instead of throwing", () => {
+      // "didn't catch that" is a normal outcome and must not break a turn.
+      addVoice();
+      createAospAdapter();
+      expect(() => fire({ type: "error", message: "didn't catch that" })).not.toThrow();
+    });
+
+    it("ignores event types it doesn't know", () => {
+      // Native may be newer than the bundle.
+      addVoice();
+      createAospAdapter();
+      expect(() => fire({ type: "somethingNew" })).not.toThrow();
+    });
+  });
 });

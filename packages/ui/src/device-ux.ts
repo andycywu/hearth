@@ -191,9 +191,40 @@ export function mountDeviceShell(
   const hint = document.getElementById(opts.hintId ?? "hint");
   // A remote-driven keyboard, so a TV is no longer limited to `?ask=` at launch.
   // Opt-in per host because bring-up runs want the screen to themselves.
+  const voice = platform.has("voice") ? platform.voice : undefined;
   const keyboard = opts.keyboard
-    ? mountOnScreenKeyboard({ onSubmit: (text) => ui.ask(text) })
+    ? mountOnScreenKeyboard({
+        onSubmit: (text) => ui.ask(text),
+        // Speech goes through the same field, so a transcript can be corrected
+        // before sending and both input methods share one place on screen.
+        ...(voice ? { onMic: () => void startListening() } : {}),
+      })
     : undefined;
+
+  let listening = false;
+  async function startListening(): Promise<void> {
+    if (!voice || listening) return;
+    listening = true;
+    ui.setListening?.(true);
+    try {
+      await voice.startListening();
+    } catch {
+      listening = false;
+      ui.setListening?.(false);
+    }
+  }
+
+  if (voice && keyboard) {
+    voice.onTranscript((text, isFinal) => {
+      keyboard.setText(text);
+      if (!isFinal) return;
+      listening = false;
+      ui.setListening?.(false);
+      // Send it straight away: on a TV, making someone walk to "Send" after
+      // speaking defeats the point of speaking.
+      if (text.trim()) void ui.ask(text.trim());
+    });
+  }
 
   if (hint) {
     hint.textContent = opts.hint ?? (

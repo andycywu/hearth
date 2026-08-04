@@ -25,7 +25,15 @@ import org.json.JSONObject
  *  - Standby: requires the DEVICE_POWER system permission; left unimplemented on
  *    unprivileged builds.
  */
-class TvNativeBridge(private val ctx: Context) {
+class TvNativeBridge(
+    private val ctx: Context,
+    /**
+     * Speech in and out. Owned by the Activity rather than constructed here,
+     * because it needs to evaluate JS in the WebView and must be shut down with
+     * the Activity — a live SpeechRecognizer holds the microphone.
+     */
+    private val voice: TvVoice,
+) {
 
     private val audio = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -178,4 +186,46 @@ class TvNativeBridge(private val ctx: Context) {
             else -> "unknown"
         }
     }
+
+    // ---------------------------------------------------------------- voice --
+    //
+    // The first capability here that is genuinely asynchronous, so it is also the
+    // first that needs to talk *back* into JS. Everything above is a synchronous
+    // call the WebView makes; recognition results arrive whenever the user stops
+    // speaking, so they are pushed to `window.__tvVoice` instead.
+    //
+    // Privilege model, which is the reason this is Android-first: both APIs are
+    // public SDK. TTS needs nothing at all; recognition needs RECORD_AUDIO, a
+    // normal runtime permission the user grants — no platform signature, no
+    // vendor relationship. That is not true of Samsung's or LG's voice stacks.
+
+    @JavascriptInterface
+    fun ttsAvailable(): Boolean = voice.ttsReady()
+
+    @JavascriptInterface
+    fun speak(text: String) = voice.speak(text)
+
+    @JavascriptInterface
+    fun stopSpeaking() = voice.stopSpeaking()
+
+    /**
+     * Whether speech recognition can run *right now* — a service exists and the
+     * microphone permission is granted. Two separate reasons it may be false, so
+     * `sttUnavailableReason()` says which.
+     */
+    @JavascriptInterface
+    fun sttAvailable(): Boolean = voice.sttReady()
+
+    @JavascriptInterface
+    fun sttUnavailableReason(): String = voice.sttReason()
+
+    /** Ask for RECORD_AUDIO. No-op when already granted or when there's no Activity. */
+    @JavascriptInterface
+    fun requestMicPermission() = voice.requestMicPermission()
+
+    @JavascriptInterface
+    fun startListening() = voice.startListening()
+
+    @JavascriptInterface
+    fun stopListening() = voice.stopListening()
 }

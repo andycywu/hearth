@@ -112,10 +112,26 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             // Expose the native bridge to JS as `TvNativeBridge`.
-            addJavascriptInterface(TvNativeBridge(this@MainActivity), "TvNativeBridge")
+            addJavascriptInterface(TvNativeBridge(this@MainActivity, voice), "TvNativeBridge")
         }
         setContentView(webView)
+        // TextToSpeech init is asynchronous and slow enough to swallow the first
+        // reply, so start it now rather than on the first thing the agent says.
+        voice.warmUp()
         load(intent)
+    }
+
+    /**
+     * Speech in and out. Held by the Activity because it evaluates JS in this
+     * WebView and has to be shut down with us — a live SpeechRecognizer keeps the
+     * microphone open.
+     */
+    private val voice by lazy {
+        TvVoice(this) { js ->
+            // `evaluateJavascript` must run on the UI thread and only after the
+            // WebView exists; recognition events can arrive during teardown.
+            if (::webView.isInitialized) webView.evaluateJavascript(js, null)
+        }
     }
 
     /**
@@ -145,8 +161,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        // Before the WebView: TvVoice posts JS into it, and a live recognizer
+        // holds the microphone open until it's destroyed.
+        voice.destroy()
         webView.destroy()
         super.onDestroy()
+    }
+
+    /**
+     * Tell the page how the microphone request went, so it can enable the mic
+     * button without the user having to trigger it again.
+     */
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != TvVoice.MIC_PERMISSION_REQUEST) return
+        val granted = grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED
+        webView.evaluateJavascript(
+            "window.__tvVoice && window.__tvVoice.onEvent({\"type\":\"micPermission\",\"granted\":$granted})",
+            null,
+        )
     }
 
     companion object {

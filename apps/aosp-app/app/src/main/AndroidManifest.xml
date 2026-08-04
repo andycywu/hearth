@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Speech recognition. A normal runtime permission the user grants from a
+         dialog — no platform signature, which is why voice is Android-first. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Reading the TV input list for best-effort input switching. -->
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
 
@@ -24,6 +27,14 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!--
+          Same rule bites speech recognition: without this,
+          SpeechRecognizer.isRecognitionAvailable() reports false on API 30+ even
+          when a recognizer is installed, because the service is invisible to us.
+        -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
 

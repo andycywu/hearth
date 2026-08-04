@@ -1,7 +1,7 @@
 import {
   matchAppsByName,
   type PlatformProvider, type DeviceInfo, type AppEntry,
-  type InputSource, type RemoteKey,
+  type InputSource, type RemoteKey, type VoicePipeline,
 } from "@tv-ai-agent/platform-api";
 
 /**
@@ -31,7 +31,30 @@ interface NativeBridge {
   kvGet(key: string): string;         // "" when absent
   kvSet(key: string, value: string): void;
   kvDelete(key: string): void;
+  // Voice. Optional so an older host APK still works with a newer bundle.
+  ttsAvailable?(): boolean;
+  speak?(text: string): void;
+  stopSpeaking?(): void;
+  sttAvailable?(): boolean;
+  sttUnavailableReason?(): string;
+  requestMicPermission?(): void;
+  startListening?(): void;
+  stopListening?(): void;
 }
+
+/**
+ * Events the native side pushes into the page, because recognition results
+ * arrive whenever the user stops talking rather than when JS asks.
+ */
+type VoiceEvent =
+  | { type: "listening" }
+  | { type: "stopped" }
+  | { type: "transcript"; text: string; isFinal: boolean }
+  | { type: "level"; level: number }
+  | { type: "speakStart" }
+  | { type: "speakDone"; spoken: boolean }
+  | { type: "micPermission"; granted: boolean }
+  | { type: "error"; message: string };
 
 export function createAospAdapter(): PlatformProvider {
   // Read the injected interface off globalThis: a bare `TvNativeBridge`
@@ -42,12 +65,21 @@ export function createAospAdapter(): PlatformProvider {
   if (!bridge) throw new Error("TvNativeBridge not found — are you running inside the AOSP host WebView?");
 
   const info = JSON.parse(bridge.getDeviceInfo()) as Partial<DeviceInfo>;
+
+  // Attached only when the host APK actually offers it, so `has("voice")` answers
+  // honestly and an older APK paired with a newer bundle degrades to text rather
+  // than throwing on the first spoken command.
+  const voice = createVoicePipeline(bridge);
+
   const device: DeviceInfo = {
     os: "aosp",
     osVersion: info.osVersion ?? "unknown",
     soc: info.soc ?? "unknown",
     model: info.model ?? "unknown",
-    capabilities: info.capabilities ?? { media: true, voice: false },
+    capabilities: {
+      ...(info.capabilities ?? { media: true, voice: false }),
+      voice: voice !== undefined,
+    },
   };
 
   const provider: PlatformProvider = {
@@ -97,10 +129,72 @@ export function createAospAdapter(): PlatformProvider {
       set: async (k, v) => bridge.kvSet(k, v),
       delete: async (k) => bridge.kvDelete(k),
     },
+    ...(voice ? { voice } : {}),
     has: (cap) => cap in provider && (provider as any)[cap] !== undefined,
     init: async () => { /* bridge is ready once WebView finished loading */ },
   };
   return provider;
+}
+
+/**
+ * Bridge the native speech APIs onto `VoicePipeline`.
+ *
+ * Native pushes events into `window.__tvVoice` rather than returning them,
+ * because recognition finishes whenever the speaker does. The subscriber list
+ * lives here so several listeners (the agent, the avatar's mouth) can share one
+ * recognizer — Android allows only one at a time.
+ */
+function createVoicePipeline(bridge: NativeBridge): VoicePipeline | undefined {
+  if (!bridge.startListening || !bridge.speak) return undefined;
+
+  const transcriptSubs = new Set<(text: string, isFinal: boolean) => void>();
+  let levelSub: ((level: number) => void) | undefined;
+  let onSpeakDone: (() => void) | undefined;
+
+  (globalThis as { __tvVoice?: { onEvent(e: VoiceEvent): void } }).__tvVoice = {
+    onEvent: (event) => {
+      switch (event.type) {
+        case "transcript":
+          transcriptSubs.forEach((cb) => cb(event.text, event.isFinal));
+          break;
+        case "level":
+          levelSub?.(event.level);
+          break;
+        case "speakDone":
+          onSpeakDone?.();
+          onSpeakDone = undefined;
+          break;
+        case "error":
+          // Not thrown: a failed recognition attempt must not break a turn, and
+          // "didn't catch that" is a normal outcome rather than a fault.
+          console.warn(`[aosp] voice: ${event.message}`);
+          break;
+        default:
+          break;
+      }
+    },
+  };
+
+  return {
+    startListening: async () => {
+      // Asking is idempotent and returns immediately when already granted; the
+      // native side reports the outcome through `micPermission`.
+      if (!(bridge.sttAvailable?.() ?? false)) bridge.requestMicPermission?.();
+      bridge.startListening!();
+    },
+    stopListening: async () => bridge.stopListening?.(),
+    onTranscript: (cb) => {
+      transcriptSubs.add(cb);
+      return () => { transcriptSubs.delete(cb); };
+    },
+    speak: async (text) =>
+      new Promise<void>((resolve) => {
+        // Resolve on the native `speakDone`, so callers can tell when the TV has
+        // actually stopped talking — that's what drives the avatar's mouth.
+        onSpeakDone = resolve;
+        bridge.speak!(text);
+      }),
+  };
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
