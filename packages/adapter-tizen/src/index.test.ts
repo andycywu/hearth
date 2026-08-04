@@ -118,6 +118,32 @@ describe("adapter-tizen", () => {
     }
   });
 
+  it("reports what the TV itself says its network is", async () => {
+    // Standard Tizen, so this is the truth on a build with no Samsung webapis —
+    // where connectionType used to flatly answer "none" whatever was going on.
+    delete (globalThis as any).webapis;
+    (globalThis as any).tizen.systeminfo = {
+      getPropertyValue: (prop: string, ok: (v: unknown) => void) => {
+        if (prop === "NETWORK") ok({ networkType: "ETHERNET" });
+      },
+    };
+    const p = createTizenAdapter();
+    expect(await p.network.connectionType()).toBe("ethernet");
+    expect(await p.network.isOnline()).toBe(true);
+  });
+
+  it("believes the TV when it says it has no network", async () => {
+    delete (globalThis as any).webapis;
+    (globalThis as any).tizen.systeminfo = {
+      getPropertyValue: (prop: string, ok: (v: unknown) => void) => {
+        if (prop === "NETWORK") ok({ networkType: "NONE" });
+      },
+    };
+    const p = createTizenAdapter();
+    expect(await p.network.isOnline()).toBe(false);
+    expect(await p.network.connectionType()).toBe("none");
+  });
+
   it("still prefers Samsung's gateway check when it exists", async () => {
     (globalThis as any).webapis.network = { isConnectedToGateway: () => false };
     expect(await createTizenAdapter().network.isOnline()).toBe(false);

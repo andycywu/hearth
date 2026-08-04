@@ -68,13 +68,23 @@ export function createTizenAdapter(): PlatformProvider {
       isOnline: async () => {
         const gateway = safe(() => webapis?.network?.isConnectedToGateway?.());
         if (typeof gateway === "boolean") return gateway;
+        // What the TV itself thinks, before falling back to the browser's view.
+        const type = await networkType();
+        if (type) return type !== "NONE";
         return typeof navigator !== "undefined" && typeof navigator.onLine === "boolean"
           ? navigator.onLine
           : true;
       },
       connectionType: async () => {
         const t = safe(() => webapis?.network?.getActiveConnectionType?.());
-        return t === 0 ? "wifi" : t === 1 ? "ethernet" : "none";
+        if (t === 0) return "wifi";
+        if (t === 1) return "ethernet";
+        // Standard Tizen again, so this reports the truth on builds without
+        // Samsung's extension instead of flatly answering "none".
+        const type = await networkType();
+        if (type === "WIFI") return "wifi";
+        if (type === "ETHERNET") return "ethernet";
+        return "none";
       },
     },
     storage: kv,
@@ -156,6 +166,12 @@ async function refreshDeviceInfo(device: DeviceInfo): Promise<void> {
   }
   const samsungVersion = safe(() => webapis?.productinfo?.getVersion?.());
   if (str(samsungVersion)) device.osVersion = String(samsungVersion);
+}
+
+/** "NONE" | "WIFI" | "ETHERNET" | … as the TV OS reports it, or undefined. */
+async function networkType(): Promise<string | undefined> {
+  const net = await systemInfo("NETWORK");
+  return str(net?.networkType);
 }
 
 function systemInfo(property: string): Promise<any | undefined> {
