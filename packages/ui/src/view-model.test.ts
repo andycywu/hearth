@@ -17,6 +17,7 @@ describe("createAgentViewModel", () => {
     const { agent } = fakeAgent();
     expect(createAgentViewModel(agent).snapshot()).toEqual({
       reply: "", activity: "", error: "", busy: false, streamed: false,
+      listening: false, speaking: false, phase: "idle",
     });
   });
 
@@ -49,6 +50,7 @@ describe("createAgentViewModel", () => {
     events.emit("turn:end", { output: "Done." });
     expect(vm.snapshot()).toEqual({
       reply: "Done.", activity: "", error: "", busy: false, streamed: false,
+      listening: false, speaking: false, phase: "idle",
     });
   });
 
@@ -82,6 +84,7 @@ describe("createAgentViewModel", () => {
     events.emit("turn:start", { input: "again" });
     expect(vm.snapshot()).toEqual({
       reply: "", activity: "", error: "", busy: true, streamed: false,
+      listening: false, speaking: false, phase: "thinking",
     });
   });
 
@@ -109,6 +112,67 @@ describe("createAgentViewModel", () => {
     expect(captured?.reply).toBe("ab");
     captured!.reply = "tampered";
     expect(vm.snapshot().reply).toBe("ab");
+  });
+
+  describe("phase, for an avatar to draw", () => {
+    it("is thinking while a turn is in flight, idle after", () => {
+      const { agent, events } = fakeAgent();
+      const vm = createAgentViewModel(agent);
+      events.emit("turn:start", { input: "hi" });
+      expect(vm.snapshot().phase).toBe("thinking");
+      events.emit("turn:end", { input: "hi", output: "done" });
+      expect(vm.snapshot().phase).toBe("idle");
+    });
+
+    it("is idle again after an error, not stuck thinking", () => {
+      const { agent, events } = fakeAgent();
+      const vm = createAgentViewModel(agent);
+      events.emit("turn:start", { input: "hi" });
+      events.emit("error", { error: new Error("nope") });
+      expect(vm.snapshot().phase).toBe("idle");
+    });
+
+    it("takes listening and speaking from outside — the agent has no mic", () => {
+      const { agent } = fakeAgent();
+      const vm = createAgentViewModel(agent);
+      vm.setListening(true);
+      expect(vm.snapshot().phase).toBe("listening");
+      vm.setListening(false);
+      vm.setSpeaking(true);
+      expect(vm.snapshot().phase).toBe("speaking");
+      vm.setSpeaking(false);
+      expect(vm.snapshot().phase).toBe("idle");
+    });
+
+    it("shows an open microphone above everything else", () => {
+      // Privacy signal: if the room is being heard the viewer must see it, even
+      // mid-turn or mid-reply.
+      const { agent, events } = fakeAgent();
+      const vm = createAgentViewModel(agent);
+      events.emit("turn:start", { input: "hi" });
+      vm.setSpeaking(true);
+      vm.setListening(true);
+      expect(vm.snapshot().phase).toBe("listening");
+    });
+
+    it("prefers speaking to thinking, so a streaming reply doesn't flicker", () => {
+      const { agent, events } = fakeAgent();
+      const vm = createAgentViewModel(agent);
+      events.emit("turn:start", { input: "hi" });
+      vm.setSpeaking(true);
+      expect(vm.snapshot().phase).toBe("speaking");
+    });
+
+    it("notifies subscribers when only the phase changed", () => {
+      const { agent } = fakeAgent();
+      const vm = createAgentViewModel(agent);
+      const phases: string[] = [];
+      vm.subscribe((s) => phases.push(s.phase));
+      vm.setListening(true);
+      vm.setListening(true);   // no-op, must not emit again
+      vm.setListening(false);
+      expect(phases).toEqual(["listening", "idle"]);
+    });
   });
 
   it("detaches from the agent on destroy", () => {
