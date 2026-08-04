@@ -108,11 +108,74 @@ Three things about this image are worth knowing before you lose a day to them.
   fetch`; `?diag&reach` shows both. So a model endpoint can't be reached from
   this image and the agent can only run against the scripted brain here. Note
   `network.isOnline` still reports `true`: `navigator.onLine` doesn't know about
-  routes, which is exactly why the reach probe exists.
+  routes, which is exactly why the reach probe exists. Details and the full
+  elimination below — the short version is that it is not anything you can fix
+  in the app.
 
 `sdb shell` answers `closed` on this image and the Web Inspector port refuses
 connections, so the screen is the only way to read anything back — hence
 `tools/capture-window.ps1`.
+
+### Why the emulator can't reach the network (investigated 2026-08-04)
+
+Worth writing down because the obvious suspects are all wrong, and checking
+them costs most of a day. **Do not start with proxy or bridge settings.**
+
+There are two *different* faults, one per image. Both are inside the emulator;
+neither is fixable from the app, the host network, or the Emulator Control
+Panel.
+
+**Generic Tizen image (`profile=tizen`) — the guest has no network interface.**
+Its kernel log (`sdk-data/emulator/vms/<vm>/logs/emulator.klog`, written by the
+`-chardev file` in `vm_launch.conf`) contains zero occurrences of `eth0`, zero
+of `virtio_net`, and no link-up line. QEMU offers the NIC
+(`-netdev user,id=net0` + `-device virtio-net-pci`) and nothing binds to it.
+Consistent with the host-side observation below: no packet is ever generated,
+so there is nothing to route, block or proxy.
+
+**Samsung TV image (`profile=tv-samsung`) — the guest is fine; slirp won't
+connect out.** The same log shows a fully configured stack:
+
+```text
+Interface [eth0]   ipv4(10.0.2.15)   Gateway [10.0.2.2]   proxy((null))
+```
+
+That address came from slirp's own DHCP, so slirp is alive and talking to the
+guest. Outbound TCP still fails, and the Control Panel's *User Network
+Information* table shows the connection stuck in `TCP[SYN_RCVD]` — slirp took
+the guest's SYN and never completed the host side.
+
+**Ruled out, each with evidence** (so nobody repeats this):
+
+| Suspect | Why it isn't that |
+|---|---|
+| Proxy | `network_proxy=""` in `vm_launch.conf`; the guest's own env logs `http_proxy=` empty with `no_proxy=localhost,127.0.0.1/8,10.0.2.0/24`; and the host has no proxy at all (`netsh winhttp show proxy` → direct, `ProxyEnable=0`). Three independent sources. |
+| TAP / bridge | All TAP adapters stay `Disconnected` *while the emulator runs*, and no Network Bridge exists. NAT mode doesn't use them. Accumulated TAP adapters are leftovers from repeated **Create tap** clicks in the Network tab. |
+| Host firewall / VPN | Nothing ever leaves the emulator process, so there is nothing to block. No firewall rule references the emulator binary either. |
+| CSP | Identical results with the `Content-Security-Policy` meta tag removed entirely. |
+| DNS | A raw-IP URL (`http://10.0.2.2:8080/…`) fails exactly like a hostname. |
+| Our code | The same build passes on the Android TV emulator, including the model round-trip. |
+
+The decisive host-side measurement: with `?diag&reach` running two fetches,
+poll `netstat -ano` for the emulator's PID. A working slirp opens an outbound
+socket per guest connection. On the generic image there were **zero** — over a
+28-second window, on a verified-fresh app start. Verify the run really is
+fresh: `tz run` on an already-running app only brings it to the front, so
+reinstall first and confirm the report changed (packaging without `reach` and
+watching the two rows disappear is a good control).
+
+**Why Android is unaffected:** `adb reverse` tunnels through the adb transport,
+not the guest's IP stack, so the emulator's NAT is never involved. Tizen's
+`sdb reverse` registers a mapping (`sdb reverse --list` shows it) but does not
+forward — so there is no equivalent escape hatch, and note the argument order
+is `<device-port> <host-port>`, the opposite of what `--list`'s "LOCAL" column
+suggests.
+
+**What this means in practice:** use the Samsung image for capability work
+(volume, mute, apps, storage all pass there) and the scripted brain for the
+agent loop. A real model needs either a network-capable image or a retail TV in
+Developer Mode — which is worth doing anyway, since that is also where
+`webapis` actually exists.
 
 ## Generating results with the self-diagnostic
 

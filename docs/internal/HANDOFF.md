@@ -159,6 +159,14 @@ The debug APK is already built at
   / `tizen.systeminfo`), and the emulator has **no outbound network** — both a
   tunnelled loopback port and a public HTTPS endpoint fail, so a real model can't
   be reached from it. `?diag&reach` proves that in one screen.
+  The network fault was traced to the emulator itself (two different faults, one
+  per image) and every plausible external cause — proxy, TAP/bridge, host
+  firewall, VPN, CSP, DNS — was eliminated with evidence. That elimination is
+  the most useful part of the write-up: **don't start with proxy or bridge
+  settings.** One experiment is still open: the socket watch on the *Samsung*
+  image, to separate "maru's slirp never connects out" from "something on the
+  host blocks it". That VM was deleted before it could be run; recreate the
+  Samsung TV image and it's a five-minute check.
   *Remaining:* the acceptance script against a model, which needs either a
   network-capable image or a real TV in Developer Mode.
 - [x] **B3. Fill `docs/platform/capability-matrix.md`** — *done for the AOSP
