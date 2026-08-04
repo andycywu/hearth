@@ -137,15 +137,37 @@ if (flags.length) {
   rmSync(flagsPath, { force: true });
 }
 
-// 3. Compile/collect the web project, then package and sign.
+/**
+ * `--profile` has to go through the *active* profile.
+ *
+ * `tz pack -s <name>` looks like the way to pick a signing profile and isn't:
+ * `-s` is flagged `[repack]` in `tz pack --help`, so it only applies when
+ * re-signing an existing package. A normal pack silently uses whatever profile
+ * is active — which meant `--profile` did nothing at all, and the package came
+ * out signed by the wrong certificate with no warning. Set it, pack, put it
+ * back, so this doesn't leave the toolchain reconfigured behind you.
+ */
+const previousProfile = profile ? activeProfile() : null;
 let packOut;
 try {
+  if (profile && profile !== previousProfile) {
+    run(`tz security-profiles set-active ${profile}`, tz, ["security-profiles", "set-active", profile]);
+    console.log(`[tizen] signing profile: ${profile} (was ${previousProfile ?? "none"})`);
+  }
   run("tz build", tz, ["build"]);
-  const packArgs = ["pack", "-t", "wgt", ...(profile ? ["-s", profile] : [])];
-  packOut = run(`tz ${packArgs.join(" ")}`, tz, packArgs);
+  packOut = run("tz pack -t wgt", tz, ["pack", "-t", "wgt"]);
 } finally {
   // Don't leave a flagged build lying around for the next person to package.
   rmSync(flagsPath, { force: true });
+  if (profile && previousProfile && profile !== previousProfile) {
+    run(`tz security-profiles set-active ${previousProfile}`, tz,
+      ["security-profiles", "set-active", previousProfile]);
+  }
+}
+
+function activeProfile() {
+  const out = run("tz security-profiles list", tz, ["security-profiles", "list"]);
+  return out.match(/Current Active Profile:\s*(\S+)/)?.[1] ?? null;
 }
 
 const match = packOut.match(/Package File Location:\s*(.+\.wgt)/i);
