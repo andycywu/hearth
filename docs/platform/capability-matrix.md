@@ -171,6 +171,35 @@ forward — so there is no equivalent escape hatch, and note the argument order
 is `<device-port> <host-port>`, the opposite of what `--list`'s "LOCAL" column
 suggests.
 
+**Checked against Samsung's own documentation** ([emulator-features.md](https://github.com/Samsung/tizen-docs/blob/master/docs/application/tizen-studio/common-tools/emulator-features.md),
+the source the docs site renders), because it settles what is a fault and what
+is by design:
+
+- NAT is the default backend and "exploits the QEMU user networking (SLIRP)".
+  The virtual LAN is `10.0.2.2` gateway/host, `10.0.2.3` DNS, `10.0.2.15`
+  emulator — matching what the guest log reports, so the addressing is right.
+- "The emulator supports TCP, UDP, and ping within a guest. However, a raw
+  socket is not supported." **"Inbound connections from external to the
+  emulator fail in the NAT backend."** Inbound and raw sockets are the *only*
+  documented limits: outbound is supposed to work, so our failure is a fault
+  rather than a design constraint.
+- Port forwarding is host→guest, which is the opposite of what a model endpoint
+  needs, so the Control Panel's *Add port-forwarding* is not the answer here.
+- **"Network bridging does not work when the underlying physical network device
+  is a wireless device."** On a laptop with only Wi-Fi up, bridge mode is not
+  an option at all — which is why repeated **Create tap** clicks leave orphaned
+  TAP adapters and never produce a Network Bridge. Don't go down this path
+  without a cable.
+
+And the VM's own `vm_config.xml` matches the documented defaults —
+`netConnectType=NAT`, `hostIp=10.0.2.2`, `useDHCP=on`, `netDns=""` (i.e. the
+default `10.0.2.3`), `netTapDevice=""`. One cosmetic oddity: `proxyMode=auto`,
+which the docs call unsupported ("Automatic proxy configuration is not
+supported due to licensing issues") — but it ships that way in the SDK's own
+templates, and the proxy is only ever injected as guest environment variables,
+which the guest log shows empty. So it is not the cause; nothing here is
+misconfigured.
+
 **What this means in practice:** use the Samsung image for capability work
 (volume, mute, apps, storage all pass there) and the scripted brain for the
 agent loop. A real model needs either a network-capable image or a retail TV in
