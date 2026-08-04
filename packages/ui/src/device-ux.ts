@@ -2,6 +2,7 @@ import { launchSearch, launchSearchSource, type Agent, type ConfirmRequest } fro
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
+import { mountOnScreenKeyboard } from "./keyboard.js";
 import { runDemo, demoFromUrl } from "./demo.js";
 
 /**
@@ -91,12 +92,16 @@ export function speakReplies(
  * brings its own layer and lifts `#app` above it instead of asking them all to
  * add a z-index.
  */
-function avatarMount(): HTMLElement {
+function avatarMount(reserveBottom: boolean): HTMLElement {
   const existing = document.getElementById("avatar-layer");
   if (existing) return existing;
   const layer = document.createElement("div");
   layer.id = "avatar-layer";
-  layer.style.cssText = "position:fixed;inset:0;z-index:0";
+  // Keep clear of the on-screen keyboard when there is one: the avatar draws its
+  // reply as a subtitle low on its own canvas, and at full height that landed
+  // underneath the keys.
+  layer.style.cssText =
+    `position:fixed;left:0;right:0;top:0;bottom:${reserveBottom ? "38vh" : "0"};z-index:0`;
   document.body.insertBefore(layer, document.body.firstChild);
   const app = document.getElementById("app");
   if (app) {
@@ -108,6 +113,12 @@ function avatarMount(): HTMLElement {
     app.style.justifyContent = "flex-start";
     app.style.paddingTop = "3vh";
   }
+  // The status line is a bring-up aid, and at the hosts' own size a long flags
+  // string wraps to three lines and reaches the face. Smaller here only.
+  const status = document.getElementById("status");
+  if (status) status.style.fontSize = "2vh";
+  const hint = document.getElementById("hint");
+  if (hint) hint.style.fontSize = "1.7vh";
   return layer;
 }
 
@@ -126,6 +137,11 @@ export interface DeviceShellOptions {
    * works with no canvas at all.
    */
   render?: "overlay" | "avatar";
+  /**
+   * Show the remote-driven on-screen keyboard. Off by default: an automated
+   * bring-up run wants the screen to itself, and `?ask=` still covers that.
+   */
+  keyboard?: boolean;
 }
 
 /**
@@ -155,7 +171,7 @@ export function mountDeviceShell(
   opts: DeviceShellOptions = {},
 ): DeviceShellController {
   const ui: DeviceShellController = opts.render === "avatar"
-    ? mountAgentAvatar(agent, { mount: avatarMount() })
+    ? mountAgentAvatar(agent, { mount: avatarMount(opts.keyboard === true) })
     : mountAgentOverlay(agent);
   const { device } = platform;
 
@@ -173,18 +189,32 @@ export function mountDeviceShell(
   }
 
   const hint = document.getElementById(opts.hintId ?? "hint");
+  // A remote-driven keyboard, so a TV is no longer limited to `?ask=` at launch.
+  // Opt-in per host because bring-up runs want the screen to themselves.
+  const keyboard = opts.keyboard
+    ? mountOnScreenKeyboard({ onSubmit: (text) => ui.ask(text) })
+    : undefined;
+
   if (hint) {
-    // Say what's actually true: these hosts ship no input surface yet, so
-    // whoever just installed this needs to know how to make it do something.
     hint.textContent = opts.hint ?? (
-      platform.has("voice")
-        ? "Say a command, or launch with ?ask=… to run one."
-        : "No input surface on this host yet — launch with ?ask=… to run a command, " +
-          "or ?diag for the capability report."
+      keyboard
+        ? (platform.has("voice")
+            ? "Say a command, or type one with the on-screen keyboard."
+            : "Use the arrow keys and OK to type a command.")
+        : platform.has("voice")
+          ? "Say a command, or launch with ?ask=… to run one."
+          : "No input surface on this host yet — launch with ?ask=… to run a command, " +
+            "or ?diag for the capability report."
     );
   }
 
-  return ui;
+  if (!keyboard) return ui;
+  // Tear the keyboard down with the shell, so a host that remounts doesn't
+  // stack a second listener on document.
+  return {
+    ...ui,
+    destroy: () => { keyboard.destroy(); ui.destroy(); },
+  };
 }
 
 /**

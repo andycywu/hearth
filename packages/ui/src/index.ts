@@ -26,6 +26,17 @@ export {
   type AvatarFrameOptions,
 } from "./avatar.js";
 export {
+  mountOnScreenKeyboard,
+  createKeyboardModel,
+  remoteIntent,
+  DEFAULT_TV_KEYBOARD,
+  type OnScreenKeyboardOptions,
+  type OnScreenKeyboardController,
+  type KeyboardModel,
+  type KeyboardKey,
+  type KeyDirection,
+} from "./keyboard.js";
+export {
   createAgentViewModel,
   type AgentViewModel,
   type AgentViewState,

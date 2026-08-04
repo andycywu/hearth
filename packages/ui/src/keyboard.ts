@@ -1,0 +1,311 @@
+/**
+ * An on-screen keyboard a remote control can drive.
+ *
+ * A TV has no keyboard and four arrow keys, so text entry has to be a grid you
+ * walk. Written here rather than delegating to each platform's IME because the
+ * IME route is capability-gated per vendor and needs a focused input the WebView
+ * may not get; a grid of divs works identically on all four hosts with no
+ * privileges at all.
+ *
+ * Navigation is `createKeyboardModel()`, pure and testable — the ragged-row
+ * clamping is the part that's easy to get wrong.
+ */
+
+export type KeyDirection = "up" | "down" | "left" | "right";
+
+/** A key's effect. Anything without an `action` inserts `value ?? label`. */
+export type KeyAction = "space" | "delete" | "clear" | "submit";
+
+export interface KeyboardKey {
+  label: string;
+  /** Inserted text, when it differs from the label. */
+  value?: string;
+  action?: KeyAction;
+  /** Relative width, for the renderer. Default 1. */
+  width?: number;
+}
+
+export interface KeyboardModelState {
+  text: string;
+  row: number;
+  col: number;
+}
+
+export interface KeyboardModel {
+  state(): KeyboardModelState;
+  rows(): readonly (readonly KeyboardKey[])[];
+  /** The key under the cursor. */
+  focused(): KeyboardKey;
+  move(dir: KeyDirection): void;
+  /** Activate the focused key. Returns the text when it was a submit. */
+  press(): { submitted: string } | undefined;
+  setText(text: string): void;
+  subscribe(cb: (state: KeyboardModelState) => void): () => void;
+}
+
+const KEY = (label: string): KeyboardKey => ({ label });
+
+/**
+ * Lowercase only, on purpose: the agent matches case-insensitively, and a shift
+ * key would cost a whole extra mode for no gain on a TV.
+ */
+export const DEFAULT_TV_KEYBOARD: readonly (readonly KeyboardKey[])[] = [
+  "1234567890".split("").map(KEY),
+  "qwertyuiop".split("").map(KEY),
+  "asdfghjkl".split("").map(KEY),
+  "zxcvbnm".split("").map(KEY),
+  [
+    { label: "space", action: "space", width: 3 },
+    { label: "⌫", action: "delete", width: 1 },
+    { label: "clear", action: "clear", width: 2 },
+    { label: "Send", action: "submit", width: 2 },
+  ],
+];
+
+export function createKeyboardModel(
+  rows: readonly (readonly KeyboardKey[])[] = DEFAULT_TV_KEYBOARD,
+): KeyboardModel {
+  if (!rows.length || rows.some((r) => r.length === 0)) {
+    throw new Error("keyboard needs at least one row and no empty rows");
+  }
+
+  let text = "";
+  let row = 0;
+  let col = 0;
+  /**
+   * The column the user actually aimed for, kept across vertical moves.
+   *
+   * Without it, walking down through a short row and back up strands you at the
+   * short row's last column — the cursor drifts left every time you pass a gap,
+   * which feels broken on a remote.
+   */
+  let desiredCol = 0;
+
+  const subs = new Set<(s: KeyboardModelState) => void>();
+  const emit = (): void => {
+    const snap: KeyboardModelState = { text, row, col };
+    subs.forEach((cb) => cb(snap));
+  };
+
+  const clampCol = (): void => {
+    const last = rows[row]!.length - 1;
+    col = desiredCol > last ? last : desiredCol;
+  };
+
+  return {
+    state: () => ({ text, row, col }),
+    rows: () => rows,
+    focused: () => rows[row]![col]!,
+
+    move: (dir) => {
+      switch (dir) {
+        case "left":
+          // Wrap within the row: on a remote, walking off one end and coming
+          // back round beats stopping dead.
+          col = col === 0 ? rows[row]!.length - 1 : col - 1;
+          desiredCol = col;
+          break;
+        case "right":
+          col = col === rows[row]!.length - 1 ? 0 : col + 1;
+          desiredCol = col;
+          break;
+        case "up":
+          row = row === 0 ? rows.length - 1 : row - 1;
+          clampCol();
+          break;
+        case "down":
+          row = row === rows.length - 1 ? 0 : row + 1;
+          clampCol();
+          break;
+      }
+      emit();
+    },
+
+    press: () => {
+      const key = rows[row]![col]!;
+      switch (key.action) {
+        case "submit": {
+          const submitted = text.trim();
+          if (!submitted) return undefined;
+          text = "";
+          emit();
+          return { submitted };
+        }
+        case "space":
+          text += " ";
+          break;
+        case "delete":
+          text = text.slice(0, -1);
+          break;
+        case "clear":
+          text = "";
+          break;
+        default:
+          text += key.value ?? key.label;
+      }
+      emit();
+      return undefined;
+    },
+
+    setText: (next) => {
+      text = next;
+      emit();
+    },
+
+    subscribe: (cb) => {
+      subs.add(cb);
+      return () => { subs.delete(cb); };
+    },
+  };
+}
+
+export interface OnScreenKeyboardOptions {
+  /** Element to mount into. Defaults to document.body. */
+  mount?: HTMLElement;
+  /** Layout override. Defaults to `DEFAULT_TV_KEYBOARD`. */
+  rows?: readonly (readonly KeyboardKey[])[];
+  /** Called with the trimmed text when Send is pressed. */
+  onSubmit: (text: string) => void | Promise<void>;
+  /** Start hidden and wait for `show()`. Default false. */
+  hidden?: boolean;
+}
+
+export interface OnScreenKeyboardController {
+  show(): void;
+  hide(): void;
+  toggle(): void;
+  visible(): boolean;
+  /** Put text in the field — a voice transcript the user can then correct. */
+  setText(text: string): void;
+  destroy(): void;
+}
+
+/**
+ * Render the keyboard and drive it from the remote.
+ *
+ * Styled inline rather than through a stylesheet so it looks the same on four
+ * hosts whose CSS was written before it existed, and so a host can adopt it
+ * without editing any markup.
+ */
+export function mountOnScreenKeyboard(
+  opts: OnScreenKeyboardOptions,
+): OnScreenKeyboardController {
+  if (typeof document === "undefined") {
+    throw new Error("mountOnScreenKeyboard requires a DOM environment");
+  }
+  const model = createKeyboardModel(opts.rows);
+  const mount = opts.mount ?? document.body;
+
+  const root = document.createElement("div");
+  root.id = "osk";
+  root.style.cssText = [
+    "position:fixed", "left:0", "right:0", "bottom:0", "z-index:2",
+    "padding:2vh 4vw 3vh", "box-sizing:border-box",
+    "background:rgba(5,6,10,.92)", "color:#e8eefc",
+    "font-family:sans-serif", "text-align:center",
+  ].join(";");
+
+  const field = document.createElement("div");
+  field.style.cssText = "font-size:2.6vh;min-height:3.6vh;margin-bottom:1.6vh;opacity:.95";
+  root.appendChild(field);
+
+  const grid = document.createElement("div");
+  root.appendChild(grid);
+
+  // One element per key, kept so redraws only touch styles — a TV WebView is
+  // slow enough that rebuilding the grid on every cursor move is visible.
+  const cells: HTMLElement[][] = model.rows().map((row) => {
+    const rowEl = document.createElement("div");
+    rowEl.style.cssText = "display:flex;gap:.8vw;justify-content:center;margin-bottom:.8vh";
+    const rowCells = row.map((key) => {
+      const cell = document.createElement("div");
+      cell.textContent = key.label;
+      cell.style.cssText = [
+        `flex:${key.width ?? 1} 0 auto`,
+        "min-width:5vw", "padding:1.2vh .6vw",
+        "border-radius:.8vh", "font-size:2.4vh",
+        "border:1px solid #2a2f3a", "background:#0d1017",
+      ].join(";");
+      rowEl.appendChild(cell);
+      return cell;
+    });
+    grid.appendChild(rowEl);
+    return rowCells;
+  });
+
+  function render(): void {
+    const { text, row, col } = model.state();
+    field.textContent = text || "Type a command…";
+    field.style.opacity = text ? "0.95" : "0.4";
+    cells.forEach((rowCells, r) => {
+      rowCells.forEach((cell, c) => {
+        const on = r === row && c === col;
+        cell.style.background = on ? "#4da3ff" : "#0d1017";
+        cell.style.color = on ? "#05060a" : "#e8eefc";
+        cell.style.borderColor = on ? "#4da3ff" : "#2a2f3a";
+      });
+    });
+  }
+
+  function onKeyDown(e: KeyboardEvent): void {
+    if (root.hidden) return;
+    const intent = remoteIntent(e);
+    if (!intent) return;
+    e.preventDefault();
+    if (intent === "back") {
+      hide();
+      return;
+    }
+    if (intent === "press") {
+      const result = model.press();
+      if (result) void opts.onSubmit(result.submitted);
+      return;
+    }
+    model.move(intent);
+  }
+
+  function show(): void { root.hidden = false; render(); }
+  function hide(): void { root.hidden = true; }
+
+  model.subscribe(render);
+  mount.appendChild(root);
+  root.hidden = opts.hidden ?? false;
+  render();
+  document.addEventListener("keydown", onKeyDown);
+
+  return {
+    show,
+    hide,
+    toggle: () => (root.hidden ? show() : hide()),
+    visible: () => !root.hidden,
+    setText: (text) => model.setText(text),
+    destroy: () => {
+      document.removeEventListener("keydown", onKeyDown);
+      root.remove();
+    },
+  };
+}
+
+/**
+ * Map a DOM `keydown` to a keyboard intent.
+ *
+ * Every host's remote arrives as a normal key event — Android TV's D-pad becomes
+ * arrow keys in the WebView, and Tizen's remote sends the same key codes plus its
+ * own for Back. Handled here so no host repeats the mapping.
+ */
+export function remoteIntent(
+  e: Pick<KeyboardEvent, "key" | "keyCode">,
+): KeyDirection | "press" | "back" | undefined {
+  switch (e.key) {
+    case "ArrowUp": return "up";
+    case "ArrowDown": return "down";
+    case "ArrowLeft": return "left";
+    case "ArrowRight": return "right";
+    case "Enter": return "press";
+    case "Backspace": return "back";
+    default: break;
+  }
+  // Tizen's remote sends Back as 10009 with no useful `key`.
+  if (e.keyCode === 10009) return "back";
+  return undefined;
+}

@@ -8,6 +8,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+You can talk to it:
+
+- **An on-screen keyboard a remote can drive** (`?keyboard`). Until now the
+  device hosts had no input surface at all — they said so on screen — so a TV
+  could only run whatever was baked into the launch flags. Now it can be typed
+  to. Written here rather than delegating to each platform's IME, because that
+  route is capability-gated per vendor and needs a focused input the WebView may
+  not get; a grid of divs works identically on all four hosts with no privileges.
+- The navigation is `createKeyboardModel()`, pure and tested (27 tests). The
+  interesting part is ragged rows: it remembers the column you *aimed* for across
+  a short row, because without that the cursor creeps left every time you pass a
+  gap and the whole thing feels broken on a remote.
+- Verified on the Android TV emulator by driving it with real D-pad key events:
+  typed "mute" letter by letter, pressed Send, and `?diag` afterwards reported
+  `getMute ✅ true`. The word went from the remote through the agent to
+  `AudioManager`.
+
 An avatar:
 
 - **`mountAgentAvatar()` — the agent has a face.** An abstract form drawn in

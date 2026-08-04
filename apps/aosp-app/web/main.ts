@@ -64,8 +64,11 @@ async function boot(): Promise<void> {
 
   const ui = mountDeviceShell(agent, platform, {
     detail: `llm=${endpoint.baseUrl ?? "offline"}`,
-    // `?render=avatar` draws the agent's face instead of the plain overlay.
+    // `?render=avatar` draws the agent's face; `?keyboard` adds the
+    // remote-driven on-screen keyboard, so a TV can type rather than being
+    // limited to whatever was baked into the launch flags.
     ...(/(^|[?&])render=avatar/.test(launchSearch()) ? { render: "avatar" as const } : {}),
+    ...(/(^|[?&])keyboard/.test(launchSearch()) ? { keyboard: true } : {}),
   });
   // After the shell exists, so the avatar can be told when it's speaking.
   speakReplies(agent, platform, { onSpeaking: (s) => ui.setSpeaking?.(s) });
