@@ -3,14 +3,16 @@
 A snapshot of what's built, what's verified, and what remains. For the full plan
 see [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md).
 
-_Last updated: 2026-08-03 · target release: v0.1.0_
+_Last updated: 2026-08-04 · target release: v0.1.0_
 
-**Group A is complete; B1, B3 and B4 are done on an Android TV emulator** — the app
-runs on device, the capability probe is clean, the CI acceptance script passes
-unchanged, and a real local model drives it. **Packaging is verified for all three
-hosts** (APK / signed `.wgt` / `.ipk`), so Tizen and webOS need only an install
-target: a TV emulator image (elevated SDK install) or a TV in Developer Mode. Real
-MTK/NVT boards (B5) and the Blits GPU pass (C1) still need hardware.
+**The agent runs end-to-end on two TV emulators.** On Android TV the capability
+probe is clean (11 ok / 0 errors), the CI acceptance script passes unchanged, and
+a real local model drives it. On the Samsung Tizen TV emulator the app installs,
+volume/mute/apps/storage all pass, and the built-in demo runs the whole agent
+loop — including Chinese and Japanese commands moving real device state — with
+**no network, no endpoint and no API key**. Packaging is verified for all three
+hosts (APK / signed `.wgt` / `.ipk`). webOS still needs an install target; real
+MTK/NVT boards (B5) and the Blits GPU pass (C1) need hardware.
 
 ## At a glance
 
@@ -22,13 +24,17 @@ MTK/NVT boards (B5) and the Blits GPU pass (C1) still need hardware.
 | LLM connectors (OpenAI-compatible + offline scripted) | ✅ done, with retry |
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
 | Voice (ASR/TTS + wake word) | ✅ web adapter (Web Speech); spoken replies on every host |
-| Skills (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
-| Tests / CI / lint / bundle-size / license / SBOM | ✅ 194 tests, CI green |
+| Skills — code (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
+| Skills — data (JSON manifests, bundled + installable) | ✅ `packages/skill-manifest`, [ADR-0002](adr/0002-declarative-skill-manifests.md) |
+| Offline demo on device (`?demo`, no network) | ✅ verified on the Android **and** Tizen emulators |
+| Tests / CI / lint / bundle-size / license / SBOM | ✅ 274 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
-| **Android TV emulator bring-up** | ✅ probe clean, acceptance script passes |
+| **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
 | **Tizen / webOS packaging** | ✅ signed `.wgt` + `.ipk` verified |
-| **Tizen / webOS install run** | ⛔ needs a TV emulator image or a TV in Developer Mode |
+| **Tizen TV emulator bring-up** | ✅ installs, runs, capabilities pass, offline demo runs |
+| **Tizen against a real model** | ⛔ the emulator's NAT is broken ([details](platform/capability-matrix.md)); needs a retail TV |
+| **webOS install run** | ⛔ needs a TV emulator image or a TV in Developer Mode |
 | **Real MTK/NVT device bring-up** | ⛔ needs hardware |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
@@ -69,12 +75,26 @@ MTK/NVT boards (B5) and the Blits GPU pass (C1) still need hardware.
   ES-module bundle could never load from `file://`, and that Android's cleartext
   policy blocked every call to a local model. Results and the platform quirks that
   are *not* bugs: [`platform/capability-matrix.md`](platform/capability-matrix.md).
+- **Second on-device bring-up (Samsung Tizen TV 10.0 emulator):** installs and
+  runs; volume, mute, 82 apps, `sendKey` and storage all pass, and `?demo` drives
+  the whole agent loop offline — `?diag` afterwards reads the volume the demo's
+  Japanese command set, so the tool calls reach the real platform. Four more
+  device-only defects found here: `webapis` was never loaded so nothing under it
+  could work, launch flags never reached `location.search` (Tizen drops the query
+  from `config.xml`), `--profile` signed with the wrong certificate, and the
+  adapter answered confident constants — `isOnline: true`, `connectionType:
+  "none"` — where it should have measured. The emulator's own NAT is broken and
+  that is written up with the full elimination, since the obvious suspects
+  (proxy, bridge, firewall, VPN) are all wrong.
+- **Skills as data:** a skill can be a JSON manifest rather than TypeScript,
+  bundled or installed into `platform.storage`, with the host owning the origin
+  allowlist ([ADR-0002](adr/0002-declarative-skill-manifests.md)).
 
-## Test coverage (194 tests)
+## Test coverage (274 tests)
 
-core 38 · ui 53 · llm-connectors 42 · adapter-aosp 14 · skills-example 13 ·
-platform-api 8 · create-skill 8 · adapter-webos 6 · adapter-web 5 ·
-acceptance 5 · adapter-tizen 2.
+skill-manifest 56 · ui 53 · core 51 · llm-connectors 44 · adapter-aosp 14 ·
+skills-example 13 · adapter-tizen 11 · platform-api 8 · create-skill 8 ·
+adapter-webos 6 · adapter-web 5 · acceptance 5.
 
 ## Remaining — needs external resources
 
@@ -90,6 +110,12 @@ acceptance 5 · adapter-tizen 2.
    silicon; finalize cloud/on-device routing policy.
 4. **Real confirm dialogs.** `createConfirmHandler({ ask })` is the seam; each
    platform still needs a focusable 10-foot dialog instead of `window.confirm`.
+5. **A real model on Tizen.** Everything else on that platform works; the
+   emulator's NAT can't reach one, so this needs a retail TV in Developer Mode —
+   which is also where Samsung's `webapis` actually exists, so it settles two
+   questions at once.
+6. **npm publish.** Waiting on the `@tv-ai-agent` npm organization; GitHub Pages
+   needs enabling in the repo settings for the hosted demo.
 
 ## How to run
 
