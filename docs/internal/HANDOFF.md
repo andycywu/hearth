@@ -163,10 +163,10 @@ The debug APK is already built at
   per image) and every plausible external cause — proxy, TAP/bridge, host
   firewall, VPN, CSP, DNS — was eliminated with evidence. That elimination is
   the most useful part of the write-up: **don't start with proxy or bridge
-  settings.** One experiment is still open: the socket watch on the *Samsung*
-  image, to separate "maru's slirp never connects out" from "something on the
-  host blocks it". That VM was deleted before it could be run; recreate the
-  Samsung TV image and it's a five-minute check.
+  settings.** Settled 2026-08-04 on the Samsung image: the emulator opens **zero**
+  outbound sockets while fetches are pending, so slirp never even attempts the
+  host side — it is the emulator, not anything on the host. Re-measured with the
+  corporate VPN up and on a wired connection; identical.
   *Remaining:* the acceptance script against a model, which needs either a
   network-capable image or a real TV in Developer Mode.
 - [x] **B3. Fill `docs/platform/capability-matrix.md`** — *done for the AOSP

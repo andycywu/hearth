@@ -133,8 +133,8 @@ of `virtio_net`, and no link-up line. QEMU offers the NIC
 Consistent with the host-side observation below: no packet is ever generated,
 so there is nothing to route, block or proxy.
 
-**Samsung TV image (`profile=tv-samsung`) — the guest is fine; slirp won't
-connect out.** The same log shows a fully configured stack:
+**Samsung TV image (`profile=tv-samsung`) — the guest is fine; slirp never even
+tries to connect out.** The same log shows a fully configured stack:
 
 ```text
 Interface [eth0]   ipv4(10.0.2.15)   Gateway [10.0.2.2]   proxy((null))
@@ -143,7 +143,11 @@ Interface [eth0]   ipv4(10.0.2.15)   Gateway [10.0.2.2]   proxy((null))
 That address came from slirp's own DHCP, so slirp is alive and talking to the
 guest. Outbound TCP still fails, and the Control Panel's *User Network
 Information* table shows the connection stuck in `TCP[SYN_RCVD]` — slirp took
-the guest's SYN and never completed the host side.
+the guest's SYN and never completed the host side. The socket count below
+confirms it never even started: **zero** outbound sockets from the emulator
+process while two fetches were pending. Measured on both images, and on both
+host network states (Wi-Fi only, and wired with the corporate VPN up), so it
+does not depend on the host's network at all.
 
 **Ruled out, each with evidence** (so nobody repeats this):
 
@@ -151,15 +155,15 @@ the guest's SYN and never completed the host side.
 |---|---|
 | Proxy | `network_proxy=""` in `vm_launch.conf`; the guest's own env logs `http_proxy=` empty with `no_proxy=localhost,127.0.0.1/8,10.0.2.0/24`; and the host has no proxy at all (`netsh winhttp show proxy` → direct, `ProxyEnable=0`). Three independent sources. |
 | TAP / bridge | All TAP adapters stay `Disconnected` *while the emulator runs*, and no Network Bridge exists. NAT mode doesn't use them. Accumulated TAP adapters are leftovers from repeated **Create tap** clicks in the Network tab. |
-| Host firewall / VPN | Nothing ever leaves the emulator process, so there is nothing to block. No firewall rule references the emulator binary either. |
+| Host firewall / VPN | Nothing ever leaves the emulator process, so there is nothing to block. No firewall rule references the emulator binary either. Re-measured with the corporate VPN (GlobalProtect) both down and up: identical. |
 | CSP | Identical results with the `Content-Security-Policy` meta tag removed entirely. |
 | DNS | A raw-IP URL (`http://10.0.2.2:8080/…`) fails exactly like a hostname. |
 | Our code | The same build passes on the Android TV emulator, including the model round-trip. |
 
 The decisive host-side measurement: with `?diag&reach` running two fetches,
 poll `netstat -ano` for the emulator's PID. A working slirp opens an outbound
-socket per guest connection. On the generic image there were **zero** — over a
-28-second window, on a verified-fresh app start. Verify the run really is
+socket per guest connection. There were **zero** on either image, over a 30-second
+window, on verified-fresh app starts. Verify the run really is
 fresh: `tz run` on an already-running app only brings it to the front, so
 reinstall first and confirm the report changed (packaging without `reach` and
 watching the two rows disappear is a good control).
