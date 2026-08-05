@@ -160,6 +160,31 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(APP_BASE + start)
     }
 
+    /**
+     * Give the page first refusal on BACK.
+     *
+     * Android routes the hardware BACK key to the Activity, not into the WebView
+     * as a key event, so a modal in the page never sees it — pressing Back on a
+     * confirmation prompt closed the whole app instead of declining. The page
+     * exposes `window.__tvBack` while something is open; anything else falls
+     * through to the normal behaviour.
+     *
+     * `evaluateJavascript` is asynchronous, so the decision happens in its
+     * callback rather than by returning from here.
+     */
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+    override fun onBackPressed() {
+        webView.evaluateJavascript(
+            "(typeof window.__tvBack === 'function' && window.__tvBack() === true)",
+        ) { handled ->
+            if (handled != "true") defaultBack()
+        }
+    }
+
+    private fun defaultBack() {
+        if (webView.canGoBack()) webView.goBack() else finish()
+    }
+
     override fun onDestroy() {
         // Before the WebView: TvVoice posts JS into it, and a live recognizer
         // holds the microphone open until it's destroyed.

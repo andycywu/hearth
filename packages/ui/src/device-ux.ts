@@ -3,6 +3,7 @@ import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
 import { mountOnScreenKeyboard } from "./keyboard.js";
+import { createTvConfirmDialog, type TvConfirmDialog } from "./confirm-dialog.js";
 import { runDemo, demoFromUrl } from "./demo.js";
 
 /**
@@ -14,8 +15,9 @@ import { runDemo, demoFromUrl } from "./demo.js";
 
 export interface ConfirmHandlerOptions {
   /**
-   * Ask the user. Defaults to `window.confirm`. Swap it for a focusable 10-foot
-   * dialog once each platform has one.
+   * Ask the user. Defaults to the remote-driven dialog in `confirm-dialog.ts`
+   * wherever there's a DOM, falling back to `window.confirm` on engines that
+   * have one but no document.
    */
   ask?: (question: string) => boolean | Promise<boolean>;
   /**
@@ -173,7 +175,10 @@ export function mountDeviceShell(
   opts: DeviceShellOptions = {},
 ): DeviceShellController {
   const ui: DeviceShellController = opts.render === "avatar"
-    ? mountAgentAvatar(agent, { mount: avatarMount(opts.keyboard === true) })
+    // Boolean(), not `=== true`: `keyboard` also takes a layout name, and
+    // `?keyboard=phrases` was leaving the avatar at full height with its
+    // subtitle behind the keys.
+    ? mountAgentAvatar(agent, { mount: avatarMount(Boolean(opts.keyboard)) })
     : mountAgentOverlay(agent);
   const { device } = platform;
 
@@ -340,7 +345,17 @@ export function confirmOverrideFromUrl(
   };
 }
 
-function defaultAsk(): ((question: string) => boolean) | undefined {
+/**
+ * Prefer the 10-foot dialog, then `window.confirm`, then nothing.
+ *
+ * Built lazily and only once: mounting a modal at import time would put an
+ * element on every page that never shows one, and every host would pay for it.
+ */
+function defaultAsk(): ((question: string) => boolean | Promise<boolean>) | undefined {
+  if (typeof document !== "undefined") {
+    let dialog: TvConfirmDialog | undefined;
+    return (q: string) => (dialog ??= createTvConfirmDialog()).ask(q);
+  }
   const w = typeof window !== "undefined" ? (window as Window & { confirm?: unknown }) : undefined;
   return typeof w?.confirm === "function" ? (q: string) => window.confirm(q) : undefined;
 }

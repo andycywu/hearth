@@ -27,6 +27,11 @@ export {
   type AvatarFrameOptions,
 } from "./avatar.js";
 export {
+  createTvConfirmDialog,
+  type TvConfirmDialog,
+  type TvConfirmDialogOptions,
+} from "./confirm-dialog.js";
+export {
   mountOnScreenKeyboard,
   createKeyboardModel,
   remoteIntent,

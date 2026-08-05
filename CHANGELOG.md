@@ -10,6 +10,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 You can talk to it:
 
+- **A real confirmation dialog**, replacing `window.confirm`. That placeholder
+  blocks the JS thread, isn't reliably focusable with a D-pad, and is stubbed out
+  on some TV builds — which silently turned the confirmation gate into "always
+  approve". The replacement is a 10-foot modal driven by the same remote intents
+  as the keyboard, and it becomes the default wherever there's a DOM.
+- It defaults to **No**, and Back declines whatever is focused: the gate exists to
+  stop side effects the viewer didn't ask for, so a stray OK shouldn't launch
+  anything. There's a timeout too, because a modal nobody dismisses is worse on a
+  TV — there may be no pointer.
+- Two defects only a device could show, both fixed. Android routes the hardware
+  BACK key to the *Activity*, not into the WebView as a key event, so pressing it
+  closed the whole app instead of declining; the page now exposes
+  `window.__tvBack` and `MainActivity` asks it first. And the dialog stayed on
+  screen after being answered, because an inline `display:flex` beats the user
+  agent's `[hidden] { display: none }`.
+- Verified on the Android TV emulator both ways: approving ran `launch_app` and
+  YouTube came up; declining left the agent reporting "Action declined by the
+  user" with the dialog gone.
+
 - **CJK input, with an honest split.** The keyboard now switches layouts
   (`?keyboard=phrases` opens on one directly). Japanese gets a **real kana
   keyboard** — kana are text, so a grid is enough and no IME is involved.
