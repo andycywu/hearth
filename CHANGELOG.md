@@ -4,7 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-08-05
+
+First release. The `0.1.0` heading below was written in July but never tagged —
+no release was ever published — so this one carries everything, and the original
+notes are kept as *Foundations* rather than pretending there was a version in
+between.
 
 ### Added
 
@@ -357,9 +362,10 @@ Making it usable by someone who didn't write it:
 - WebView hardening on AOSP (`MainActivity`: file-access flags, in-origin
   navigation) and a `Content-Security-Policy` `<meta>` in every app `index.html`.
 
-## [0.1.0] - 2026-07-27
+### Foundations
 
-### Added
+The core as it stood on 2026-07-27, before device bring-up.
+
 - Portable agent core ("the Harness"): agent loop, tool registry, LLM
   abstraction, rolling memory, typed event bus.
 - Platform HAL (`@tv-ai-agent/platform-api`) with adapters for Tizen, AOSP
@@ -382,5 +388,4 @@ Making it usable by someone who didn't write it:
   a partner/platform certificate (Tizen) or system signature (Android); the
   open-source build degrades gracefully via `has()`.
 
-[Unreleased]: https://github.com/andycywu/tv-ai-agent/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/andycywu/tv-ai-agent/releases/tag/v0.1.0
