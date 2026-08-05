@@ -140,8 +140,10 @@ export interface DeviceShellOptions {
   /**
    * Show the remote-driven on-screen keyboard. Off by default: an automated
    * bring-up run wants the screen to itself, and `?ask=` still covers that.
+   * A layout name opens on that layout — `"phrases"` for a build whose viewers
+   * mostly speak Chinese, where typing characters isn't an option.
    */
-  keyboard?: boolean;
+  keyboard?: boolean | string;
 }
 
 /**
@@ -198,6 +200,7 @@ export function mountDeviceShell(
         // Speech goes through the same field, so a transcript can be corrected
         // before sending and both input methods share one place on screen.
         ...(voice ? { onMic: () => void startListening() } : {}),
+        ...(typeof opts.keyboard === "string" ? { layout: opts.keyboard } : {}),
       })
     : undefined;
 
@@ -246,6 +249,22 @@ export function mountDeviceShell(
     ...ui,
     destroy: () => { keyboard.destroy(); ui.destroy(); },
   };
+}
+
+/**
+ * Read the keyboard flag: `?keyboard` turns it on, `?keyboard=phrases` turns it
+ * on and opens that layout.
+ *
+ * Returns a fragment to spread into `mountDeviceShell` options, so each host
+ * stays a single line instead of three copies of the same regex.
+ */
+export function keyboardOption(search = launchSearch()): { keyboard?: boolean | string } {
+  // The trailing boundary matters: without it `?keyboardless` would switch the
+  // keyboard on, which is the kind of thing nobody notices until it happens.
+  const match = /(?:^|[?&])keyboard(?:=([^&]*))?(?=&|$)/.exec(search);
+  if (!match) return {};
+  const value = match[1];
+  return { keyboard: value ? decodeURIComponent(value) : true };
 }
 
 /**

@@ -10,6 +10,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 You can talk to it:
 
+- **CJK input, with an honest split.** The keyboard now switches layouts
+  (`?keyboard=phrases` opens on one directly). Japanese gets a **real kana
+  keyboard** — kana are text, so a grid is enough and no IME is involved.
+  Chinese gets **ready-made phrases**, because characters cannot be typed from a
+  grid: that needs an IME with a dictionary, phonetic input and a candidate list,
+  which is a large component to own and miserable to drive with four arrow keys.
+  A phrase list is what Netflix and YouTube already do for TV search, and it
+  doubles as discoverability. A test asserts this design so nobody later "fixes"
+  it into a broken half-IME.
+- Verified on the Android TV emulator by picking 音量調到 30 with the remote and
+  pressing Send: `?diag` afterwards read `getVolume ✅ 33` — the Chinese phrase
+  reached `AudioManager` (33 rather than 30 because Android quantises volume,
+  which the capability matrix already documents).
+
 - **Voice on Tizen and webOS, with no native code** — and this corrects an
   assumption. I expected Samsung voice to need Bixby and a partner agreement; the
   TV 10.0 emulator instead reports `speechSynthesis (TTS, 4 voices),

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  createKeyboardModel, remoteIntent, DEFAULT_TV_KEYBOARD, type KeyboardKey,
+  createKeyboardModel, remoteIntent, DEFAULT_TV_KEYBOARD, LAYOUTS, type KeyboardKey,
 } from "./keyboard.js";
 
 /** Ragged on purpose: 3 / 1 / 2 columns exercises the clamping. */
@@ -15,7 +15,7 @@ const at = (m: ReturnType<typeof createKeyboardModel>) => m.focused().label;
 describe("createKeyboardModel", () => {
   it("starts on the first key with empty text", () => {
     const m = createKeyboardModel(RAGGED);
-    expect(m.state()).toEqual({ text: "", row: 0, col: 0 });
+    expect(m.state()).toEqual({ text: "", row: 0, col: 0, layout: "latin" });
     expect(at(m)).toBe("a");
   });
 
@@ -180,6 +180,99 @@ describe("DEFAULT_TV_KEYBOARD", () => {
     expect(actions).toContain("space");
     expect(actions).toContain("delete");
     expect(actions).toContain("submit");
+  });
+});
+
+describe("layouts — how CJK is handled", () => {
+  /**
+   * Walk to the first key matching `label` and press it, using only the moves a
+   * remote has. Both axes wrap, and the column must be measured *after* the
+   * vertical move because it gets clamped into a shorter row.
+   */
+  const pressLabel = (m: ReturnType<typeof createKeyboardModel>, label: string) => {
+    const rows = m.rows();
+    for (let r = 0; r < rows.length; r++) {
+      const c = rows[r]!.findIndex((k) => k.label === label);
+      if (c === -1) continue;
+      const downs = (r - m.state().row + rows.length) % rows.length;
+      for (let i = 0; i < downs; i++) m.move("down");
+      const rights = (c - m.state().col + rows[r]!.length) % rows[r]!.length;
+      for (let i = 0; i < rights; i++) m.move("right");
+      expect(m.focused().label).toBe(label);
+      return m.press();
+    }
+    throw new Error(`no key labelled ${label} in layout ${m.state().layout}`);
+  };
+
+  it("starts on latin and can reach kana and phrases", () => {
+    const m = createKeyboardModel(LAYOUTS, "latin");
+    expect(m.state().layout).toBe("latin");
+    pressLabel(m, "かな");
+    expect(m.state().layout).toBe("kana");
+    pressLabel(m, "常用");
+    expect(m.state().layout).toBe("phrases");
+    pressLabel(m, "abc");
+    expect(m.state().layout).toBe("latin");
+  });
+
+  it("resets the cursor on switch, so it can't point outside the new grid", () => {
+    const m = createKeyboardModel(LAYOUTS, "latin");
+    m.move("down"); m.move("right"); m.move("right");
+    pressLabel(m, "かな");
+    expect(m.state()).toMatchObject({ row: 0, col: 0 });
+    expect(m.focused()).toBeDefined();
+  });
+
+  it("types real kana — they are text, so no IME is involved", () => {
+    const m = createKeyboardModel(LAYOUTS, "kana");
+    m.press();               // あ
+    m.move("right"); m.press();  // い
+    expect(m.state().text).toBe("あい");
+  });
+
+  it("keeps typed text across a layout switch", () => {
+    // Switching script mid-sentence must not throw away what you wrote.
+    const m = createKeyboardModel(LAYOUTS, "latin");
+    m.press();               // "1"
+    pressLabel(m, "かな");
+    m.press();               // あ
+    expect(m.state().text).toBe("1あ");
+  });
+
+  it("offers Chinese as whole phrases, not characters", () => {
+    // Characters can't come from a grid — that needs an IME with a dictionary
+    // and a candidate list. This asserts the design decision, so nobody
+    // "fixes" it into a broken half-IME later.
+    const labels = LAYOUTS.phrases!.flat().map((k) => k.label);
+    const chinese = labels.filter((l) => /[一-鿿]/.test(l));
+    expect(chinese.length).toBeGreaterThan(3);
+    // Each is a full command, not a lone character.
+    expect(chinese.every((l) => l.length > 1)).toBe(true);
+  });
+
+  it("every phrase inserts itself verbatim, ready to send", () => {
+    const m = createKeyboardModel(LAYOUTS, "phrases");
+    m.press();
+    expect(m.state().text).toBe(LAYOUTS.phrases![0]![0]!.label);
+  });
+
+  it("gives every layout a way out and a way to send", () => {
+    for (const [name, rows] of Object.entries(LAYOUTS)) {
+      const actions = rows.flat().map((k) => k.action);
+      expect(actions, `${name} must be able to submit`).toContain("submit");
+      expect(actions, `${name} must be able to delete`).toContain("delete");
+      if (name !== "latin") {
+        expect(actions, `${name} must be able to get back to latin`).toContain("layout");
+      }
+    }
+  });
+
+  it("ignores a switch to a layout that isn't installed", () => {
+    // A bare grid still carries the かな/常用 keys; they must be inert, not throw.
+    const m = createKeyboardModel(DEFAULT_TV_KEYBOARD);
+    pressLabel(m, "かな");
+    expect(m.state().layout).toBe("latin");
+    expect(m.focused()).toBeDefined();
   });
 });
 

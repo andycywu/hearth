@@ -7,6 +7,7 @@ export {
   runStartupCommands,
   mountDeviceShell,
   speakReplies,
+  keyboardOption,
   type ConfirmHandlerOptions,
   type DeviceShellOptions,
   type SpeakRepliesOptions,

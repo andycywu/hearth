@@ -3,7 +3,7 @@ import { EventBus, type AgentEvents } from "@tv-ai-agent/core";
 import type { Agent, ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider, VoicePipeline } from "@tv-ai-agent/platform-api";
 import {
-  createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, speakReplies,
+  createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, speakReplies, keyboardOption,
 } from "./device-ux.js";
 
 const request = (over: Partial<ConfirmRequest> = {}): ConfirmRequest => ({
@@ -159,5 +159,36 @@ describe("speakReplies", () => {
     const voice = { speak: (() => { throw new Error("boom"); }) as unknown as VoicePipeline["speak"] };
     speakReplies(agent, platformWithVoice(voice));
     expect(() => events.emit("turn:end", { output: "hi" })).not.toThrow();
+  });
+});
+
+describe("keyboardOption", () => {
+  it("is absent when the flag isn't there, so bring-up keeps the screen", () => {
+    expect(keyboardOption("?demo")).toEqual({});
+  });
+
+  it("turns the keyboard on for a bare flag", () => {
+    expect(keyboardOption("?keyboard")).toEqual({ keyboard: true });
+    expect(keyboardOption("?demo&keyboard&confirm=auto")).toEqual({ keyboard: true });
+  });
+
+  it("opens on a named layout when one is given", () => {
+    // A build for viewers who mostly speak Chinese starts on phrases, since
+    // characters can't be typed from a grid.
+    expect(keyboardOption("?keyboard=phrases")).toEqual({ keyboard: "phrases" });
+    expect(keyboardOption("?keyboard=kana&demo")).toEqual({ keyboard: "kana" });
+  });
+
+  it("decodes a percent-encoded layout name", () => {
+    expect(keyboardOption("?keyboard=%70hrases")).toEqual({ keyboard: "phrases" });
+  });
+
+  it("treats an empty value as just on", () => {
+    expect(keyboardOption("?keyboard=")).toEqual({ keyboard: true });
+  });
+
+  it("doesn't match a different flag that starts the same way", () => {
+    expect(keyboardOption("?keyboardless")).toEqual({});
+    expect(keyboardOption("?render=avatar&keyboards")).toEqual({});
   });
 });

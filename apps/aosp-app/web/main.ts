@@ -3,6 +3,7 @@ import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
+  keyboardOption,
 } from "@tv-ai-agent/ui";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 
@@ -68,7 +69,7 @@ async function boot(): Promise<void> {
     // remote-driven on-screen keyboard, so a TV can type rather than being
     // limited to whatever was baked into the launch flags.
     ...(/(^|[?&])render=avatar/.test(launchSearch()) ? { render: "avatar" as const } : {}),
-    ...(/(^|[?&])keyboard/.test(launchSearch()) ? { keyboard: true } : {}),
+    ...keyboardOption(),
   });
   // After the shell exists, so the avatar can be told when it's speaking.
   speakReplies(agent, platform, { onSpeaking: (s) => ui.setSpeaking?.(s) });
