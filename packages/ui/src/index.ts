@@ -31,6 +31,11 @@ export {
   type AvatarFrameOptions,
 } from "./avatar.js";
 export {
+  createListeningState,
+  type ListeningState,
+  type ListeningStateOptions,
+} from "./listening.js";
+export {
   mountMicButton,
   type MicButtonOptions,
   type MicButtonController,

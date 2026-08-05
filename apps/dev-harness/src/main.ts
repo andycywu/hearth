@@ -2,6 +2,7 @@ import { Agent, runDiagnostics, reportToMarkdown, launchSearch, type LlmClient }
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 import {
   mountAgentOverlay, mountAgentCanvas, mountAgentAvatar, createConfirmHandler, speakReplies,
+  createListeningState,
 } from "@tv-ai-agent/ui";
 import {
   createScriptedClient, createOpenAiCompatibleClient, resolveLlmEndpoint,
@@ -117,30 +118,25 @@ async function boot(): Promise<void> {
   if (platform.has("voice") && platform.voice) {
     const voice = platform.voice;
     const mic = document.getElementById("mic") as HTMLButtonElement | null;
-    let listening = false;
-    // One place that owns "the mic is open", because it drives three things now
-    // and they must not drift apart.
-    const setListening = (next: boolean): void => {
-      listening = next;
-      if (mic) mic.textContent = next ? "● Listening…" : "🎤 Speak";
-      avatar?.setListening(next);
-    };
-    async function startCapture(): Promise<void> {
-      if (listening) return;
-      setListening(true);
-      try { await voice.startListening(); }
-      catch { setListening(false); }
-    }
+    // Shared with the device hosts. This used to be a local copy of the same
+    // logic, and it had the same defect: only a final transcript cleared the
+    // flag, so a no-match or an error left the button reading "Listening…" and
+    // every later click doing nothing.
+    const capture = createListeningState({
+      voice,
+      onChange: (on) => {
+        if (mic) mic.textContent = on ? "● Listening…" : "🎤 Speak";
+        avatar?.setListening(on);
+      },
+    });
+    const startCapture = (): Promise<void> => capture.start();
     if (mic) {
       mic.hidden = false;
       voice.onTranscript((text, isFinal) => {
         if (input) input.value = text;
-        if (isFinal) { setListening(false); void ui.ask(text); }
+        if (isFinal) { void capture.stop(); void ui.ask(text); }
       });
-      mic.addEventListener("click", async () => {
-        if (listening) { await voice.stopListening(); setListening(false); return; }
-        await startCapture();
-      });
+      mic.addEventListener("click", () => void capture.toggle());
     }
 
     // Hands-free wake word ("hey tv") when the pipeline supports it.

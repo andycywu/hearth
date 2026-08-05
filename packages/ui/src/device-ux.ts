@@ -4,6 +4,7 @@ import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
 import { mountOnScreenKeyboard, remoteIntent } from "./keyboard.js";
 import { mountMicButton } from "./mic-button.js";
+import { createListeningState } from "./listening.js";
 import { createTvConfirmDialog, type TvConfirmDialog } from "./confirm-dialog.js";
 import { runDemo, demoFromUrl } from "./demo.js";
 
@@ -289,7 +290,7 @@ export function mountDeviceShell(
         onSubmit: (text) => ui.ask(text),
         // Speech goes through the same field, so a transcript can be corrected
         // before sending and both input methods share one place on screen.
-        ...(voice ? { onMic: () => void toggleListening() } : {}),
+        ...(voice ? { onMic: () => void mic?.toggle() } : {}),
         ...(typeof opts.keyboard === "string" ? { layout: opts.keyboard } : {}),
       })
     : undefined;
@@ -305,82 +306,40 @@ export function mountDeviceShell(
    * on those devices was simply untrue.
    */
   const micButton = voice && !keyboard
-    ? mountMicButton({ onPress: () => void toggleListening() })
+    ? mountMicButton({ onPress: () => void mic?.toggle() })
     : undefined;
 
-  /**
-   * Press to talk, press again to give up.
-   *
-   * Without the second half the button is inert for as long as an attempt lasts,
-   * which is the wrong answer to "it isn't hearing me" — and on a device where
-   * recognition is broken there was no way to get the screen back at all.
-   */
-  async function toggleListening(): Promise<void> {
-    if (!voice) return;
-    if (!listening) return startListening();
-    // The adapter reports the stop through `onListeningEnd`; reset here as well
-    // in case it doesn't, so the button can't latch.
-    try {
-      await voice.stopListening();
-    } finally {
-      stoppedListening();
-    }
-  }
+  // Owns the flag, the end-of-attempt signal and the backstop timer. Shared with
+  // the dev harness, which had its own copy and its own version of the same bug.
+  const mic = voice
+    ? createListeningState({
+        voice,
+        onChange: (on) => {
+          ui.setListening?.(on);
+          micButton?.setListening(on);
+        },
+      })
+    : undefined;
 
-  let listening = false;
-  /**
-   * Backstop for an adapter with no `onListeningEnd`, and for one that has it but
-   * misses an event. Nothing is worse here than being stuck: a listening flag
-   * that never clears makes every later press a no-op, so voice stays dead until
-   * the app is relaunched. Longer than any plausible attempt, so it only ever
-   * fires when the real signal didn't.
-   */
-  let safety: ReturnType<typeof setTimeout> | undefined;
-  const LISTEN_SAFETY_MS = 30_000;
-
-  async function startListening(): Promise<void> {
-    if (!voice || listening) return;
-    listening = true;
-    ui.setListening?.(true);
-    micButton?.setListening(true);
-    if (safety !== undefined) clearTimeout(safety);
-    safety = setTimeout(stoppedListening, LISTEN_SAFETY_MS);
-    try {
-      await voice.startListening();
-    } catch {
-      stoppedListening();
-    }
-  }
-
-  function stoppedListening(): void {
-    if (safety !== undefined) clearTimeout(safety);
-    safety = undefined;
-    if (!listening) return;
-    listening = false;
-    ui.setListening?.(false);
-    micButton?.setListening(false);
-  }
-
-  if (voice) {
+  if (voice && mic) {
     voice.onTranscript((text, isFinal) => {
       // Show it in the field when there is one, so it can be corrected.
       keyboard?.setText(text);
       if (!isFinal) return;
-      stoppedListening();
+      // `onListeningEnd` will fire too; this is just faster, and the state
+      // ignores a repeat.
+      void mic.stop();
       // Send it straight away: on a TV, making someone walk to "Send" after
       // speaking defeats the point of speaking.
       if (text.trim()) void ui.ask(text.trim());
     });
-    // Every outcome that isn't a transcript — no match, silence, an error —
-    // arrives here and nowhere else.
-    voice.onListeningEnd?.(stoppedListening);
 
     document.addEventListener("keydown", (e) => {
       const intent = remoteIntent(e);
       // The remote's own voice button, bound whether or not the keyboard is up.
       if (intent === "mic") {
         e.preventDefault();
-        void toggleListening();
+        void mic?.toggle();
         return;
       }
       // OK on the mic button. Handled here rather than left to the button's own
@@ -389,13 +348,13 @@ export function mountDeviceShell(
       // OK, which is why this is bound only alongside the button.
       if (intent === "press" && micButton) {
         e.preventDefault();
-        void toggleListening();
+        void mic?.toggle();
       }
     });
     // Android never delivers the voice button to the WebView — it goes to the
     // Activity and on to the system assistant — so the host forwards it here,
     // the same way it forwards BACK. Harmless on platforms that don't call it.
-    (globalThis as { __tvVoiceKey?: () => void }).__tvVoiceKey = () => void toggleListening();
+    (globalThis as { __tvVoiceKey?: () => void }).__tvVoiceKey = () => void mic?.toggle();
   }
 
   if (hint) hint.textContent = hintText;
