@@ -2,7 +2,7 @@ import { launchSearch, launchSearchSource, type Agent, type ConfirmRequest } fro
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
-import { mountOnScreenKeyboard } from "./keyboard.js";
+import { mountOnScreenKeyboard, remoteIntent } from "./keyboard.js";
 import { createTvConfirmDialog, type TvConfirmDialog } from "./confirm-dialog.js";
 import { runDemo, demoFromUrl } from "./demo.js";
 
@@ -222,9 +222,10 @@ export function mountDeviceShell(
     }
   }
 
-  if (voice && keyboard) {
+  if (voice) {
     voice.onTranscript((text, isFinal) => {
-      keyboard.setText(text);
+      // Show it in the field when there is one, so it can be corrected.
+      keyboard?.setText(text);
       if (!isFinal) return;
       listening = false;
       ui.setListening?.(false);
@@ -232,6 +233,19 @@ export function mountDeviceShell(
       // speaking defeats the point of speaking.
       if (text.trim()) void ui.ask(text.trim());
     });
+
+    // The remote's own voice button, bound whether or not the keyboard is up.
+    // Speech used to be reachable only through the keyboard's mic key, so
+    // `?render=avatar` on its own had no way to start listening.
+    document.addEventListener("keydown", (e) => {
+      if (remoteIntent(e) !== "mic") return;
+      e.preventDefault();
+      void startListening();
+    });
+    // Android never delivers that button to the WebView — it goes to the
+    // Activity and on to the system assistant — so the host forwards it here,
+    // the same way it forwards BACK. Harmless on platforms that don't call it.
+    (globalThis as { __tvVoiceKey?: () => void }).__tvVoiceKey = () => void startListening();
   }
 
   if (hint) {
@@ -241,7 +255,9 @@ export function mountDeviceShell(
             ? "Say a command, or type one with the on-screen keyboard."
             : "Use the arrow keys and OK to type a command.")
         : platform.has("voice")
-          ? "Say a command, or launch with ?ask=… to run one."
+          // Name the button: without the keyboard this is the only way in, and
+          // "say a command" doesn't tell anyone how to make it listen.
+          ? "Press the voice button on the remote to speak, or add ?keyboard to type."
           : "No input surface on this host yet — launch with ?ask=… to run a command, " +
             "or ?diag for the capability report."
     );

@@ -185,6 +185,26 @@ class MainActivity : AppCompatActivity() {
         if (webView.canGoBack()) webView.goBack() else finish()
     }
 
+    /**
+     * Forward the remote's voice/search button into the page.
+     *
+     * Same shape as BACK above and for the same reason: Android hands these to
+     * the Activity (and normally on to the system assistant) rather than
+     * delivering them to the WebView, so a `keydown` listener in the page never
+     * sees them. Without this, speech was reachable only through the on-screen
+     * keyboard's mic key — with the keyboard hidden there was no way in at all.
+     */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        val isVoiceKey = keyCode == android.view.KeyEvent.KEYCODE_SEARCH ||
+            keyCode == android.view.KeyEvent.KEYCODE_VOICE_ASSIST ||
+            keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD
+        if (isVoiceKey) {
+            webView.evaluateJavascript("window.__tvVoiceKey && window.__tvVoiceKey()", null)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     override fun onDestroy() {
         // Before the WebView: TvVoice posts JS into it, and a live recognizer
         // holds the microphone open until it's destroyed.

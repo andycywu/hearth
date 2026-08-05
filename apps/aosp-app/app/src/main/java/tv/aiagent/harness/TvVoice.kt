@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -58,7 +59,29 @@ class TvVoice(
                 ttsInitialised = status == TextToSpeech.SUCCESS
                 if (!ttsInitialised) {
                     android.util.Log.w("TvVoice", "TextToSpeech init failed with status $status")
+                    return@TextToSpeech
                 }
+                /*
+                 * Speak as an assistant, not as media.
+                 *
+                 * TextToSpeech defaults to STREAM_MUSIC — which is the exact
+                 * stream `set_mute` mutes. So asking the agent to mute the TV
+                 * silenced its own reply, and every turn after it: it would
+                 * announce what it had done, inaudibly. USAGE_ASSISTANT is
+                 * routed as speech and survives a media mute.
+                 */
+                tts?.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                AudioAttributes.USAGE_ASSISTANT
+                            } else {
+                                AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY
+                            },
+                        )
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build(),
+                )
             }
         }
     }

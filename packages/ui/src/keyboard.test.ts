@@ -296,3 +296,18 @@ describe("remoteIntent", () => {
     expect(remoteIntent({ key: "Shift", keyCode: 16 })).toBeUndefined();
   });
 });
+
+describe("the remote's voice button", () => {
+  it("is recognised so speech doesn't depend on the keyboard being open", () => {
+    // With the keyboard hidden there was previously no way at all to start
+    // listening: the mic key was the only trigger.
+    expect(remoteIntent({ key: "Unidentified", keyCode: 84 })).toBe("mic");    // Android SEARCH
+    expect(remoteIntent({ key: "Unidentified", keyCode: 231 })).toBe("mic");   // Android VOICE_ASSIST
+    expect(remoteIntent({ key: "Unidentified", keyCode: 10224 })).toBe("mic"); // Tizen mic
+  });
+
+  it("doesn't shadow ordinary typing", () => {
+    // 84 is also "T" on a real keyboard; the `key` check runs first.
+    expect(remoteIntent({ key: "t", keyCode: 84 })).toBeUndefined();
+  });
+});
