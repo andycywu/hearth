@@ -4,6 +4,7 @@ import type { Agent, ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider, VoicePipeline } from "@tv-ai-agent/platform-api";
 import {
   createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, speakReplies, keyboardOption,
+  renderOption, inviteText, debugRequested, confirmQuestion,
 } from "./device-ux.js";
 
 const request = (over: Partial<ConfirmRequest> = {}): ConfirmRequest => ({
@@ -32,7 +33,7 @@ describe("createConfirmHandler", () => {
     const asked: string[] = [];
     const allow = createConfirmHandler({ ask: (q) => { asked.push(q); return true; } });
     expect(await allow(request())).toBe(true);
-    expect(asked).toEqual(["Allow set_input_source(source=hdmi2)?"]);
+    expect(asked).toEqual(["Switch the TV input to HDMI 2?"]);
 
     const deny = createConfirmHandler({ ask: () => false });
     expect(await deny(request())).toBe(false);
@@ -43,11 +44,14 @@ describe("createConfirmHandler", () => {
     await expect(Promise.resolve(handler(request()))).resolves.toBe(true);
   });
 
-  it("renders every argument in the question", async () => {
+  it("still surfaces an argument the plain-words question doesn't name", async () => {
+    // The rewrite to plain words must not narrow what is being approved: this is
+    // the one dialog with side effects behind it, so an argument the viewer
+    // can't see is an argument they never agreed to.
     let question = "";
     const handler = createConfirmHandler({ ask: (q) => { question = q; return true; } });
     await handler(request({ name: "launch_app", args: { appId: "netflix", cold: true } }));
-    expect(question).toBe("Allow launch_app(appId=netflix, cold=true)?");
+    expect(question).toBe("Open Netflix? (cold: true)");
   });
 
   it("approves by default when no dialog is available", async () => {
@@ -190,5 +194,115 @@ describe("keyboardOption", () => {
   it("doesn't match a different flag that starts the same way", () => {
     expect(keyboardOption("?keyboardless")).toEqual({});
     expect(keyboardOption("?render=avatar&keyboards")).toEqual({});
+  });
+});
+
+describe("renderOption", () => {
+  it("gives a viewer the avatar by default", () => {
+    // The default used to be the unstyled bring-up overlay, which is what made
+    // a freshly installed app look like a test harness.
+    expect(renderOption("")).toEqual({ render: "avatar" });
+    expect(renderOption("?keyboard")).toEqual({ render: "avatar" });
+  });
+
+  it("still lets bring-up ask for the plain view", () => {
+    expect(renderOption("?render=overlay")).toEqual({ render: "overlay" });
+    expect(renderOption("?demo&render=overlay")).toEqual({ render: "overlay" });
+  });
+
+  it("keeps working for anyone who kept the old ?render=avatar in a script", () => {
+    expect(renderOption("?render=avatar")).toEqual({ render: "avatar" });
+  });
+});
+
+describe("debugRequested", () => {
+  it("keeps the engineering line off unless asked for", () => {
+    expect(debugRequested("")).toBe(false);
+    expect(debugRequested("?keyboard&demo")).toBe(false);
+  });
+
+  it("shows it on ?debug", () => {
+    expect(debugRequested("?debug")).toBe(true);
+    expect(debugRequested("?render=avatar&debug")).toBe(true);
+  });
+
+  it("isn't switched on by a flag that merely starts with 'debug'", () => {
+    expect(debugRequested("?debugger")).toBe(false);
+  });
+});
+
+describe("inviteText", () => {
+  it("names the button when speech is the only way in", () => {
+    // Without the keyboard this is the only entry point, and "say a command"
+    // doesn't tell anyone how to make it listen.
+    expect(inviteText(false, true)).toMatch(/voice button/i);
+  });
+
+  it("offers both when both exist", () => {
+    const text = inviteText(true, true);
+    expect(text).toMatch(/voice/i);
+    expect(text).toMatch(/type/i);
+  });
+
+  it("explains the keys when there is no microphone", () => {
+    expect(inviteText(true, false)).toMatch(/arrow keys/i);
+  });
+
+  it("falls back to the bring-up instructions only when nothing else is possible", () => {
+    // The only case where telling a viewer about a URL flag is the honest
+    // answer: there is genuinely nothing they can do with the remote.
+    expect(inviteText(false, false)).toContain("?ask=");
+  });
+
+  it("never mentions a URL flag when the viewer has a way in", () => {
+    for (const [k, v] of [[true, true], [true, false], [false, true]] as const) {
+      expect(inviteText(k, v)).not.toContain("?");
+    }
+  });
+});
+
+describe("confirmQuestion", () => {
+  const req = (name: string, args: Record<string, unknown>, description = "") =>
+    ({ name, args, description });
+
+  it("asks about switching input in words, not as a call", () => {
+    // `Allow set_input_source(source=hdmi1)?` asks a viewer to approve a
+    // function signature, and the safe answer to a question you don't
+    // understand is always No.
+    expect(confirmQuestion(req("set_input_source", { source: "hdmi1" })))
+      .toBe("Switch the TV input to HDMI 1?");
+  });
+
+  it("names the app rather than its reverse-DNS id", () => {
+    expect(confirmQuestion(req("launch_app", { appId: "com.netflix.ninja" })))
+      .toBe("Open Ninja?");
+    expect(confirmQuestion(req("launch_app", { appId: "youtube_tv" })))
+      .toBe("Open Youtube tv?");
+  });
+
+  it("falls back to the tool's own description for a tool it has never seen", () => {
+    // Skill manifests add gated tools this file can't know about; their
+    // description is already prose. Its arguments are appended, because nothing
+    // here knows which of them the sentence already accounts for.
+    expect(confirmQuestion(req("dim_lights", { room: "lounge" }, "Dim the lounge lights.")))
+      .toBe("Dim the lounge lights? (room: lounge)");
+    expect(confirmQuestion(req("sleep_now", {}, "Put the TV to sleep.")))
+      .toBe("Put the TV to sleep?");
+  });
+
+  it("doesn't produce a full stop followed by a question mark", () => {
+    expect(confirmQuestion(req("x", {}, "Do the thing."))).not.toContain(".?");
+  });
+
+  it("falls back to the raw call only when there is nothing else to say", () => {
+    expect(confirmQuestion(req("mystery_tool", { a: 1 })))
+      .toBe("Allow mystery_tool(a=1)?");
+  });
+
+  it("gives the raw call back under ?debug, arguments and all", () => {
+    // This is what you want when checking that the right arguments reached the
+    // gate — which is why it stays reachable rather than being deleted.
+    expect(confirmQuestion(req("set_input_source", { source: "hdmi1" }), true))
+      .toBe("Allow set_input_source(source=hdmi1)?");
   });
 });

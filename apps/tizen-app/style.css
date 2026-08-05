@@ -1,6 +1,12 @@
-html, body { margin: 0; height: 100%; background: #05060a; color: #e8eefc; font-family: sans-serif; }
-/* Left-aligned and vertically centred: the agent overlay owns the bottom of the
-   screen, so the status block sits above it rather than fighting for the middle. */
+/*
+ * Pre-boot only.
+ *
+ * Everything the app looks like now comes from `applyTvTheme()` in
+ * @tv-ai-agent/ui, injected once the runtime starts, so all four hosts share one
+ * visual language instead of four stylesheets that drifted apart. What's left
+ * here is the paint between the window opening and that running: a dark surface,
+ * so the launch doesn't flash white.
+ */
+html, body { margin: 0; height: 100%; background: #05060a; color: #eef3fb; }
 #app { display: flex; flex-direction: column; justify-content: center; height: 100%; padding: 0 64px; box-sizing: border-box; }
-#status { font-size: 30px; opacity: 0.85; }
-#hint { font-size: 22px; opacity: 0.45; margin-top: 16px; line-height: 1.5; }
+#status { font-size: 22px; opacity: 0.55; }

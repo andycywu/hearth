@@ -8,6 +8,10 @@ export {
   mountDeviceShell,
   speakReplies,
   keyboardOption,
+  confirmQuestion,
+  renderOption,
+  inviteText,
+  debugRequested,
   type ConfirmHandlerOptions,
   type DeviceShellOptions,
   type SpeakRepliesOptions,
@@ -48,5 +52,13 @@ export {
   type AgentViewState,
   type AgentPhase,
 } from "./view-model.js";
+export {
+  applyTvTheme,
+  tvThemeCss,
+  tvThemeOptionsFromUrl,
+  TV_PALETTE,
+  TV_FONT,
+  type TvThemeOptions,
+} from "./theme.js";
 export { formatToolCall, truncate } from "./format.js";
 export { wrapLines } from "./wrap.js";

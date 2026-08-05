@@ -55,6 +55,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         webView = WebView(this).apply {
+            // The agent is an overlay: the window is translucent (themes.xml) and
+            // the page paints its own scrim. A WebView's default background is
+            // opaque, so without this the window's translucency is invisible and
+            // nothing behind the app ever shows through.
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             // Hardening: the bundle is local; deny cross-origin file access and

@@ -3,7 +3,7 @@ import { createWebosAdapter } from "@tv-ai-agent/adapter-webos";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
-  keyboardOption,
+  keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
 } from "@tv-ai-agent/ui";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 
@@ -31,6 +31,12 @@ async function boot(): Promise<void> {
     const platform = createWebosAdapter();
     await platform.init();
 
+    // The shared look, before anything is drawn: it makes the window itself
+    // transparent, so the agent sits over whatever was on screen. `?solid`
+    // turns that off for a bring-up capture, `?scrim=` tunes how much of the
+    // content behind stays visible.
+    applyTvTheme(tvThemeOptionsFromUrl(launchSearch()));
+
     // Bring-up mode: open with `?diag` to render a capability report.
     if (/(^|[?&])diag/.test(launchSearch())) {
       const report = await runDiagnostics(platform, { allowWrites: launchSearch().includes("writes") });
@@ -42,6 +48,8 @@ async function boot(): Promise<void> {
         const pre = document.createElement("pre");
         pre.style.cssText = "padding:24px;font-size:20px;white-space:pre-wrap;text-align:left";
         pre.textContent = markdown;
+        // Opaque for the report: it is read, not glanced at.
+        applyTvTheme({ translucent: false });
         app.innerHTML = "";
         app.appendChild(pre);
       }
@@ -70,10 +78,11 @@ async function boot(): Promise<void> {
 
     const ui = mountDeviceShell(agent, platform, {
       detail: `llm=${endpoint.baseUrl ?? "offline"}`,
-      // `?render=avatar` draws the agent's face; `?keyboard` adds the
-      // remote-driven on-screen keyboard, so a TV can type rather than being
-      // limited to whatever was baked into the launch flags.
-      ...(/(^|[?&])render=avatar/.test(launchSearch()) ? { render: "avatar" as const } : {}),
+      // The avatar is the default face; `?render=overlay` is the plain
+      // bring-up view. `?keyboard` adds the remote-driven on-screen keyboard,
+      // so a TV can type rather than being limited to whatever was baked into
+      // the launch flags.
+      ...renderOption(),
       ...keyboardOption(),
     });
     // After the shell exists, so the avatar can be told when it's speaking.

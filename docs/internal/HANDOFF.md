@@ -234,7 +234,7 @@ the install step:
   `docs/api.md`, `docs/extending.md`, `docs/skills.md`, `docs/POC.md`,
   `docs/EMULATOR_SETUP.md`, `docs/BRINGUP_CHECKLIST.md`, `docs/SECURITY_REVIEW.md`.
 - *Both of these were closed later:* the device hosts render through
-  `mountDeviceShell` (with `?render=avatar` and a remote-driven keyboard), and
+  `mountDeviceShell` (avatar renderer by default, plus a remote-driven keyboard), and
   `createConfirmHandler` now defaults to a real focusable dialog wherever there's
   a DOM, keeping `window.confirm` only as the no-document fallback.
 

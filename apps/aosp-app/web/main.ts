@@ -3,7 +3,7 @@ import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
-  keyboardOption,
+  keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
 } from "@tv-ai-agent/ui";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 
@@ -21,6 +21,12 @@ async function boot(): Promise<void> {
   const platform = createAospAdapter();
   await platform.init();
 
+  // The shared look, before anything is drawn: it makes the window itself
+  // transparent, so the agent sits over whatever was on screen. `?solid`
+  // turns that off for a bring-up capture, `?scrim=` tunes how much of the
+  // content behind stays visible.
+  applyTvTheme(tvThemeOptionsFromUrl(launchSearch()));
+
   // Bring-up mode: load with `?diag` to render an on-screen capability report.
   if (/(^|[?&])diag/.test(launchSearch())) {
     const report = await runDiagnostics(platform, { allowWrites: launchSearch().includes("writes") });
@@ -29,6 +35,9 @@ async function boot(): Promise<void> {
     pre.style.cssText = "padding:24px;color:#e8eefc;white-space:pre-wrap;text-align:left";
     pre.textContent = markdown;
     document.body.innerHTML = "";
+    // Re-apply opaque: clearing the body took the backdrop with it, and a
+    // capability report you can read the launcher through is no use to anyone.
+    applyTvTheme({ translucent: false });
     document.body.appendChild(pre);
     // Also to the console so bring-up can pull it off the device without OCR:
     // `adb logcat -s chromium:I` (or the Web Inspector on Tizen/webOS).
@@ -65,10 +74,11 @@ async function boot(): Promise<void> {
 
   const ui = mountDeviceShell(agent, platform, {
     detail: `llm=${endpoint.baseUrl ?? "offline"}`,
-    // `?render=avatar` draws the agent's face; `?keyboard` adds the
-    // remote-driven on-screen keyboard, so a TV can type rather than being
-    // limited to whatever was baked into the launch flags.
-    ...(/(^|[?&])render=avatar/.test(launchSearch()) ? { render: "avatar" as const } : {}),
+    // The avatar is the default face; `?render=overlay` is the plain bring-up
+    // view. `?keyboard` adds the remote-driven on-screen keyboard, so a TV can
+    // type rather than being limited to whatever was baked into the launch
+    // flags.
+    ...renderOption(),
     ...keyboardOption(),
   });
   // After the shell exists, so the avatar can be told when it's speaking.

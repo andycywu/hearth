@@ -2,6 +2,7 @@ import type { Agent } from "@tv-ai-agent/core";
 import { truncate } from "./format.js";
 import { wrapLines } from "./wrap.js";
 import { createAgentViewModel, type AgentPhase, type AgentViewState } from "./view-model.js";
+import { TV_PALETTE, TV_FONT as FONT } from "./theme.js";
 
 /**
  * The agent's face: an abstract form that shows what it is doing.
@@ -33,13 +34,18 @@ export interface AvatarFrame {
 }
 
 const COLORS: Record<AgentPhase, string> = {
-  // Muted enough to sit behind content without competing with it.
-  idle: "#5b6b8c",
+  // Muted enough to sit over content without competing with it, but not the
+  // near-grey it used to be — at rest this is the only thing on screen, and a
+  // dead grey disc is what made the app look unfinished.
+  idle: "#7d90b6",
   // Unmistakably "live" — this is the state that must be readable at a glance.
-  listening: "#4da3ff",
-  thinking: "#a78bfa",
-  // Warm, so speech feels different in kind from listening rather than louder.
-  speaking: "#f5f0e6",
+  // Same blue as the theme accent, so "the app is listening" and "this key is
+  // focused" are visibly the same idea.
+  listening: "#6cb6ff",
+  thinking: "#b39dfb",
+  // Warm, so speech differs from listening in kind rather than in brightness —
+  // which also keeps the two apart for a red/green colour-blind viewer.
+  speaking: "#f4c98a",
 };
 
 export interface AvatarFrameOptions {
@@ -155,6 +161,22 @@ export interface AvatarOptions {
   reducedMotion?: boolean;
   /** Draw the reply and activity text under the form. Default true. */
   showText?: boolean;
+  /**
+   * What to say before anything has been said, in place of the reply. Pass "" to
+   * leave the space empty. Default: an invitation to speak.
+   */
+  greeting?: string;
+  /** How to talk to it, under the greeting. Shown only alongside the greeting. */
+  hint?: string;
+  /**
+   * Show the tool call in flight along the bottom edge. Default false.
+   *
+   * It is the raw call — `set_input_source(source=hdmi1)` — which is exactly
+   * what bring-up wants and exactly what a viewer shouldn't be reading. The
+   * phase pill already says the agent is working, so nothing is lost by leaving
+   * this to `?debug`. Errors are always shown: those are actionable.
+   */
+  showActivity?: boolean;
 }
 
 export interface AvatarController {
@@ -193,6 +215,9 @@ export function mountAgentAvatar(agent: Agent, opts: AvatarOptions = {}): Avatar
 
   const reducedMotion = opts.reducedMotion ?? prefersReducedMotion();
   const showText = opts.showText ?? true;
+  const greeting = opts.greeting ?? "How can I help?";
+  const hint = opts.hint ?? "";
+  const showActivity = opts.showActivity ?? false;
 
   const vm = createAgentViewModel(agent);
   let state: AgentViewState = vm.snapshot();
@@ -206,15 +231,17 @@ export function mountAgentAvatar(agent: Agent, opts: AvatarOptions = {}): Avatar
       ...(level !== undefined ? { level } : {}),
     });
 
+    // Cleared to *transparent*, not filled. The canvas used to paint an opaque
+    // `#05060a` over the whole layer, which made the app impossible to show over
+    // live content however translucent the window was. The backdrop is the
+    // theme's job now; the avatar draws only the agent.
     ctx.clearRect(0, 0, cssW, cssH);
-    ctx.fillStyle = "#05060a";
-    ctx.fillRect(0, 0, cssW, cssH);
 
     // The form sits in the upper half so subtitles have the lower half, which is
     // where a viewer's eyes already are on a TV.
     const cx = cssW / 2;
     const cy = cssH * (showText ? 0.36 : 0.5);
-    const maxR = Math.min(cssW, cssH) * (showText ? 0.16 : 0.28);
+    const maxR = Math.min(cssW, cssH) * (showText ? 0.21 : 0.3);
 
     // Travelling rings first, so the core sits on top of them.
     for (const p of frame.rings) {
@@ -239,45 +266,135 @@ export function mountAgentAvatar(agent: Agent, opts: AvatarOptions = {}): Avatar
     }
 
     // Glow, then core.
+    //
+    // Both are gradients rather than flat discs. A flat circle of one colour is
+    // most of what made this read as a debug placeholder — the form is the only
+    // thing on screen most of the time, so it has to look deliberate.
     const coreR = maxR * frame.coreScale;
     if (frame.glow > 0) {
+      const glowR = coreR * 2.6;
+      const halo = ctx.createRadialGradient(cx, cy, coreR * 0.6, cx, cy, glowR);
+      halo.addColorStop(0, withAlpha(frame.color, frame.glow * 0.42));
+      halo.addColorStop(0.55, withAlpha(frame.color, frame.glow * 0.12));
+      halo.addColorStop(1, withAlpha(frame.color, 0));
       ctx.beginPath();
-      ctx.arc(cx, cy, coreR * 1.5, 0, Math.PI * 2);
-      ctx.fillStyle = withAlpha(frame.color, frame.glow * 0.25);
+      ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+      ctx.fillStyle = halo;
       ctx.fill();
     }
+    // Lit from above-left, which is enough to make a sphere out of a circle.
+    const body = ctx.createRadialGradient(
+      cx - coreR * 0.35, cy - coreR * 0.4, coreR * 0.1,
+      cx, cy, coreR,
+    );
+    body.addColorStop(0, withAlpha(lighten(frame.color, 0.45), 0.98));
+    body.addColorStop(0.6, withAlpha(frame.color, 0.96));
+    body.addColorStop(1, withAlpha(darken(frame.color, 0.35), 0.94));
     ctx.beginPath();
     ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
-    ctx.fillStyle = withAlpha(frame.color, 0.95);
+    ctx.fillStyle = body;
     ctx.fill();
 
-    if (showText) drawText();
+    if (showText) drawText(cx, cy + coreR);
   }
 
-  function drawText(): void {
+  /**
+   * What the agent is doing, in words, under the form.
+   *
+   * The colour and motion say it too, but only to someone who already knows the
+   * vocabulary. "Listening" is unambiguous to everyone, and it is the difference
+   * between a viewer waiting confidently and pressing the button again.
+   */
+  const PHASE_LABEL: Record<AgentPhase, string> = {
+    idle: "",
+    listening: "Listening…",
+    thinking: "Thinking…",
+    speaking: "Speaking",
+  };
+
+  /** Draws the pill and returns its bottom edge, or `top` when there isn't one. */
+  function drawPhasePill(cx: number, top: number, color: string): number {
+    const label = PHASE_LABEL[state.phase];
+    if (!label) return top;
+    const font = Math.round(cssH * 0.026);
+    ctx.font = `${font}px ${FONT}`;
+    const padX = font * 0.9;
+    const w = ctx.measureText(label).width + padX * 2;
+    const h = font * 2.1;
+    const x = cx - w / 2;
+    const y = top + cssH * 0.035;
+    roundRect(ctx, x, y, w, h, h / 2);
+    ctx.fillStyle = withAlpha(color, 0.16);
+    ctx.fill();
+    ctx.strokeStyle = withAlpha(color, 0.45);
+    ctx.lineWidth = Math.max(1, cssH * 0.0015);
+    ctx.stroke();
+    ctx.fillStyle = withAlpha(lighten(color, 0.25), 0.95);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, cx, y + h / 2 + font * 0.05);
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "start";
+    return y + h;
+  }
+
+  function drawText(cx: number, orbBottom: number): void {
+    const frameColor = COLORS[state.phase];
+    const pillBottom = drawPhasePill(cx, orbBottom, frameColor);
+    // Below the pill, not at a fixed fraction of the height. A fixed position
+    // put "Listening…" hard against the cap-height of the greeting — and it
+    // would collide outright on a shorter layer, which is exactly what the
+    // keyboard produces.
+    const textTop = Math.max(cssH * 0.6, pillBottom + cssH * 0.055);
+
     const pad = Math.round(cssW * 0.06);
     const maxW = cssW - pad * 2;
-    const replyFont = Math.round(cssH * 0.055);
-    ctx.font = `${replyFont}px sans-serif`;
     ctx.textAlign = "center";
     const measure = (s: string) => ctx.measureText(s).width;
-    const lines = wrapLines(measure, state.reply, maxW).slice(-3);
 
-    ctx.fillStyle = "#e8eefc";
-    let y = cssH * 0.68;
-    for (const line of lines) {
-      ctx.fillText(line, cssW / 2, y);
-      y += replyFont * 1.3;
+    if (state.reply) {
+      const replyFont = Math.round(cssH * 0.055);
+      ctx.font = `${replyFont}px ${FONT}`;
+      const lines = wrapLines(measure, state.reply, maxW).slice(-3);
+      ctx.fillStyle = TV_PALETTE.text;
+      let y = textTop + replyFont;
+      for (const line of lines) {
+        ctx.fillText(line, cx, y);
+        y += replyFont * 1.3;
+      }
+    } else if (greeting) {
+      // Nothing said yet. An empty screen with a dot on it reads as "not
+      // working"; a question reads as "your turn". This is the whole reason the
+      // greeting lives on the canvas rather than in the host's markup — it has
+      // to disappear the instant there is a real reply to show instead.
+      const greetFont = Math.round(cssH * 0.062);
+      ctx.font = `${greetFont}px ${FONT}`;
+      ctx.fillStyle = TV_PALETTE.text;
+      let y = textTop + greetFont;
+      for (const line of wrapLines(measure, greeting, maxW)) {
+        ctx.fillText(line, cx, y);
+        y += greetFont * 1.25;
+      }
+      if (hint) {
+        const hintFont = Math.round(cssH * 0.03);
+        ctx.font = `${hintFont}px ${FONT}`;
+        ctx.fillStyle = TV_PALETTE.muted;
+        y += hintFont * 0.6;
+        for (const line of wrapLines(measure, hint, maxW * 0.8)) {
+          ctx.fillText(line, cx, y);
+          y += hintFont * 1.4;
+        }
+      }
     }
 
-    const smallFont = Math.round(cssH * 0.032);
-    ctx.font = `${smallFont}px sans-serif`;
+    const smallFont = Math.round(cssH * 0.03);
+    ctx.font = `${smallFont}px ${FONT}`;
     if (state.error) {
-      ctx.fillStyle = "#ff9a9a";
-      ctx.fillText(truncate("⚠ " + state.error, 80), cssW / 2, cssH - pad);
-    } else if (state.activity) {
-      ctx.fillStyle = "rgba(232,238,252,.6)";
-      ctx.fillText(truncate("· " + state.activity, 80), cssW / 2, cssH - pad);
+      ctx.fillStyle = TV_PALETTE.danger;
+      ctx.fillText(truncate("⚠ " + state.error, 80), cx, cssH - pad);
+    } else if (state.activity && showActivity) {
+      ctx.fillStyle = TV_PALETTE.faint;
+      ctx.fillText(truncate(state.activity, 80), cx, cssH - pad);
     }
     ctx.textAlign = "start";
   }
@@ -329,9 +446,53 @@ function prefersReducedMotion(): boolean {
 
 /** `#rrggbb` + alpha → `rgba(...)`. Avoids a colour library for four constants. */
 function withAlpha(hex: string, alpha: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
+  const [r, g, b] = rgb(hex);
   return `rgba(${r},${g},${b},${clamp01(alpha).toFixed(3)})`;
+}
+
+function rgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Mix towards white / black by `amount`, for the sphere's shading. */
+function lighten(hex: string, amount: number): string {
+  return mix(hex, 255, amount);
+}
+
+function darken(hex: string, amount: number): string {
+  return mix(hex, 0, amount);
+}
+
+function mix(hex: string, target: number, amount: number): string {
+  const a = clamp01(amount);
+  const channel = (c: number) => Math.round(c + (target - c) * a);
+  const [r, g, b] = rgb(hex);
+  return `#${[channel(r), channel(g), channel(b)]
+    .map((c) => c.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+/**
+ * A rounded rectangle path.
+ *
+ * Hand-rolled because `CanvasRenderingContext2D.roundRect` is far newer than the
+ * Chromium in a shipped TV, and calling it there throws mid-frame.
+ */
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number,
+): void {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.arcTo(x + w, y, x + w, y + radius, radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+  ctx.lineTo(x + radius, y + h);
+  ctx.arcTo(x, y + h, x, y + h - radius, radius);
+  ctx.lineTo(x, y + radius);
+  ctx.arcTo(x, y, x + radius, y, radius);
+  ctx.closePath();
 }

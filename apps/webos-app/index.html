@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=1920, height=1080" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'" />
     <title>TV AI Agent</title>
+    <!-- Pre-boot paint only; `applyTvTheme()` owns the look once the runtime
+         starts, so all four hosts share one visual language. -->
     <style>
-      html, body { margin: 0; height: 100%; background: #05060a; color: #e8eefc; font-family: sans-serif; }
+      html, body { margin: 0; height: 100%; background: #05060a; color: #eef3fb; }
       #app { display: flex; flex-direction: column; justify-content: center; height: 100%; padding: 0 64px; box-sizing: border-box; }
-      #status { font-size: 30px; opacity: .85; }
-      #hint { font-size: 22px; opacity: .45; margin-top: 16px; line-height: 1.5; }
+      #status { font-size: 22px; opacity: .55; }
     </style>
     <!--
       The Luna bridge comes from LG's webOSTV.js, which is NOT bundled here (see

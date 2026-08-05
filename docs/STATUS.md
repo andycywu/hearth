@@ -28,7 +28,7 @@ hardware.
 | LLM connectors (OpenAI-compatible + offline scripted) | ✅ done, with retry |
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
-| Avatar + on-screen keyboard | ✅ `?render=avatar`, `?keyboard` — verified on the Android TV emulator |
+| Avatar + on-screen keyboard | ✅ avatar is the default face, `?keyboard` to type — verified on the Android TV emulator |
 | CJK input | ✅ kana keyboard (real characters); Chinese as phrases — an IME is out of scope |
 | Confirmation dialog | ✅ focusable 10-foot modal, defaults to No; `window.confirm` only as a no-DOM fallback |
 | Skills — code (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
@@ -94,7 +94,7 @@ hardware.
   that is written up with the full elimination, since the obvious suspects
   (proxy, bridge, firewall, VPN) are all wrong.
 - **Avatar, keyboard and voice:** an abstract form drawn in code with four states
-  driven by agent events (`?render=avatar`), a remote-driven on-screen keyboard
+  driven by agent events (the default renderer), a remote-driven on-screen keyboard
   (`?keyboard`), and speech both ways. Verified on the Android TV emulator by
   typing "mute" letter-by-letter with real D-pad events — `?diag` afterwards read
   `getMute ✅ true` — and by pressing 🎤 Speak, which drove the permission dialog

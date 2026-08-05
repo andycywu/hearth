@@ -11,6 +11,8 @@
  * clamping is the part that's easy to get wrong.
  */
 
+import { TV_PALETTE, TV_FONT as FONT } from "./theme.js";
+
 export type KeyDirection = "up" | "down" | "left" | "right";
 
 /**
@@ -345,13 +347,28 @@ export function mountOnScreenKeyboard(
   root.id = "osk";
   root.style.cssText = [
     "position:fixed", "left:0", "right:0", "bottom:0", "z-index:2",
-    "padding:2vh 4vw 3vh", "box-sizing:border-box",
-    "background:rgba(5,6,10,.92)", "color:#e8eefc",
-    "font-family:sans-serif", "text-align:center",
+    "padding:2.4vh 4vw 3vh", "box-sizing:border-box",
+    // A sheet the content behind fades into, rather than a hard black bar
+    // cutting the screen in half. Nearly solid under the keys and only a short
+    // fade at the very top: with a long fade, whatever is behind the app showed
+    // through the text field and the top row, which read as a rendering bug.
+    "background:linear-gradient(to top," +
+      "rgba(9,12,20,.97) 0%,rgba(9,12,20,.97) 72%,rgba(14,19,30,.86) 88%,rgba(20,26,38,0) 100%)",
+    "-webkit-backdrop-filter:blur(1.6vh)", "backdrop-filter:blur(1.6vh)",
+    `color:${TV_PALETTE.text}`, `font-family:${FONT}`, "text-align:center",
   ].join(";");
 
+  // The text field reads as an input, with a caret, instead of as a line of
+  // status text — otherwise there is nothing to say where typing goes.
   const field = document.createElement("div");
-  field.style.cssText = "font-size:2.6vh;min-height:3.6vh;margin-bottom:1.6vh;opacity:.95";
+  field.style.cssText = [
+    "display:inline-block", "min-width:40vw", "max-width:80vw",
+    "padding:1.1vh 2vw", "margin-bottom:2vh",
+    "font-size:2.8vh", "line-height:1.3", "text-align:left",
+    "border-radius:1vh", `border:1px solid ${TV_PALETTE.edge}`,
+    `background:${TV_PALETTE.glass}`,
+    "white-space:pre-wrap", "word-break:break-word",
+  ].join(";");
   root.appendChild(field);
 
   const grid = document.createElement("div");
@@ -367,17 +384,20 @@ export function mountOnScreenKeyboard(
     grid.textContent = "";
     cells = model.rows().map((row) => {
       const rowEl = document.createElement("div");
-      rowEl.style.cssText = "display:flex;gap:.8vw;justify-content:center;margin-bottom:.8vh";
+      rowEl.style.cssText = "display:flex;gap:.9vw;justify-content:center;margin-bottom:1vh";
       const rowCells = row.map((key) => {
         const cell = document.createElement("div");
         cell.textContent = key.label;
         cell.style.cssText = [
           `flex:${key.width ?? 1} 0 auto`,
-          "min-width:5vw", "padding:1.2vh .6vw",
-          "border-radius:.8vh", "font-size:2.4vh",
-          "border:1px solid #2a2f3a", "background:#0d1017",
+          "min-width:5vw", "padding:1.3vh .6vw",
+          "border-radius:1vh", "font-size:2.4vh",
+          `border:1px solid ${TV_PALETTE.edge}`, `background:${TV_PALETTE.glass}`,
           // Phrases are whole sentences; stop them wrapping mid-key.
           "white-space:nowrap",
+          // Only the focused key animates, and only its own properties: a TV
+          // WebView will happily drop frames if asked to transition a grid.
+          "transition:background .12s linear,transform .12s ease-out",
         ].join(";");
         rowEl.appendChild(cell);
         return cell;
@@ -392,13 +412,17 @@ export function mountOnScreenKeyboard(
     const { text, row, col, layout } = model.state();
     if (layout !== builtLayout) buildGrid();
     field.textContent = text || "Type a command…";
-    field.style.opacity = text ? "0.95" : "0.4";
+    field.style.color = text ? TV_PALETTE.text : TV_PALETTE.faint;
     cells.forEach((rowCells, r) => {
       rowCells.forEach((cell, c) => {
         const on = r === row && c === col;
-        cell.style.background = on ? "#4da3ff" : "#0d1017";
-        cell.style.color = on ? "#05060a" : "#e8eefc";
-        cell.style.borderColor = on ? "#4da3ff" : "#2a2f3a";
+        cell.style.background = on ? TV_PALETTE.accent : TV_PALETTE.glass;
+        cell.style.color = on ? "#08101c" : TV_PALETTE.text;
+        cell.style.borderColor = on ? TV_PALETTE.accent : TV_PALETTE.edge;
+        // Lift the focused key. On a grid this size, colour alone is easy to
+        // lose track of from across a room.
+        cell.style.transform = on ? "scale(1.08)" : "scale(1)";
+        cell.style.boxShadow = on ? `0 0 2.4vh ${TV_PALETTE.accent}55` : "none";
       });
     });
   }

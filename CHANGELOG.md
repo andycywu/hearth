@@ -6,6 +6,43 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+It no longer looks like a test build. The screen used to open on an engineering
+status line, a grey disc and a line of grey hint text, and every surface had
+picked its own colours:
+
+- **One theme for all four hosts** (`applyTvTheme`), replacing four stylesheets
+  that had drifted apart. The palette, the font stack and the glass treatment are
+  tokens now, so the keyboard, the dialog and the avatar can't invent their own
+  blue.
+- **The window is translucent** — the agent appears *over* what you were
+  watching and dims it rather than replacing it. On AOSP that needed the native
+  side too: a translucent theme and a transparent WebView background, because a
+  WebView paints opaque by default. The canvas also stopped filling itself with
+  opaque black, which was what made an overlay impossible however translucent the
+  window was. `?solid` for a bring-up capture, `?scrim=0.4` to see more of the
+  channel.
+  - CSS cannot blur another native window — `backdrop-filter` only ever sees the
+    page's own content — so dimming is the only tool there is, and the default
+    scrim is heavier than it looks like it should be. At the first value tried the
+    launcher behind made the greeting genuinely hard to read.
+- **The avatar is the default renderer.** The plain DOM overlay is still there
+  for bring-up as `?render=overlay`, which is the right way round.
+- **The engineering line is behind `?debug`**, along with the raw tool call the
+  avatar used to print along the bottom edge. Both earned their place during
+  bring-up — the flags line is how the Tizen launch-flag fault was found — but
+  neither is something a viewer should be reading.
+- **A greeting instead of an empty screen**, drawn on the canvas so it disappears
+  the instant there is a real reply, and a phase pill that says "Listening…" in
+  words rather than only in colour and motion.
+- **Confirmations ask in plain words**: "Switch the TV input to HDMI 1?" instead
+  of `Allow set_input_source(source=hdmi1)?`. That was the one place the
+  engineering face had real consequences — the safe answer to a question you
+  don't understand is always No. Any argument the sentence doesn't name is still
+  appended, because a gate that hides what it is asking about is worse than an
+  ugly one.
+
 ### Fixed
 
 Voice on AOSP, which didn't work at all on a device despite passing every test:

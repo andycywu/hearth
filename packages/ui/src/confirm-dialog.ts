@@ -1,4 +1,5 @@
 import { remoteIntent } from "./keyboard.js";
+import { TV_PALETTE, TV_FONT } from "./theme.js";
 
 /**
  * A confirmation dialog you can actually answer from a sofa.
@@ -88,18 +89,23 @@ export function createTvConfirmDialog(opts: TvConfirmDialogOptions = {}): TvConf
     // `display:flex` beats the user-agent's `[hidden] { display: none }`, so
     // setting `hidden` left the dialog on screen after it had been answered.
     "display:none", "align-items:center", "justify-content:center",
-    "background:rgba(5,6,10,.86)", "color:#e8eefc", "font-family:sans-serif",
+    // Darken and blur what's behind rather than hiding it: the viewer needs to
+    // see they are still in the same place, being asked one question.
+    "background:rgba(4,6,12,.62)",
+    "-webkit-backdrop-filter:blur(1.2vh)", "backdrop-filter:blur(1.2vh)",
+    `color:${TV_PALETTE.text}`, `font-family:${TV_FONT}`,
   ].join(";");
 
   const panel = document.createElement("div");
   panel.style.cssText = [
-    "max-width:70vw", "padding:5vh 5vw", "border-radius:1.6vh",
-    "background:#0d1017", "border:1px solid #2a2f3a", "text-align:center",
+    "max-width:70vw", "padding:6vh 6vw", "border-radius:2vh",
+    `background:${TV_PALETTE.glassStrong}`, `border:1px solid ${TV_PALETTE.edge}`,
+    "box-shadow:0 4vh 8vh rgba(0,0,0,.55)", "text-align:center",
   ].join(";");
   root.appendChild(panel);
 
   const text = document.createElement("div");
-  text.style.cssText = "font-size:3.4vh;line-height:1.4;margin-bottom:4vh";
+  text.style.cssText = "font-size:3.4vh;line-height:1.45;margin-bottom:4.5vh";
   panel.appendChild(text);
 
   const buttons = document.createElement("div");
@@ -110,8 +116,10 @@ export function createTvConfirmDialog(opts: TvConfirmDialogOptions = {}): TvConf
     const b = document.createElement("div");
     b.textContent = label;
     b.style.cssText = [
-      "min-width:14vw", "padding:1.8vh 2vw", "border-radius:1vh",
-      "font-size:2.8vh", "border:1px solid #2a2f3a", "background:#12161f",
+      "min-width:14vw", "padding:1.9vh 2vw", "border-radius:1.2vh",
+      "font-size:2.8vh", `border:1px solid ${TV_PALETTE.edge}`,
+      `background:${TV_PALETTE.glass}`,
+      "transition:background .12s linear,transform .12s ease-out",
     ].join(";");
     buttons.appendChild(b);
     return b;
@@ -131,9 +139,11 @@ export function createTvConfirmDialog(opts: TvConfirmDialogOptions = {}): TvConf
 
   function paint(): void {
     for (const [button, on] of [[allowButton, allowFocused], [denyButton, !allowFocused]] as const) {
-      button.style.background = on ? "#4da3ff" : "#12161f";
-      button.style.color = on ? "#05060a" : "#e8eefc";
-      button.style.borderColor = on ? "#4da3ff" : "#2a2f3a";
+      button.style.background = on ? TV_PALETTE.accent : TV_PALETTE.glass;
+      button.style.color = on ? "#08101c" : TV_PALETTE.text;
+      button.style.borderColor = on ? TV_PALETTE.accent : TV_PALETTE.edge;
+      button.style.transform = on ? "scale(1.06)" : "scale(1)";
+      button.style.boxShadow = on ? `0 0 3vh ${TV_PALETTE.accent}55` : "none";
     }
   }
 

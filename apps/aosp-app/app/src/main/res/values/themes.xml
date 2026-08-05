@@ -2,10 +2,24 @@
 <resources>
     <!--
       AppCompatActivity requires a Theme.AppCompat descendant; without one the
-      host crashes on launch. No action bar and a black window background: the
-      WebView paints the whole screen, so any other backdrop flashes on start.
+      host crashes on launch.
+
+      The window is translucent because the agent is an overlay, not an app: it
+      appears over whatever you were watching and dims it rather than replacing
+      it. That needs all three of these together — a transparent window
+      background, `windowIsTranslucent` so the surface is composited against
+      what's behind instead of an opaque backing, and `windowContentOverlay`
+      cleared so the framework doesn't draw its own shadow strip across the top.
+      The WebView's own background is cleared in MainActivity; a WebView paints
+      opaque by default and would undo all of this on its own.
+
+      How much shows through is the page's decision, not the window's:
+      `applyTvTheme()` draws the scrim, and `?solid` makes it opaque for a
+      bring-up capture.
     -->
     <style name="Theme.TvAiAgent" parent="Theme.AppCompat.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowContentOverlay">@null</item>
     </style>
 </resources>
