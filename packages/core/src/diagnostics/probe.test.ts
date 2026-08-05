@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { runDiagnostics, reportToMarkdown, type DiagnosticsReport } from "./probe.js";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 
@@ -133,6 +133,70 @@ describe("runDiagnostics", () => {
         }));
       expect(seen).toHaveLength(2);
       expect(report.results.filter((r) => r.capability.startsWith("network.reach"))).toHaveLength(2);
+    });
+  });
+
+  describe("speech engine detection", () => {
+    const g = globalThis as Record<string, unknown>;
+    const saved: Record<string, unknown> = {};
+    const set = (k: string, v: unknown) => { saved[k] = g[k]; g[k] = v; };
+    afterEach(() => {
+      for (const k of Object.keys(saved)) {
+        if (saved[k] === undefined) delete g[k]; else g[k] = saved[k];
+      }
+    });
+
+    it("reports none when the runtime has no speech APIs", async () => {
+      const report = await runDiagnostics(createWebAdapter());
+      expect(detail(report, "voice.engines")).toBe("none detected");
+    });
+
+    it("names Web Speech when it's there — then voice needs no native code", async () => {
+      set("speechSynthesis", {});
+      set("webkitSpeechRecognition", function () {});
+      const report = await runDiagnostics(createWebAdapter());
+      expect(detail(report, "voice.engines")).toContain("speechSynthesis (TTS)");
+      expect(detail(report, "voice.engines")).toContain("webkitSpeechRecognition (STT)");
+    });
+
+    it("counts synthesis voices, because an engine with none is silently mute", async () => {
+      set("speechSynthesis", { getVoices: () => [{}, {}, {}] });
+      const report = await runDiagnostics(createWebAdapter());
+      expect(detail(report, "voice.engines")).toContain("3 voices");
+    });
+
+    it("says zero voices rather than hiding it", async () => {
+      set("speechSynthesis", { getVoices: () => [] });
+      const report = await runDiagnostics(createWebAdapter());
+      expect(detail(report, "voice.engines")).toContain("0 voices");
+    });
+
+    it("survives an engine whose getVoices throws", async () => {
+      set("speechSynthesis", { getVoices: () => { throw new Error("not ready"); } });
+      const report = await runDiagnostics(createWebAdapter());
+      expect(detail(report, "voice.engines")).toContain("speechSynthesis (TTS)");
+    });
+
+    it("names vendor extensions without assuming the namespace exists", async () => {
+      set("webapis", { voice: {} });
+      set("tizen", { tts: {} });
+      const report = await runDiagnostics(createWebAdapter());
+      expect(detail(report, "voice.engines")).toContain("webapis.voice (Samsung)");
+      expect(detail(report, "voice.engines")).toContain("tizen.tts");
+    });
+
+    it("doesn't trip over a vendor namespace that exists but is empty", async () => {
+      // Exactly the Tizen emulator's shape: `tizen` present, no speech in it.
+      set("tizen", {});
+      set("webapis", {});
+      const report = await runDiagnostics(createWebAdapter());
+      expect(detail(report, "voice.engines")).toBe("none detected");
+    });
+
+    it("spots the Android bridge by the method it would use", async () => {
+      set("TvNativeBridge", { startListening: () => {} });
+      const report = await runDiagnostics(createWebAdapter());
+      expect(detail(report, "voice.engines")).toContain("native bridge (Android)");
     });
   });
 

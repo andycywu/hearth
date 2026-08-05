@@ -116,6 +116,35 @@ Three things about this image are worth knowing before you lose a day to them.
 connections, so the screen is the only way to read anything back — hence
 `tools/capture-window.ps1`.
 
+### Voice, and a correction (measured 2026-08-05)
+
+I assumed voice on Samsung TV would need Bixby and a partner agreement. On this
+image that is **wrong**: the Tizen WebView is Chromium and `?diag` reports
+
+```text
+voice.engines ✅ speechSynthesis (TTS, 4 voices), webkitSpeechRecognition (STT)
+```
+
+so the adapter now uses the shared Web Speech pipeline and reports
+`voice ✅ advertised`. No native code, no vendor relationship.
+
+What that does and doesn't establish:
+
+- **Four synthesis voices are installed**, so TTS should genuinely speak rather
+  than being a mute API. The voice count is in the probe precisely because an
+  engine with zero voices looks identical to a working one from JS.
+- **`webkitSpeechRecognition` existing is not the same as it working.**
+  Chromium's implementation ships audio to a cloud service, and this emulator has
+  no outbound network at all (see above), so recognition here will exist and then
+  fail. Whether a retail Samsung TV has a working recognition backend is still
+  unverified.
+- webOS is wired the same way on the same reasoning, but is **untested** — it
+  still has no install target.
+
+Android is the exception and goes through the native bridge instead: our WebView
+is deliberately not a secure context (the app is served over http so a local
+model is reachable), which rules Web Speech out there.
+
 ### Why the emulator can't reach the network (investigated 2026-08-04)
 
 Worth writing down because the obvious suspects are all wrong, and checking

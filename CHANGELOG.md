@@ -10,6 +10,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 You can talk to it:
 
+- **Voice on Tizen and webOS, with no native code** — and this corrects an
+  assumption. I expected Samsung voice to need Bixby and a partner agreement; the
+  TV 10.0 emulator instead reports `speechSynthesis (TTS, 4 voices),
+  webkitSpeechRecognition (STT)`, because the Tizen WebView is Chromium. Both
+  adapters now use a shared `createWebSpeechPipeline()` — the implementation the
+  web adapter already had, moved into `platform-api` rather than copied a third
+  time. Tizen went from `voice ⚠` to `voice ✅ advertised`, and `?diag` reports
+  zero unsupported capabilities there.
+- `?diag` gained a **`voice.engines`** row listing which speech APIs a given
+  firmware actually has, including the synthesis voice count — an engine with
+  zero voices is silently mute and otherwise looks identical to a working one.
+  Being honest about the limit: `webkitSpeechRecognition` *existing* is not it
+  *working*, since Chromium ships audio to a cloud service and that emulator has
+  no network. webOS is wired the same way but remains untested.
 - **Voice on Android TV** — `TextToSpeech` and `SpeechRecognizer` through the
   native bridge, exposed as the HAL's existing `VoicePipeline`. Android first
   because both are public SDK: TTS needs no permission at all and recognition

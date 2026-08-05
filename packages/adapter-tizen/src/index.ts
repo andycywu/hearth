@@ -1,5 +1,5 @@
 import {
-  matchAppsByName, createLocalStorageStore,
+  matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey, type KeyValueStore,
 } from "@tv-ai-agent/platform-api";
@@ -21,12 +21,21 @@ declare const webapis: any;
 export function createTizenAdapter(): PlatformProvider {
   const kv = tizenKeyValueStore();
 
+  /**
+   * Tizen's WebView is Chromium, and the TV 10.0 emulator turned out to expose
+   * `speechSynthesis` and `webkitSpeechRecognition` — so voice here needs no
+   * native code and no Samsung partner agreement, which is not what I expected.
+   * Feature-detected, so a firmware without them reports no voice rather than
+   * advertising one that throws. See `?diag`'s `voice.engines` row.
+   */
+  const voice = createWebSpeechPipeline();
+
   const device: DeviceInfo = {
     os: "tizen",
     osVersion: safe(() => webapis?.productinfo?.getVersion?.()) ?? "unknown",
     soc: detectSoc(),
     model: safe(() => webapis?.productinfo?.getModel?.()) ?? "unknown",
-    capabilities: { media: true, voice: false },
+    capabilities: { media: true, voice: voice !== undefined },
   };
 
   const provider: PlatformProvider = {
@@ -88,6 +97,7 @@ export function createTizenAdapter(): PlatformProvider {
       },
     },
     storage: kv,
+    ...(voice ? { voice } : {}),
     media: {
       // Media transport on Tizen is typically driven by the app's own AVPlay /
       // <video> element; the agent injects the corresponding remote keys so the

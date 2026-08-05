@@ -1,5 +1,5 @@
 import {
-  matchAppsByName, createLocalStorageStore,
+  matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey,
 } from "@tv-ai-agent/platform-api";
@@ -39,12 +39,21 @@ const APPMGR = "luna://com.webos.applicationManager";
 const CONN = "luna://com.palm.connectionmanager";
 
 export function createWebosAdapter(): PlatformProvider {
+  /**
+   * webOS runs a Chromium WebView too, so Web Speech is worth trying before
+   * reaching for LG's voice services, which are partner-gated. Feature-detected,
+   * so a firmware without it reports no voice rather than advertising one that
+   * throws. `?diag`'s `voice.engines` row says what a given build actually has —
+   * unverified here, since webOS still needs an install target.
+   */
+  const voice = createWebSpeechPipeline();
+
   const device: DeviceInfo = {
     os: "webos",
     osVersion: safe(() => webOSSystem?.deviceInfo && JSON.parse(webOSSystem.deviceInfo).sdkVersion) ?? "unknown",
     soc: detectSoc(),
     model: safe(() => webOSSystem?.deviceInfo && JSON.parse(webOSSystem.deviceInfo).modelName) ?? "unknown",
-    capabilities: { media: true, voice: false },
+    capabilities: { media: true, voice: voice !== undefined },
   };
 
   // webOS web apps get a normal localStorage; a bare Map here meant
@@ -86,6 +95,7 @@ export function createWebosAdapter(): PlatformProvider {
       },
     },
     storage: kv,
+    ...(voice ? { voice } : {}),
     media: {
       // webOS media is app-managed (MediaController / <video>); inject transport keys.
       play: async (_uri) => dispatchKey("playpause"),
