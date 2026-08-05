@@ -31,6 +31,11 @@ export {
   type AvatarFrameOptions,
 } from "./avatar.js";
 export {
+  mountMicButton,
+  type MicButtonOptions,
+  type MicButtonController,
+} from "./mic-button.js";
+export {
   createTvConfirmDialog,
   type TvConfirmDialog,
   type TvConfirmDialogOptions,

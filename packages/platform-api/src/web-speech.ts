@@ -27,6 +27,7 @@ export function createWebSpeechPipeline(): VoicePipeline | undefined {
   if (!SR && !synth) return undefined;
 
   const listeners = new Set<(text: string, isFinal: boolean) => void>();
+  const endListeners = new Set<() => void>();
   let recognition: any;
   let wake: any;
 
@@ -42,10 +43,15 @@ export function createWebSpeechPipeline(): VoicePipeline | undefined {
           listeners.forEach((cb) => cb(r[0].transcript, r.isFinal));
         }
       };
+      // `onend` fires for every outcome — result, no-match, silence, aborted —
+      // which is exactly the guarantee `onListeningEnd` promises. `onerror` is
+      // followed by `onend`, so notifying from one place can't double-fire.
+      recognition.onend = () => { endListeners.forEach((cb) => cb()); };
       recognition.start();
     },
     stopListening: async () => { recognition?.stop?.(); },
     onTranscript: (cb) => { listeners.add(cb); return () => { listeners.delete(cb); }; },
+    onListeningEnd: (cb) => { endListeners.add(cb); return () => { endListeners.delete(cb); }; },
     speak: async (text: string) => {
       if (!synth || !w.SpeechSynthesisUtterance) return;
       synth.cancel();

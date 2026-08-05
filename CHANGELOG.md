@@ -36,6 +36,13 @@ picked its own colours:
 - **A greeting instead of an empty screen**, drawn on the canvas so it disappears
   the instant there is a real reply, and a phase pill that says "Listening…" in
   words rather than only in colour and motion.
+- **An on-screen Speak button**, because "press the voice button on your remote"
+  was the only way in and is untrue on any remote without that key — and on the
+  Android TV emulator, which has no remote at all, so the only way to start
+  listening was `adb shell input keyevent 84`. OK did nothing on that screen at
+  all. It now accepts OK/Enter, a pointer click and the remote's voice key, all
+  four verified to open the microphone on the emulator. The hint text names a
+  control that exists.
 - **Confirmations ask in plain words**: "Switch the TV input to HDMI 1?" instead
   of `Allow set_input_source(source=hdmi1)?`. That was the one place the
   engineering face had real consequences — the safe answer to a question you
@@ -44,6 +51,21 @@ picked its own colours:
   ugly one.
 
 ### Fixed
+
+- **A recognition attempt that produced no transcript left the app listening
+  forever.** `VoicePipeline` had no way to say "the attempt is over": the only
+  signal was a transcript, and `startListening()` resolves as soon as the request
+  is handed to the platform, not when the attempt ends. So a no-match, silence or
+  an error closed the microphone while the avatar kept pulsing — and the shell's
+  own listening flag stayed set, which made every later press a no-op. Voice was
+  dead until the app was relaunched, and since you can't get a transcript without
+  speaking, this was the first thing anyone would hit. `onListeningEnd` is now
+  part of the contract, wired to the AOSP bridge's `stopped` event (which was
+  being received and discarded) and to `recognition.onend` in the shared Web
+  Speech pipeline, so Tizen and webOS were affected identically. There's a 30 s
+  backstop as well, because nothing here is worse than being stuck.
+- **Press again to give up.** The button was inert for the whole attempt, which is
+  the wrong answer to "it isn't hearing me".
 
 Voice on AOSP, which didn't work at all on a device despite passing every test:
 

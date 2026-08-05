@@ -168,6 +168,40 @@ describe("adapter-aosp", () => {
       expect(platform.device.capabilities.voice).toBe(true);
     });
 
+    it("reports the end of an attempt that produced no transcript", () => {
+      // This is what left the UI listening forever: native emits `stopped` for a
+      // no-match, a timeout and an error alike, and the adapter used to drop it,
+      // so the only signal a caller ever got was a transcript that never came.
+      addVoice();
+      const platform = createAospAdapter();
+      let ends = 0;
+      platform.voice!.onListeningEnd!(() => { ends++; });
+      fire({ type: "error", message: "didn't catch that" });
+      fire({ type: "stopped" });
+      expect(ends).toBe(1);
+    });
+
+    it("reports the end after a successful transcript too", () => {
+      addVoice();
+      const platform = createAospAdapter();
+      let ends = 0;
+      platform.voice!.onListeningEnd!(() => { ends++; });
+      fire({ type: "transcript", text: "mute", isFinal: true });
+      fire({ type: "stopped" });
+      expect(ends).toBe(1);
+    });
+
+    it("stops reporting once unsubscribed", () => {
+      addVoice();
+      const platform = createAospAdapter();
+      let ends = 0;
+      const off = platform.voice!.onListeningEnd!(() => { ends++; });
+      fire({ type: "stopped" });
+      off();
+      fire({ type: "stopped" });
+      expect(ends).toBe(1);
+    });
+
     it("delivers partial and final transcripts to subscribers", () => {
       addVoice();
       const platform = createAospAdapter();

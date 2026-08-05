@@ -148,6 +148,7 @@ function createVoicePipeline(bridge: NativeBridge): VoicePipeline | undefined {
   if (!bridge.startListening || !bridge.speak) return undefined;
 
   const transcriptSubs = new Set<(text: string, isFinal: boolean) => void>();
+  const endSubs = new Set<() => void>();
   let levelSub: ((level: number) => void) | undefined;
   let onSpeakDone: (() => void) | undefined;
 
@@ -159,6 +160,14 @@ function createVoicePipeline(bridge: NativeBridge): VoicePipeline | undefined {
           break;
         case "level":
           levelSub?.(event.level);
+          break;
+        case "stopped":
+          // Native emits this after a result *and* after an error, so it is the
+          // one reliable "the attempt is over" signal. It used to be dropped
+          // here, which left every unsuccessful attempt looking like it was
+          // still listening — and the caller's flag stuck, so the next press did
+          // nothing.
+          endSubs.forEach((cb) => cb());
           break;
         case "speakDone":
           onSpeakDone?.();
@@ -186,6 +195,10 @@ function createVoicePipeline(bridge: NativeBridge): VoicePipeline | undefined {
     onTranscript: (cb) => {
       transcriptSubs.add(cb);
       return () => { transcriptSubs.delete(cb); };
+    },
+    onListeningEnd: (cb) => {
+      endSubs.add(cb);
+      return () => { endSubs.delete(cb); };
     },
     speak: async (text) =>
       new Promise<void>((resolve) => {

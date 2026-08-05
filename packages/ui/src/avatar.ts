@@ -375,7 +375,9 @@ export function mountAgentAvatar(agent: Agent, opts: AvatarOptions = {}): Avatar
         ctx.fillText(line, cx, y);
         y += greetFont * 1.25;
       }
-      if (hint) {
+      // Only at rest. "Press OK to speak" is stale advice once the microphone is
+      // already open, and the pill is saying what is happening instead.
+      if (hint && state.phase === "idle") {
         const hintFont = Math.round(cssH * 0.03);
         ctx.font = `${hintFont}px ${FONT}`;
         ctx.fillStyle = TV_PALETTE.muted;

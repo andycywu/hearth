@@ -3,6 +3,7 @@ import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
 import { mountOnScreenKeyboard, remoteIntent } from "./keyboard.js";
+import { mountMicButton } from "./mic-button.js";
 import { createTvConfirmDialog, type TvConfirmDialog } from "./confirm-dialog.js";
 import { runDemo, demoFromUrl } from "./demo.js";
 
@@ -288,22 +289,76 @@ export function mountDeviceShell(
         onSubmit: (text) => ui.ask(text),
         // Speech goes through the same field, so a transcript can be corrected
         // before sending and both input methods share one place on screen.
-        ...(voice ? { onMic: () => void startListening() } : {}),
+        ...(voice ? { onMic: () => void toggleListening() } : {}),
         ...(typeof opts.keyboard === "string" ? { layout: opts.keyboard } : {}),
       })
     : undefined;
 
+  /**
+   * An on-screen button to start talking, when the keyboard isn't already
+   * providing one.
+   *
+   * Without this, the only ways in were the remote's dedicated voice key and the
+   * keyboard's mic key — so a device whose remote has no voice button had no way
+   * in at all, and neither did the Android TV emulator, which has no remote of
+   * any kind. The hint text said "press the voice button on your remote", which
+   * on those devices was simply untrue.
+   */
+  const micButton = voice && !keyboard
+    ? mountMicButton({ onPress: () => void toggleListening() })
+    : undefined;
+
+  /**
+   * Press to talk, press again to give up.
+   *
+   * Without the second half the button is inert for as long as an attempt lasts,
+   * which is the wrong answer to "it isn't hearing me" — and on a device where
+   * recognition is broken there was no way to get the screen back at all.
+   */
+  async function toggleListening(): Promise<void> {
+    if (!voice) return;
+    if (!listening) return startListening();
+    // The adapter reports the stop through `onListeningEnd`; reset here as well
+    // in case it doesn't, so the button can't latch.
+    try {
+      await voice.stopListening();
+    } finally {
+      stoppedListening();
+    }
+  }
+
   let listening = false;
+  /**
+   * Backstop for an adapter with no `onListeningEnd`, and for one that has it but
+   * misses an event. Nothing is worse here than being stuck: a listening flag
+   * that never clears makes every later press a no-op, so voice stays dead until
+   * the app is relaunched. Longer than any plausible attempt, so it only ever
+   * fires when the real signal didn't.
+   */
+  let safety: ReturnType<typeof setTimeout> | undefined;
+  const LISTEN_SAFETY_MS = 30_000;
+
   async function startListening(): Promise<void> {
     if (!voice || listening) return;
     listening = true;
     ui.setListening?.(true);
+    micButton?.setListening(true);
+    if (safety !== undefined) clearTimeout(safety);
+    safety = setTimeout(stoppedListening, LISTEN_SAFETY_MS);
     try {
       await voice.startListening();
     } catch {
-      listening = false;
-      ui.setListening?.(false);
+      stoppedListening();
     }
+  }
+
+  function stoppedListening(): void {
+    if (safety !== undefined) clearTimeout(safety);
+    safety = undefined;
+    if (!listening) return;
+    listening = false;
+    ui.setListening?.(false);
+    micButton?.setListening(false);
   }
 
   if (voice) {
@@ -311,35 +366,46 @@ export function mountDeviceShell(
       // Show it in the field when there is one, so it can be corrected.
       keyboard?.setText(text);
       if (!isFinal) return;
-      listening = false;
-      ui.setListening?.(false);
+      stoppedListening();
       // Send it straight away: on a TV, making someone walk to "Send" after
       // speaking defeats the point of speaking.
       if (text.trim()) void ui.ask(text.trim());
     });
+    // Every outcome that isn't a transcript — no match, silence, an error —
+    // arrives here and nowhere else.
+    voice.onListeningEnd?.(stoppedListening);
 
-    // The remote's own voice button, bound whether or not the keyboard is up.
-    // Speech used to be reachable only through the keyboard's mic key, so
-    // `?render=avatar` on its own had no way to start listening.
     document.addEventListener("keydown", (e) => {
-      if (remoteIntent(e) !== "mic") return;
-      e.preventDefault();
-      void startListening();
+      const intent = remoteIntent(e);
+      // The remote's own voice button, bound whether or not the keyboard is up.
+      if (intent === "mic") {
+        e.preventDefault();
+        void toggleListening();
+        return;
+      }
+      // OK on the mic button. Handled here rather than left to the button's own
+      // click handler because a TV WebView does not reliably turn an OK press
+      // into a click on a focused element — and when the keyboard is up it owns
+      // OK, which is why this is bound only alongside the button.
+      if (intent === "press" && micButton) {
+        e.preventDefault();
+        void toggleListening();
+      }
     });
-    // Android never delivers that button to the WebView — it goes to the
+    // Android never delivers the voice button to the WebView — it goes to the
     // Activity and on to the system assistant — so the host forwards it here,
     // the same way it forwards BACK. Harmless on platforms that don't call it.
-    (globalThis as { __tvVoiceKey?: () => void }).__tvVoiceKey = () => void startListening();
+    (globalThis as { __tvVoiceKey?: () => void }).__tvVoiceKey = () => void toggleListening();
   }
 
   if (hint) hint.textContent = hintText;
 
-  if (!keyboard) return ui;
-  // Tear the keyboard down with the shell, so a host that remounts doesn't
-  // stack a second listener on document.
+  if (!keyboard && !micButton) return ui;
+  // Tear these down with the shell, so a host that remounts doesn't stack a
+  // second listener on document.
   return {
     ...ui,
-    destroy: () => { keyboard.destroy(); ui.destroy(); },
+    destroy: () => { keyboard?.destroy(); micButton?.destroy(); ui.destroy(); },
   };
 }
 
@@ -373,8 +439,14 @@ export function renderOption(search = launchSearch()): { render: "overlay" | "av
  * the viewer can do.
  */
 export function inviteText(hasKeyboard: boolean, hasVoice: boolean): string {
-  if (hasVoice && hasKeyboard) return "Press the voice button to speak, or type below";
-  if (hasVoice) return "Press the voice button on your remote to speak";
+  // Every one of these names a control that is actually on screen. The previous
+  // voice-only text was "Press the voice button on your remote", which is untrue
+  // on a remote without that key and on an emulator with no remote at all — and
+  // there was nothing else to press, so the app was unusable rather than merely
+  // mislabelled. OK works for a D-pad, an emulator's Enter and a pointer click
+  // alike.
+  if (hasVoice && hasKeyboard) return "Select 🎤 Speak to talk, or type a command below";
+  if (hasVoice) return "Press OK to speak";
   if (hasKeyboard) return "Use the arrow keys and OK to type";
   return "Launch with ?ask=… to run a command, or ?diag for the capability report";
 }

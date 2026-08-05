@@ -232,15 +232,18 @@ describe("debugRequested", () => {
 });
 
 describe("inviteText", () => {
-  it("names the button when speech is the only way in", () => {
-    // Without the keyboard this is the only entry point, and "say a command"
-    // doesn't tell anyone how to make it listen.
-    expect(inviteText(false, true)).toMatch(/voice button/i);
+  it("points at the on-screen button, not a key the remote may not have", () => {
+    // This used to read "Press the voice button on your remote", which is untrue
+    // on a remote without that key and on an emulator with no remote at all —
+    // and there was nothing else to press, so the app was unusable rather than
+    // just mislabelled. OK covers a D-pad, an emulator's Enter and a click.
+    expect(inviteText(false, true)).toBe("Press OK to speak");
+    expect(inviteText(false, true)).not.toMatch(/remote/i);
   });
 
   it("offers both when both exist", () => {
     const text = inviteText(true, true);
-    expect(text).toMatch(/voice/i);
+    expect(text).toMatch(/speak/i);
     expect(text).toMatch(/type/i);
   });
 

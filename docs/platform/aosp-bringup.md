@@ -1,7 +1,11 @@
 # AOSP / Android TV bring-up (MTK / NVT)
 
 ## Prerequisites
-- Android SDK + JDK 17; device with `adb` access (Developer Mode).
+
+- Android SDK + a JDK Gradle can parse; device with `adb` access (Developer Mode).
+  Android Studio's bundled JBR is now Java 25, which Gradle 8.7's Kotlin DSL
+  rejects with `IllegalArgumentException: 25.0.2` — point `JAVA_HOME` at a JDK 17
+  or 21 instead.
 
 ## Steps
 1. Bundle: `node tools/bundle.mjs aosp` (copies runtime into `assets/`).
@@ -14,6 +18,30 @@
 3. Launch; the `WebView` loads the runtime and installs `TvNativeBridge`.
 4. Walk the HAL: volume (public `AudioManager`), list/launch app
    (`PackageManager` + Leanback), network. Record in `capability-matrix.md`.
+
+## Starting a conversation on an emulator
+
+An emulator has no remote, so "press the voice button" is not available — and for
+a while it was the only documented way in, which made voice untestable without
+`adb`. The on-screen **Speak** button now takes anything the emulator can send,
+and all four of these are verified to open the microphone:
+
+| Input | Command | Where it comes from |
+| --- | --- | --- |
+| OK / D-pad centre | `adb shell input keyevent 23` | a real remote, or the emulator's D-pad panel |
+| Enter | `adb shell input keyevent 66` | typing into the emulator window |
+| Pointer | `adb shell input tap 960 955` | clicking the button; also touch panels |
+| Voice key | `adb shell input keyevent 84` | remotes that have one — routed via `dispatchKeyEvent` |
+
+Note that `adb shell input keyevent` drops events fired in quick succession or
+while the emulator is loaded; pace them ~200–300 ms apart.
+
+An `&` inside a launch flag has to be quoted for the *device's* shell, or it
+backgrounds the command and the flag silently never arrives:
+
+```bash
+adb shell "am start -n tv.aiagent.harness/.MainActivity -e start 'index.html?keyboard&debug'"
+```
 
 ## Advanced capabilities — what actually gates them
 

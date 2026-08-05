@@ -88,6 +88,21 @@ export interface VoicePipeline {
   startListening(): Promise<void>;
   stopListening(): Promise<void>;
   onTranscript(cb: (text: string, isFinal: boolean) => void): () => void;
+  /**
+   * Fires when a recognition attempt finishes, for *any* reason — a result, no
+   * match, silence, a timeout, an error.
+   *
+   * Without this there was no way to know an attempt was over unless it produced
+   * a transcript, so anything else left the UI listening forever: the microphone
+   * had closed, the avatar was still pulsing, and the caller's own "am I
+   * listening" flag stayed set, which made the next press a no-op. Voice was dead
+   * until the app was relaunched. `startListening` resolving doesn't help — it
+   * returns as soon as the request is handed over, not when the attempt ends.
+   *
+   * Optional so an adapter that genuinely can't tell still satisfies the
+   * contract; callers should keep a timeout for those.
+   */
+  onListeningEnd?(cb: () => void): () => void;
   speak(text: string): Promise<void>;
   /**
    * Optional hands-free wake word. Listens continuously for `phrase`; when heard,
