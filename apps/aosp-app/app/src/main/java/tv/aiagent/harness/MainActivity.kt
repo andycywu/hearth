@@ -188,21 +188,30 @@ class MainActivity : AppCompatActivity() {
     /**
      * Forward the remote's voice/search button into the page.
      *
-     * Same shape as BACK above and for the same reason: Android hands these to
-     * the Activity (and normally on to the system assistant) rather than
-     * delivering them to the WebView, so a `keydown` listener in the page never
-     * sees them. Without this, speech was reachable only through the on-screen
-     * keyboard's mic key — with the keyboard hidden there was no way in at all.
+     * Same intent as BACK above — the page can't see these otherwise — but it
+     * has to be `dispatchKeyEvent`, not `onKeyDown`. Android offers a key to the
+     * focused view first and only calls `Activity.onKeyDown` if nothing consumed
+     * it; the WebView is focused and swallows everything, so an `onKeyDown`
+     * override here never ran and pressing the voice button did precisely
+     * nothing. `dispatchKeyEvent` sees the event before any view does.
+     *
+     * Acting on ACTION_DOWN only, while still returning true for the matching
+     * ACTION_UP: letting the UP through unconsumed makes the framework treat it
+     * as an orphan and hand it to the system assistant.
      */
-    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
-        val isVoiceKey = keyCode == android.view.KeyEvent.KEYCODE_SEARCH ||
-            keyCode == android.view.KeyEvent.KEYCODE_VOICE_ASSIST ||
-            keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD
-        if (isVoiceKey) {
-            webView.evaluateJavascript("window.__tvVoiceKey && window.__tvVoiceKey()", null)
-            return true
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        val isVoiceKey = when (event.keyCode) {
+            android.view.KeyEvent.KEYCODE_SEARCH,
+            android.view.KeyEvent.KEYCODE_VOICE_ASSIST,
+            android.view.KeyEvent.KEYCODE_MEDIA_RECORD,
+            -> true
+            else -> false
         }
-        return super.onKeyDown(keyCode, event)
+        if (!isVoiceKey) return super.dispatchKeyEvent(event)
+        if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            webView.evaluateJavascript("window.__tvVoiceKey && window.__tvVoiceKey()", null)
+        }
+        return true
     }
 
     override fun onDestroy() {

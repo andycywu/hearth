@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+Voice on AOSP, which didn't work at all on a device despite passing every test:
+
+- **The voice button did nothing.** The forwarding added in `5b8557e` overrode
+  `Activity.onKeyDown`, which Android calls only when no view has consumed the
+  key — the focused WebView consumes everything, so it never ran. Intercepting in
+  `dispatchKeyEvent`, which sees the event before any view, is what actually
+  works. BACK was unaffected because it arrives via `onBackPressed`.
+- **The first reply was never spoken.** `TextToSpeech` takes ~3s to bind and the
+  offline model answers instantly, so the greeting hit an engine that wasn't
+  ready yet and was dropped on the floor. Warming up at launch narrowed that
+  window but never closed it; the engine now holds one pending utterance and
+  speaks it on init. A failed init releases it, so the avatar can't get stuck
+  mid-sentence.
+
 ## [0.1.0] - 2026-08-05
 
 First release. The `0.1.0` heading below was written in July but never tagged —

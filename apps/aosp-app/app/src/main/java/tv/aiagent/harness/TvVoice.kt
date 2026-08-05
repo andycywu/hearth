@@ -39,6 +39,19 @@ class TvVoice(
 
     private var tts: TextToSpeech? = null
     private var ttsInitialised = false
+    private var ttsInitFailed = false
+
+    /**
+     * What to say as soon as the engine finishes initialising.
+     *
+     * `TextToSpeech` takes a couple of seconds to bind, and the agent can answer
+     * in well under that — with an offline model it answers instantly. So the
+     * very first reply, the one that greets you, arrived while the engine was
+     * still connecting and was silently dropped; warming up at launch narrowed
+     * the window but never closed it. Holding one utterance closes it. Only one:
+     * `speak` uses QUEUE_FLUSH, so a newer reply supersedes an older one anyway.
+     */
+    private var pending: String? = null
 
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
@@ -59,6 +72,13 @@ class TvVoice(
                 ttsInitialised = status == TextToSpeech.SUCCESS
                 if (!ttsInitialised) {
                     android.util.Log.w("TvVoice", "TextToSpeech init failed with status $status")
+                    ttsInitFailed = true
+                    // Release anything that was waiting on the engine, or the
+                    // avatar keeps its mouth open forever.
+                    if (pending != null) {
+                        pending = null
+                        emit("speakDone", JSONObject().put("spoken", false))
+                    }
                     return@TextToSpeech
                 }
                 /*
@@ -82,6 +102,8 @@ class TvVoice(
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build(),
                 )
+                // Say whatever arrived while we were connecting.
+                pending?.let { pending = null; speak(it) }
             }
         }
     }
@@ -92,6 +114,11 @@ class TvVoice(
         if (text.isBlank()) return
         main.post {
             val engine = tts
+            if (engine != null && !ttsInitialised && !ttsInitFailed) {
+                // Still connecting — hold it rather than lose it. See `pending`.
+                pending = text
+                return@post
+            }
             if (engine == null || !ttsInitialised) {
                 // Report completion anyway: the avatar's speaking state must not
                 // stick on for a device with no working engine.
@@ -103,10 +130,16 @@ class TvVoice(
                 override fun onDone(utteranceId: String?) =
                     emit("speakDone", JSONObject().put("spoken", true))
                 @Deprecated("Required by the abstract class")
-                override fun onError(utteranceId: String?) =
+                override fun onError(utteranceId: String?) {
+                    android.util.Log.w("TvVoice", "utterance failed")
                     emit("speakDone", JSONObject().put("spoken", false))
+                }
             })
-            engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "reply")
+            val queued = engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "reply")
+            if (queued != TextToSpeech.SUCCESS) {
+                android.util.Log.w("TvVoice", "speak() refused by the engine: $queued")
+                emit("speakDone", JSONObject().put("spoken", false))
+            }
         }
     }
 
@@ -218,6 +251,7 @@ class TvVoice(
             tts?.shutdown()
             tts = null
             ttsInitialised = false
+            pending = null
         }
     }
 
