@@ -233,11 +233,10 @@ the install step:
 - Docs index: `docs/STATUS.md` (snapshot), `docs/DEVELOPMENT_PLAN.md` (roadmap),
   `docs/api.md`, `docs/extending.md`, `docs/skills.md`, `docs/POC.md`,
   `docs/EMULATOR_SETUP.md`, `docs/BRINGUP_CHECKLIST.md`, `docs/SECURITY_REVIEW.md`.
-- Deliberately **not** done, so nobody assumes otherwise: real focusable confirm
-  dialogs per platform (`createConfirmHandler({ ask })` is the seam — today it
-  falls back to `window.confirm`), and the device hosts still mount no UI shell of
-  their own (they stash the agent on `window.__tvAgent`; only the dev harness and
-  the Blits demo render).
+- *Both of these were closed later:* the device hosts render through
+  `mountDeviceShell` (with `?render=avatar` and a remote-driven keyboard), and
+  `createConfirmHandler` now defaults to a real focusable dialog wherever there's
+  a DOM, keeping `window.confirm` only as the no-document fallback.
 
 Keep it green, keep the HAL boundary clean, and update `CHANGELOG.md` + this file
 as tasks are completed.

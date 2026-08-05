@@ -29,10 +29,12 @@ hardware.
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
 | Avatar + on-screen keyboard | ✅ `?render=avatar`, `?keyboard` — verified on the Android TV emulator |
+| CJK input | ✅ kana keyboard (real characters); Chinese as phrases — an IME is out of scope |
+| Confirmation dialog | ✅ focusable 10-foot modal, defaults to No; `window.confirm` only as a no-DOM fallback |
 | Skills — code (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
 | Skills — data (JSON manifests, bundled + installable) | ✅ `packages/skill-manifest`, [ADR-0002](adr/0002-declarative-skill-manifests.md) |
 | Offline demo on device (`?demo`, no network) | ✅ verified on the Android **and** Tizen emulators |
-| Tests / CI / lint / bundle-size / license / SBOM | ✅ 274 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM | ✅ 348 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
@@ -100,13 +102,21 @@ hardware.
   Android's own green mic indicator lit). Voice needs no native code on
   web/Tizen/webOS: their WebViews are Chromium and expose Web Speech, which
   contradicted the assumption that Samsung would require a partner agreement.
+- **A confirmation dialog you can answer from a sofa,** replacing
+  `window.confirm` — which blocks the JS thread, isn't reliably D-pad focusable
+  and is stubbed out on some TV builds, silently turning the gate into "always
+  approve". Defaults to No; Back declines. Two device-only defects fixed on the
+  way: Android routes hardware BACK to the Activity rather than the WebView (so
+  Back closed the app instead of declining), and an inline `display:flex` beats
+  `[hidden]`, so the dialog stayed on screen after being answered. Both paths
+  verified on the emulator.
 - **Skills as data:** a skill can be a JSON manifest rather than TypeScript,
   bundled or installed into `platform.storage`, with the host owning the origin
   allowlist ([ADR-0002](adr/0002-declarative-skill-manifests.md)).
 
-## Test coverage (330 tests)
+## Test coverage (348 tests)
 
-ui 94 · core 59 · skill-manifest 56 · llm-connectors 44 · adapter-aosp 25 ·
+ui 114 · core 59 · skill-manifest 56 · llm-connectors 44 · adapter-aosp 25 ·
 skills-example 13 · adapter-tizen 11 · platform-api 8 · create-skill 8 ·
 adapter-webos 6 · adapter-web 5 · acceptance 5.
 
@@ -122,13 +132,11 @@ adapter-webos 6 · adapter-web 5 · acceptance 5.
    browser/device).
 3. **On-device model benchmark.** Measure model size vs. RAM/latency on real
    silicon; finalize cloud/on-device routing policy.
-4. **Real confirm dialogs.** `createConfirmHandler({ ask })` is the seam; each
-   platform still needs a focusable 10-foot dialog instead of `window.confirm`.
-5. **A real model on Tizen.** Everything else on that platform works; the
+4. **A real model on Tizen.** Everything else on that platform works; the
    emulator's NAT can't reach one, so this needs a retail TV in Developer Mode —
    which is also where Samsung's `webapis` actually exists, so it settles two
    questions at once.
-6. **npm publish.** Waiting on the `@tv-ai-agent` npm organization; GitHub Pages
+5. **npm publish.** Waiting on the `@tv-ai-agent` npm organization; GitHub Pages
    needs enabling in the repo settings for the hosted demo.
 
 ## How to run
