@@ -3,16 +3,20 @@
 A snapshot of what's built, what's verified, and what remains. For the full plan
 see [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md).
 
-_Last updated: 2026-08-04 · target release: v0.1.0_
+_Last updated: 2026-08-05 · target release: v0.1.0_
 
-**The agent runs end-to-end on two TV emulators.** On Android TV the capability
-probe is clean (11 ok / 0 errors), the CI acceptance script passes unchanged, and
-a real local model drives it. On the Samsung Tizen TV emulator the app installs,
-volume/mute/apps/storage all pass, and the built-in demo runs the whole agent
-loop — including Chinese and Japanese commands moving real device state — with
-**no network, no endpoint and no API key**. Packaging is verified for all three
-hosts (APK / signed `.wgt` / `.ipk`). webOS still needs an install target; real
-MTK/NVT boards (B5) and the Blits GPU pass (C1) need hardware.
+**The agent runs end-to-end on two TV emulators, and you can talk to it.** On
+Android TV the capability probe is clean (11 ok / 0 errors), the CI acceptance
+script passes unchanged, a real local model drives it, and speech works both ways
+through the native bridge. On the Samsung Tizen TV emulator the app installs,
+volume/mute/apps/storage all pass, `?diag` reports **zero** unsupported
+capabilities, and the built-in demo runs the whole agent loop — including Chinese
+and Japanese commands moving real device state — with **no network, no endpoint
+and no API key**. There is an avatar and a remote-driven on-screen keyboard, so a
+TV is no longer limited to whatever was baked into the launch flags. Packaging is
+verified for all three hosts (APK / signed `.wgt` / `.ipk`). webOS still needs an
+install target; real MTK/NVT boards (B5) and the Blits GPU pass (C1) need
+hardware.
 
 ## At a glance
 
@@ -23,7 +27,8 @@ MTK/NVT boards (B5) and the Blits GPU pass (C1) need hardware.
 | App hosts (Tizen `.wgt`, AOSP APK, webOS `.ipk`, dev harness) | ✅ bundled; **APK compiles** |
 | LLM connectors (OpenAI-compatible + offline scripted) | ✅ done, with retry |
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
-| Voice (ASR/TTS + wake word) | ✅ web adapter (Web Speech); spoken replies on every host |
+| Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
+| Avatar + on-screen keyboard | ✅ `?render=avatar`, `?keyboard` — verified on the Android TV emulator |
 | Skills — code (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
 | Skills — data (JSON manifests, bundled + installable) | ✅ `packages/skill-manifest`, [ADR-0002](adr/0002-declarative-skill-manifests.md) |
 | Offline demo on device (`?demo`, no network) | ✅ verified on the Android **and** Tizen emulators |
@@ -86,13 +91,22 @@ MTK/NVT boards (B5) and the Blits GPU pass (C1) need hardware.
   "none"` — where it should have measured. The emulator's own NAT is broken and
   that is written up with the full elimination, since the obvious suspects
   (proxy, bridge, firewall, VPN) are all wrong.
+- **Avatar, keyboard and voice:** an abstract form drawn in code with four states
+  driven by agent events (`?render=avatar`), a remote-driven on-screen keyboard
+  (`?keyboard`), and speech both ways. Verified on the Android TV emulator by
+  typing "mute" letter-by-letter with real D-pad events — `?diag` afterwards read
+  `getMute ✅ true` — and by pressing 🎤 Speak, which drove the permission dialog
+  and then opened the microphone (`RecognitionService#onMicrophoneOpened`, with
+  Android's own green mic indicator lit). Voice needs no native code on
+  web/Tizen/webOS: their WebViews are Chromium and expose Web Speech, which
+  contradicted the assumption that Samsung would require a partner agreement.
 - **Skills as data:** a skill can be a JSON manifest rather than TypeScript,
   bundled or installed into `platform.storage`, with the host owning the origin
   allowlist ([ADR-0002](adr/0002-declarative-skill-manifests.md)).
 
-## Test coverage (274 tests)
+## Test coverage (330 tests)
 
-skill-manifest 56 · ui 53 · core 51 · llm-connectors 44 · adapter-aosp 14 ·
+ui 94 · core 59 · skill-manifest 56 · llm-connectors 44 · adapter-aosp 25 ·
 skills-example 13 · adapter-tizen 11 · platform-api 8 · create-skill 8 ·
 adapter-webos 6 · adapter-web 5 · acceptance 5.
 
