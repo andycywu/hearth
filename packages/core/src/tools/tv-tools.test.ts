@@ -76,9 +76,23 @@ describe("createTvTools — system", () => {
   it("reads and writes the volume through the HAL", async () => {
     const { platform, calls } = fakePlatform();
     const tools = createTvTools(platform);
-    expect(await byName(tools, "get_volume").execute({})).toEqual({ volume: 20 });
+    // `get_volume` reports the mute state alongside the level: on Android the
+    // platform zeroes the stream while muted, so a bare "volume: 0" hides the
+    // difference between muted and turned all the way down.
+    expect(await byName(tools, "get_volume").execute({})).toEqual({ volume: 20, muted: false });
     expect(await byName(tools, "set_volume").execute({ level: 35 })).toEqual({ ok: true, volume: 35 });
     expect(calls.setVolume).toEqual([35]);
+  });
+
+  it("can be asked whether the TV is muted", async () => {
+    // There was a `set_mute` with nothing to read it back, so "is the TV muted?"
+    // was a question the agent had no tool to answer.
+    const { platform } = fakePlatform();
+    const tools = createTvTools(platform);
+    expect(await byName(tools, "get_mute").execute({})).toEqual({ muted: false });
+    await byName(tools, "set_mute").execute({ mute: true });
+    expect(await byName(tools, "get_mute").execute({})).toEqual({ muted: true });
+    expect(await byName(tools, "get_volume").execute({})).toMatchObject({ muted: true });
   });
 
   it("coerces a string level to a number (models often send strings)", async () => {

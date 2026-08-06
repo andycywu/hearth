@@ -62,10 +62,42 @@ window.__AGENT_LLM_MODEL__ = "local-tv-agent";
 That keeps it inside both the app's CSP and the Android cleartext policy, which
 permits plain http for loopback only — a LAN address would be blocked by design.
 
+### The model server must send CORS headers
+
+**This blocks every default-configured server, and it fails silently.** The app
+is a web page on its own origin, so a call to the model server is cross-origin
+and the WebView rejects it at preflight:
+
+```text
+Access to fetch at 'http://127.0.0.1:8080/v1/chat/completions' from origin
+'http://appassets.androidplatform.net' has been blocked by CORS policy:
+No 'Access-Control-Allow-Origin' header is present on the requested resource.
+```
+
+The endpoint is reachable, the model is loaded, `curl` from the device works —
+and the agent still can't use it. Found by pointing the AOSP build at a real
+endpoint for the first time; the fetch failure surfaces only in the console.
+
+The server has to allow the app's origin:
+
+| Server | How |
+| --- | --- |
+| Ollama | `OLLAMA_ORIGINS='*'` (or the app origin) in its environment |
+| llama.cpp `llama-server` | serves `Access-Control-Allow-Origin: *` by default; keep it if you put a proxy in front |
+| vLLM | `--allowed-origins '["*"]'` |
+
+The origins to allow, per host: `http://appassets.androidplatform.net` on AOSP,
+and the `file://`-derived origin on Tizen/webOS (which is `null`, so those need
+`*`).
+
+A cleaner long-term fix is for the host to proxy the model under its own origin —
+on AOSP that is a few lines in `shouldInterceptRequest`, and it would remove
+this whole class of problem. Not done yet.
+
 So the on-device path is: ship a small quantized model + a local
-OpenAI-compatible server on the TV, point the agent at loopback, done. Tool
-calling must be supported by the model/server for TV control to work
-(llama.cpp/Ollama/vLLM all support it for capable models).
+OpenAI-compatible server on the TV, allow the app's origin, point the agent at
+loopback, done. Tool calling must be supported by the model/server for TV
+control to work (llama.cpp/Ollama/vLLM all support it for capable models).
 
 ## Measured: 1.5B on the Android TV emulator (2026-07-30)
 

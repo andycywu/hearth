@@ -23,10 +23,28 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
     {
       spec: {
         name: "get_volume",
-        description: "Get the current TV volume (0-100).",
+        // Both, in one call: "the volume is 0" and "the volume is 0 because the
+        // TV is muted" are different answers, and a model that has to make two
+        // calls to tell them apart usually makes one and guesses.
+        description: "Get the current TV volume (0-100) and whether the TV is muted.",
         parameters: {},
       },
-      execute: async () => ({ volume: await platform.system.getVolume() }),
+      execute: async () => ({
+        volume: await platform.system.getVolume(),
+        muted: await platform.system.getMute(),
+      }),
+    },
+    {
+      spec: {
+        name: "get_mute",
+        description: "Check whether the TV audio is currently muted.",
+        parameters: {},
+      },
+      // There was a `set_mute` with nothing to read it back, so "is the TV
+      // muted?" was a question the agent could not answer — and after muting,
+      // `get_volume` reports 0 on Android (the platform zeroes the stream while
+      // muted), which hides the difference between muted and turned down.
+      execute: async () => ({ muted: await platform.system.getMute() }),
     },
     {
       spec: {
