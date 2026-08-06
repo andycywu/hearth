@@ -6,6 +6,36 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- **The API key could end up on the television.** The `?debug` status line
+  printed the launch query verbatim, so launching with `?key=sk-…` put a live
+  credential on screen — and on a shipped TV that key is the same for every unit
+  of the model, so one photograph is everyone's key and everyone's bill. Nothing
+  redacted it. `redactSecrets()` now masks `key`, `token`, `secret`, `password`
+  and friends wherever the flags are shown, and the runtime warns once when a key
+  arrives through the URL at all, because that URL also lives in shell history
+  and in the launch intent. Verified on the emulator: the line now reads
+  `key=***`.
+  - Deliberately not masked: `keyboard`, `monkey` and anything else that merely
+    contains a secret-ish word. Hiding a real flag would make the line useless
+    for the thing it exists for.
+- **Two ways to keep the key off the launch URL**, both optional:
+  - `adb shell am start -e llmKey sk-…` provisions it once into the AOSP host's
+    keystore (AES-GCM, key held by Android; no new dependency). The extra is
+    removed from the intent as soon as it's read, and only its *length* is
+    logged. This keeps the key out of the URL, the history, the logs, the screen
+    and the APK — but not out of the app, since the page is what calls the model.
+    `LlmSecrets.kt` states that boundary next to the code rather than letting it
+    be assumed.
+  - `examples/llm-relay` holds the key on a server you run, so it is never on the
+    TV at all — the only arrangement that survives a device in someone else's
+    hands. ~100 lines, streams straight through so tool calling and token-by-token
+    replies keep working. Verified end to end: the emulator drove a full turn
+    through it with no key on the device.
+  - `docs/on-device-inference.md` now lays out all four options weakest-first,
+    including what the relay's shared token does *not* buy you.
+
 ### Changed
 
 Architecture review pass — three small changes, no restructuring:

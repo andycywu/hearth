@@ -161,8 +161,33 @@ class MainActivity : AppCompatActivity() {
      * WebView somewhere else.
      */
     private fun load(intent: Intent?) {
+        provisionApiKey(intent)
         val start = intent?.getStringExtra("start")?.takeIf { it.startsWith("index.html") } ?: "index.html"
         webView.loadUrl(APP_BASE + start)
+    }
+
+    /**
+     * One-time provisioning of the LLM API key:
+     *
+     *     adb shell am start -n tv.aiagent.harness/.MainActivity -e llmKey sk-…
+     *
+     * Stored encrypted and then removed from the intent, so a later `am start`
+     * that re-uses this instance can't re-read it and it never reaches the page
+     * URL. An empty value clears it. The value is never logged — only whether
+     * one arrived.
+     *
+     * This replaces putting the key in `?key=`, which left it in shell history,
+     * in the intent, and on screen under `?debug`. See [LlmSecrets] for what
+     * this does and doesn't protect against; it is not a substitute for a relay.
+     */
+    private fun provisionApiKey(intent: Intent?) {
+        val provided = intent?.getStringExtra("llmKey") ?: return
+        LlmSecrets.save(this, provided)
+        intent.removeExtra("llmKey")
+        android.util.Log.i(
+            "MainActivity",
+            if (provided.isBlank()) "LLM API key cleared" else "LLM API key stored (${provided.length} chars)",
+        )
     }
 
     /**

@@ -33,6 +33,9 @@ export interface ResolveLlmEndpointOptions {
 
 const DEFAULT_MODEL = "local-tv-agent";
 
+/** Once per page: a boot that reads the endpoint repeatedly shouldn't nag. */
+let warnedAboutQueryKey = false;
+
 export function resolveLlmEndpoint(opts: ResolveLlmEndpointOptions = {}): LlmEndpoint {
   const search = opts.search ?? launchSearch();
   const globals = opts.globals ?? (typeof window !== "undefined" ? (window as unknown as Record<string, unknown>) : {});
@@ -53,7 +56,22 @@ export function resolveLlmEndpoint(opts: ResolveLlmEndpointOptions = {}): LlmEnd
     DEFAULT_MODEL;
 
   // A key may be needed for a cloud gateway; never invent one.
-  const apiKey = trimmed(params.get("key")) ?? trimmed(globals["__AGENT_LLM_API_KEY__"]);
+  const queryKey = trimmed(params.get("key"));
+  const apiKey = queryKey ?? trimmed(globals["__AGENT_LLM_API_KEY__"]);
+
+  // `?key=` is for pointing a dev build at a real endpoint without rebuilding,
+  // and that is all it is for. The launch URL survives in the host's shell
+  // history, in the intent, and in anything that echoes the flags — so a key
+  // passed this way should be treated as already disclosed. Say so once, loudly,
+  // rather than let a build ship this way quietly.
+  if (queryKey && !warnedAboutQueryKey) {
+    warnedAboutQueryKey = true;
+    console.warn(
+      "[llm] an API key was passed in the launch URL. That is for development only: " +
+      "the URL is visible in shell history and in the launch intent. Ship the key " +
+      "through the host instead (see docs/on-device-inference.md).",
+    );
+  }
 
   return { ...(baseUrl ? { baseUrl } : {}), model, ...(apiKey ? { apiKey } : {}), source };
 }

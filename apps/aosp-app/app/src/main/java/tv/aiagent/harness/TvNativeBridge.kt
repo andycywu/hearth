@@ -178,6 +178,19 @@ class TvNativeBridge(
     }
     @JavascriptInterface fun kvDelete(key: String) { prefs.edit().remove(key).apply() }
 
+    /**
+     * The provisioned LLM API key, or "" when there isn't one.
+     *
+     * Deliberately not in the ordinary key-value store: that one is readable by
+     * any skill, and this is a credential. Provision it with
+     * `am start -e llmKey …` (see MainActivity) rather than in the launch URL.
+     *
+     * The page does receive the key here — it is the page that calls the model —
+     * so this keeps the key out of the URL, the shell history, the logs and the
+     * screen, not out of the app. [LlmSecrets] spells out that boundary.
+     */
+    @JavascriptInterface fun getLlmApiKey(): String = LlmSecrets.load(ctx) ?: ""
+
     private fun detectSoc(): String {
         val h = (android.os.Build.HARDWARE + " " + android.os.Build.BOARD).lowercase()
         return when {

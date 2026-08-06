@@ -1,4 +1,4 @@
-import { launchSearch, launchSearchSource, type Agent, type ConfirmRequest } from "@tv-ai-agent/core";
+import { launchSearch, launchSearchSource, redactSecrets, type Agent, type ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
@@ -272,7 +272,8 @@ export function mountDeviceShell(
       status.textContent =
         `${device.model} · ${device.os} ${device.osVersion} · soc=${device.soc}` +
         (opts.detail ? ` · ${opts.detail}` : "") +
-        ` · flags:${launchSearchSource()}${search || "(none)"}`;
+        // Redacted: this line put `?key=sk-…` on the television.
+        ` · flags:${launchSearchSource()}${redactSecrets(search) || "(none)"}`;
     } else {
       status.remove();
     }

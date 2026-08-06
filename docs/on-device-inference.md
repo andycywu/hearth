@@ -62,6 +62,72 @@ window.__AGENT_LLM_MODEL__ = "local-tv-agent";
 That keeps it inside both the app's CSP and the Android cleartext policy, which
 permits plain http for loopback only — a LAN address would be blocked by design.
 
+## Where the API key goes
+
+A TV calling a cloud model needs a key, and a television is a device you hand to
+someone else. Whatever you put on it, they can eventually get. And it is the
+*same* key on every unit of that model, so one extraction is not one leak — it
+is everyone's key and everyone's bill.
+
+Four arrangements, weakest first. Pick by how much you trust the device.
+
+**1. `?key=` in the launch flags — development only.**
+
+```bash
+adb shell am start -n tv.aiagent.harness/.MainActivity \
+  -e start 'index.html?llm=https://api.openai.com/v1\&key=sk-…'
+```
+
+The URL survives in your shell history and in the launch intent, and until
+recently the `?debug` status line printed it *on the television*. That is fixed —
+`redactSecrets()` masks it to `key=***`, and the runtime logs a warning once when
+a key arrives this way — but the URL itself is still not a private channel.
+Convenient on the bench; never ship it.
+
+**2. Provisioned into the host's keystore (AOSP) — good for lab and internal
+devices.**
+
+```bash
+# once per device; not needed again
+adb shell am start -n tv.aiagent.harness/.MainActivity -e llmKey sk-…
+# from then on, no key in the launch flags
+adb shell am start -n tv.aiagent.harness/.MainActivity \
+  -e start 'index.html?llm=https://api.openai.com/v1'
+```
+
+Encrypted with an AES-GCM key held in the Android keystore, and the extra is
+removed from the intent as soon as it is read, so a later launch can't re-read
+it. The value is never logged — only its length. Keeps the key out of the URL,
+the shell history, the logs, the screen and the APK.
+
+It does **not** keep it out of the app: the page reads it through the bridge,
+because the page is what calls the model. Encryption at rest defeats someone
+copying a file or a backup, not someone running code as the app. See
+`LlmSecrets.kt`, which says the same thing next to the code.
+
+**3. A relay you run — the only one that survives a device you don't control.**
+
+The key is never on the TV at all. The TV points at your relay; the relay holds
+the key and forwards. `examples/llm-relay` is a working one, about a hundred
+lines, and it streams straight through so tool calling and token-by-token
+replies keep working:
+
+```bash
+UPSTREAM_API_KEY=sk-… node examples/llm-relay/server.mjs
+adb shell am start -n tv.aiagent.harness/.MainActivity \
+  -e start 'index.html?llm=https://relay.example.com/v1'
+```
+
+`RELAY_TOKEN` adds a shared secret the TV must send. Be honest with yourself
+about what that buys: it is one value for every TV, so it discourages casual
+abuse of an open relay and is not access control.
+
+**4. Per-user credentials issued by your own backend** — out of scope here, and
+what a real product ends up doing.
+
+Note that a relay solves the CORS problem below at the same time, because you
+control its headers.
+
 ### The model server must send CORS headers
 
 **This blocks every default-configured server, and it fails silently.** The app

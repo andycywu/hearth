@@ -32,6 +32,49 @@ export function launchSearch(): string {
 }
 
 /**
+ * Parameters whose value must never be shown or logged.
+ *
+ * Kept deliberately wide. A flag added later called `token` or `apiKey` should
+ * be covered by default, because the failure mode here is silent and permanent:
+ * a credential printed once on a TV screen, or into logcat, is a credential you
+ * have to rotate.
+ */
+const SECRET_PARAM = /^(key|api[-_]?key|token|secret|password|passwd|pass|auth|authorization)$/i;
+
+/**
+ * The launch query with credential values masked, for anything a human or a log
+ * will see.
+ *
+ * The `?debug` status line printed the query verbatim, so launching with
+ * `?key=sk-…` put a live API key on the television. Nothing redacted it, and on
+ * a shipped device that key is the same for every unit of that model — one
+ * screenshot and it belongs to everyone.
+ *
+ * Rewrites values in place rather than going through `URLSearchParams`, which
+ * would reorder and re-encode the rest: this string is a debugging aid and it
+ * has to keep looking exactly like what was passed in.
+ */
+export function redactSecrets(search: string): string {
+  return search.replace(
+    // `?` is excluded from the name class on purpose: without that, the `^`
+    // branch matches the empty string at position 0 and swallows the leading
+    // `?` into the name, so `?key=…` read as a parameter called "?key" and the
+    // very first parameter — the most likely place for the key — went unmasked.
+    /(^|[?&])([^=&?]+)=([^&]*)/g,
+    (whole, sep: string, name: string, value: string) =>
+      value && SECRET_PARAM.test(safeDecode(name)) ? `${sep}${name}=***` : whole,
+  );
+}
+
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+/**
  * How the flags got here, for the status line. On a TV you cannot attach a
  * debugger to, "the flag never arrived" and "the flag did nothing" look
  * identical, and telling them apart cost a full debugging session once.

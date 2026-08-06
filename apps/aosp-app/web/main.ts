@@ -52,6 +52,11 @@ async function boot(): Promise<void> {
   // No default endpoint: with nothing configured, fall back to the offline brain
   // that is already in this bundle rather than to a dead address. That is what
   // lets `?demo` run on a TV with no network set up yet.
+  // A key provisioned into the host's encrypted store (`am start -e llmKey …`)
+  // is picked up here, before the endpoint is resolved, so it never has to
+  // travel in the launch URL. `?key=` still works for development and still
+  // wins, because that is what you reach for when overriding on the bench.
+  adoptProvisionedApiKey();
   const endpoint = resolveLlmEndpoint();
   const llm = endpoint.baseUrl
     ? createOpenAiCompatibleClient({
@@ -89,3 +94,24 @@ async function boot(): Promise<void> {
   await runStartupCommands(ui);
 }
 boot();
+
+/**
+ * Copy the host's provisioned API key into the global `resolveLlmEndpoint()`
+ * reads, when there is one and the launch flags didn't supply one.
+ *
+ * Kept in the host entry rather than in the adapter: a credential for the model
+ * is not a TV capability, and `PlatformProvider` should not grow a slot for it.
+ * Guarded on the method existing so a newer bundle still runs on an older APK.
+ */
+function adoptProvisionedApiKey(): void {
+  const bridge = (globalThis as { TvNativeBridge?: { getLlmApiKey?: () => string } }).TvNativeBridge;
+  const w = window as unknown as Record<string, unknown>;
+  if (w.__AGENT_LLM_API_KEY__) return;
+  try {
+    const key = bridge?.getLlmApiKey?.();
+    if (key) w.__AGENT_LLM_API_KEY__ = key;
+  } catch {
+    // An older host APK without the method. Not worth a warning: no key
+    // provisioned simply means the endpoint needs one from somewhere else.
+  }
+}
