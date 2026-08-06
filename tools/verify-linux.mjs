@@ -38,6 +38,24 @@ await tv.init();
 console.log(`\ndevice: ${tv.device.model} · node ${tv.device.osVersion}`);
 console.log(`capabilities: ${JSON.stringify(tv.device.capabilities)}\n`);
 
+/**
+ * Which backend the adapter picked, from the model string it builds at init.
+ * `Linux (pulseaudio)` → `pulseaudio`; plain `Linux` → `none`.
+ */
+const backend = /\((.+)\)/.exec(tv.device.model)?.[1] ?? "none";
+
+// CI pins this per matrix leg. Without it the script just reports what it found,
+// which is what you want when running it on your own box.
+//
+// It matters because detection is ordered — PipeWire, then PulseAudio, then
+// ALSA — and "some backend answered" would pass even if the wrong one did. On a
+// box with PipeWire installed, silently driving it through the PulseAudio
+// shim is a different code path than the one under test.
+const expected = process.env.EXPECT_AUDIO;
+if (expected) {
+  check(backend === expected, `picked the ${expected} backend (got ${backend})`);
+}
+
 // --- audio, whichever way this box answers ------------------------------------
 const claimsAudio = tv.device.capabilities.audio === true;
 if (claimsAudio) {

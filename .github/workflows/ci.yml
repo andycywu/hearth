@@ -28,8 +28,23 @@ jobs:
   # `wpctl`. That leaves the one question a fake can't answer: does it work when
   # the commands are real? A CI runner is a Linux box we already have, so this
   # closes the gap on every push rather than waiting for hardware.
+  # One leg per audio stack, because Linux audio is the part that actually
+  # differs between boxes and the adapter picks between three of them. A single
+  # leg would prove "some backend works" while the ordering silently sent every
+  # machine down the same path.
+  #
+  # `none` is not a filler case: a minimal set-top image really does ship without
+  # a mixer, and reporting that as *unsupported* rather than failing is what
+  # stops a viewer being told to try again at something that never can.
   linux-adapter:
     runs-on: ubuntu-latest
+    strategy:
+      # Every leg reports. One backend being unavailable on a runner shouldn't
+      # hide the state of the other three.
+      fail-fast: false
+      matrix:
+        audio: [none, pulseaudio, pipewire, alsa]
+    name: linux-adapter (${{ matrix.audio }})
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -40,41 +55,90 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
-      # First with nothing installed: no mixer is a legitimate state, and the
-      # adapter has to report it as *unsupported* rather than fail. Getting this
-      # wrong is how a viewer ends up being told to try again forever.
-      - name: With no mixer installed
-        run: node tools/verify-linux.mjs
-
-      # Then for real. A CI runner has no sound card, so PulseAudio gets a
-      # null sink — which is a real sink as far as `pactl` is concerned, and
-      # exercises the actual command strings, the actual output format and the
-      # actual round-trip.
-      - name: Install PulseAudio and create a null sink
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils
-          pulseaudio --start --exit-idle-time=-1
-          pactl load-module module-null-sink sink_name=tv_test
-          pactl set-default-sink tv_test
-          pactl get-sink-volume @DEFAULT_SINK@
-
-      # Some real .desktop entries to scan, in the user's own XDG directory.
+      # Real entries for the .desktop scan, in the user's own XDG directory.
       - name: Add a desktop entry
         run: |
           mkdir -p ~/.local/share/applications
           printf '[Desktop Entry]\nType=Application\nName=Test Player\nExec=/bin/true %%U\n' \
             > ~/.local/share/applications/test-player.desktop
 
-      - name: With a working mixer
+      # A runner has no sound card, so each stack gets a null sink — a real sink
+      # as far as its own tooling is concerned, which is what exercises the
+      # command strings and the output format for real.
+      #
+      # Each setup ends by running the tool the adapter will run. If that fails,
+      # the job fails here rather than later as a mysterious "backend not found",
+      # which would otherwise pass the `none` assertions and look green.
+      - name: Set up ${{ matrix.audio }}
+        if: matrix.audio != 'none'
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          case "${{ matrix.audio }}" in
+            pulseaudio)
+              sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils
+              pulseaudio --start --exit-idle-time=-1
+              pactl load-module module-null-sink sink_name=tv_test
+              pactl set-default-sink tv_test
+              pactl get-sink-volume @DEFAULT_SINK@
+              ;;
+            pipewire)
+              # wpctl ships in wireplumber; pipewire-pulse provides the pactl
+              # shim used only to add the null sink.
+              sudo apt-get install -y --no-install-recommends \
+                pipewire pipewire-pulse wireplumber pulseaudio-utils dbus-x11
+              ;;
+            alsa)
+              # snd-dummy is a real ALSA card with a real mixer, no hardware.
+              # The runner is a VM with root, so the module can be loaded — but
+              # only if the matching extra-modules package is available.
+              sudo apt-get install -y --no-install-recommends alsa-utils "linux-modules-extra-$(uname -r)"
+              sudo modprobe snd-dummy
+              amixer -c 0 get Master
+              ;;
+          esac
+
+      # PipeWire needs a session bus and a session manager, so its daemons and
+      # the check itself have to share one `dbus-run-session`. That is why this
+      # leg can't reuse the plain step below.
+      - name: Verify (pipewire)
+        if: matrix.audio == 'pipewire'
+        env:
+          EXPECT_AUDIO: wireplumber
+        run: |
+          set -euxo pipefail
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          sudo install -d -o "$(id -u)" -g "$(id -g)" -m 700 "$XDG_RUNTIME_DIR"
+          dbus-run-session -- bash -euxo pipefail -c '
+            pipewire & pipewire-pulse & wireplumber &
+            for i in $(seq 30); do wpctl status >/dev/null 2>&1 && break; sleep 1; done
+            pactl load-module module-null-sink sink_name=tv_test
+            pactl set-default-sink tv_test
+            wpctl get-volume @DEFAULT_AUDIO_SINK@
+            node tools/verify-linux.mjs
+            node apps/cli/dist/main.js --platform linux --quiet "set volume to 30"
+            wpctl get-volume @DEFAULT_AUDIO_SINK@
+          '
+
+      - name: Verify (${{ matrix.audio }})
+        if: matrix.audio != 'pipewire'
+        env:
+          # `none` is the absence of a backend, which the script spells that way.
+          EXPECT_AUDIO: ${{ matrix.audio }}
         run: node tools/verify-linux.mjs
 
-      # And the CLI itself, the way someone on a box would actually use it.
+      # And the CLI itself, the way someone on a box would use it. Skipped for
+      # `none`, where there is deliberately nothing to set.
       - name: Drive it from the terminal
+        if: matrix.audio == 'pulseaudio' || matrix.audio == 'alsa'
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           node apps/cli/dist/main.js --platform linux --quiet "set volume to 30"
-          pactl get-sink-volume @DEFAULT_SINK@ | head -1
+          if [ "${{ matrix.audio }}" = "pulseaudio" ]; then
+            pactl get-sink-volume @DEFAULT_SINK@ | head -1
+          else
+            amixer -c 0 get Master | tail -2
+          fi
           echo "what's the volume?" | node apps/cli/dist/main.js --platform linux --quiet
 
   # The Blits (WebGL) renderer lives outside the pnpm workspace on purpose — its
