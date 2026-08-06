@@ -86,11 +86,17 @@ every push — no fakes, real commands — across four legs:
 Also on every push: the CLI setting the volume and the platform's own tool
 reading back the change.
 
-**Still unverified:** ALSA with a real card. A GitHub runner's kernel is the
-Azure cloud flavour and ships no sound modules, so `snd-dummy` can't be loaded —
-`amixer`'s integration is covered by parser tests against recorded output and by
-the no-card case, but never against a working mixer. Also unverified: real
-hardware quantisation (a device's actual volume steps and dB curve).
+ALSA with a real card can't be done on a hosted runner — the kernel is the Azure
+cloud flavour and ships no sound modules, so `snd-dummy` won't load. That leg was
+covered separately, by hand, on an Ubuntu 26.04 VM with an emulated AC'97 card
+(`Intel 82801AA-ICH`): the adapter picked the `alsa` backend, round-tripped
+volume and mute through real `amixer`, and the CLI's changes were confirmed with
+`amixer` itself rather than by asking our own code.
+
+That run is also where the quantisation question got a real answer. The card has
+**32 steps**, so asking for 30 reads back 29 — which is why the check allows ±5
+rather than demanding the exact number. A test written to expect 30 would have
+passed everywhere it was written and failed on the first real device.
 
 If you have a box, run the same script:
 

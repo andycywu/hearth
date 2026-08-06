@@ -59,7 +59,11 @@ if (expected) {
 // --- audio, whichever way this box answers ------------------------------------
 const claimsAudio = tv.device.capabilities.audio === true;
 if (claimsAudio) {
+  // Both, because both get changed below. Restoring the level but not the mute
+  // state would leave a machine unmuted that was muted when we arrived — on
+  // someone's actual device that is a rude thing to do.
   const before = await tv.system.getVolume();
+  const wasMuted = await tv.system.getMute();
   check(before >= 0 && before <= 100, `getVolume returned ${before}, in 0..100`);
 
   await tv.system.setVolume(30);
@@ -74,7 +78,8 @@ if (claimsAudio) {
   check((await tv.system.getMute()) === false, "unmute reports false");
 
   await tv.system.setVolume(before);
-  console.log(`  ..    volume restored to ${before}`);
+  await tv.system.setMute(wasMuted);
+  console.log(`  ..    restored: volume ${before}, muted ${wasMuted}`);
 } else {
   // No mixer here. The adapter must say so as *unsupported*, not fail: the
   // difference is what the viewer is told, and whether a model retries.
