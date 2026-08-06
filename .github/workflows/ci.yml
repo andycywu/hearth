@@ -28,9 +28,10 @@ jobs:
   # `wpctl`. That leaves the one question a fake can't answer: does it work when
   # the commands are real? A CI runner is a Linux box we already have, so this
   # closes the gap on every push rather than waiting for hardware.
-  # One leg per audio stack, because Linux audio is the part that actually
-  # differs between boxes and the adapter picks between three of them. A single
-  # leg would prove "some backend works" while the ordering silently sent every
+  #
+  # One leg per audio stack, because that is the part that actually differs
+  # between boxes and the adapter chooses between three of them. A single leg
+  # would prove "some backend works" while the ordering silently sent every
   # machine down the same path.
   #
   # `none` is not a filler case: a minimal set-top image really does ship without
@@ -43,7 +44,12 @@ jobs:
       # hide the state of the other three.
       fail-fast: false
       matrix:
-        audio: [none, pulseaudio, pipewire, alsa]
+        # `alsa-no-card` rather than `alsa`: a GitHub runner's kernel is the
+        # Azure cloud flavour, which ships no sound modules at all, so
+        # `snd-dummy` cannot be loaded and a real ALSA card is not available
+        # here. What that leg checks instead is the failure mode it leaves
+        # behind — see the setup step.
+        audio: [none, pulseaudio, pipewire, alsa-no-card]
     name: linux-adapter (${{ matrix.audio }})
     steps:
       - uses: actions/checkout@v4
@@ -88,13 +94,26 @@ jobs:
               sudo apt-get install -y --no-install-recommends \
                 pipewire pipewire-pulse wireplumber pulseaudio-utils dbus-x11
               ;;
-            alsa)
-              # snd-dummy is a real ALSA card with a real mixer, no hardware.
-              # The runner is a VM with root, so the module can be loaded — but
-              # only if the matching extra-modules package is available.
-              sudo apt-get install -y --no-install-recommends alsa-utils "linux-modules-extra-$(uname -r)"
-              sudo modprobe snd-dummy
-              amixer -c 0 get Master
+            alsa-no-card)
+              # `amixer` present, no card behind it — which is what a runner has
+              # (the Azure kernel ships no sound modules, so `snd-dummy` will not
+              # load) and, more to the point, what a stripped set-top image with
+              # alsa-utils in the rootfs looks like.
+              #
+              # The bug this guards against: detection that looks for the binary
+              # on PATH would find `amixer`, declare audio available, and then
+              # fail on every call. Detection asks each tool to *answer* instead,
+              # so this must come out as no backend at all. Same reasoning as a
+              # `wpctl` with no PipeWire session, but here against the real
+              # binary rather than a fake.
+              sudo apt-get install -y --no-install-recommends alsa-utils
+              command -v amixer
+              # Confirm the premise: if this ever starts succeeding, a card
+              # appeared and the leg is no longer testing what it claims to.
+              if amixer get Master >/dev/null 2>&1; then
+                echo "amixer unexpectedly found a card — this leg's premise is stale" >&2
+                exit 1
+              fi
               ;;
           esac
 
@@ -123,22 +142,21 @@ jobs:
       - name: Verify (${{ matrix.audio }})
         if: matrix.audio != 'pipewire'
         env:
-          # `none` is the absence of a backend, which the script spells that way.
-          EXPECT_AUDIO: ${{ matrix.audio }}
+          # `none` is the absence of a backend, which the script spells that way
+          # — and `alsa-no-card` must reach the same answer despite `amixer`
+          # being installed. That equivalence is the point of the leg.
+          EXPECT_AUDIO: ${{ matrix.audio == 'alsa-no-card' && 'none' || matrix.audio }}
         run: node tools/verify-linux.mjs
 
       # And the CLI itself, the way someone on a box would use it. Skipped for
       # `none`, where there is deliberately nothing to set.
       - name: Drive it from the terminal
-        if: matrix.audio == 'pulseaudio' || matrix.audio == 'alsa'
+        if: matrix.audio == 'pulseaudio'
         run: |
           set -euxo pipefail
           node apps/cli/dist/main.js --platform linux --quiet "set volume to 30"
-          if [ "${{ matrix.audio }}" = "pulseaudio" ]; then
-            pactl get-sink-volume @DEFAULT_SINK@ | head -1
-          else
-            amixer -c 0 get Master | tail -2
-          fi
+          # Read it back with the platform's own tool, not ours.
+          pactl get-sink-volume @DEFAULT_SINK@ | head -1
           echo "what's the volume?" | node apps/cli/dist/main.js --platform linux --quiet
 
   # The Blits (WebGL) renderer lives outside the pnpm workspace on purpose — its

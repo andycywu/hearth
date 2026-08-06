@@ -73,12 +73,27 @@ that" rather than something that looks worth retrying.
 
 ## Verification status
 
-Honest about this: the CLI and the adapter's logic are covered by tests and were
-run end to end, **but not on real Linux hardware** — the machine this was written
-on is Windows, and the audio tools were exercised through a fake that only
-answers to the exact arguments `wpctl` takes. The parsers are tested against real
-recorded output from `wpctl`, `pactl` and `amixer`.
+CI runs [`tools/verify-linux.mjs`](../../tools/verify-linux.mjs) on Ubuntu on
+every push — no fakes, real commands — across four legs:
 
-What that means in practice: the shape is right and the commands are right, and
-the first run on an actual box may still turn up something. If you have one,
-`tv-agent --platform linux "what's the volume?"` is the thing to try first.
+| Leg | What it proves |
+| --- | --- |
+| `pulseaudio` | Real `pactl`: volume set/read round-trips, mute round-trips |
+| `pipewire` | Real `wpctl` under a real WirePlumber session |
+| `alsa-no-card` | `amixer` installed but no card must come out as *no backend*, not as broken audio |
+| `none` | Nothing installed → the capability reports unsupported and the agent says so |
+
+Also on every push: the CLI setting the volume and the platform's own tool
+reading back the change.
+
+**Still unverified:** ALSA with a real card. A GitHub runner's kernel is the
+Azure cloud flavour and ships no sound modules, so `snd-dummy` can't be loaded —
+`amixer`'s integration is covered by parser tests against recorded output and by
+the no-card case, but never against a working mixer. Also unverified: real
+hardware quantisation (a device's actual volume steps and dB curve).
+
+If you have a box, run the same script:
+
+```bash
+node tools/verify-linux.mjs
+```
