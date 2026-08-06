@@ -16,7 +16,7 @@
     "apps/dev-harness"
   ],
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/*\" run build",
+    "build": "pnpm -r --filter \"./packages/*\" run build && pnpm --filter @tv-ai-agent/cli run build",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "lint": "eslint .",
