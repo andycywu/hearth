@@ -21,6 +21,62 @@ jobs:
       - run: pnpm bundle:all
       - run: pnpm check:size
 
+  # The Linux adapter, on actual Linux.
+  #
+  # It was written on a Windows laptop with no WSL and no Docker, so everything
+  # about it was covered through an injected command runner — real parsers, fake
+  # `wpctl`. That leaves the one question a fake can't answer: does it work when
+  # the commands are real? A CI runner is a Linux box we already have, so this
+  # closes the gap on every push rather than waiting for hardware.
+  linux-adapter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # First with nothing installed: no mixer is a legitimate state, and the
+      # adapter has to report it as *unsupported* rather than fail. Getting this
+      # wrong is how a viewer ends up being told to try again forever.
+      - name: With no mixer installed
+        run: node tools/verify-linux.mjs
+
+      # Then for real. A CI runner has no sound card, so PulseAudio gets a
+      # null sink — which is a real sink as far as `pactl` is concerned, and
+      # exercises the actual command strings, the actual output format and the
+      # actual round-trip.
+      - name: Install PulseAudio and create a null sink
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=tv_test
+          pactl set-default-sink tv_test
+          pactl get-sink-volume @DEFAULT_SINK@
+
+      # Some real .desktop entries to scan, in the user's own XDG directory.
+      - name: Add a desktop entry
+        run: |
+          mkdir -p ~/.local/share/applications
+          printf '[Desktop Entry]\nType=Application\nName=Test Player\nExec=/bin/true %%U\n' \
+            > ~/.local/share/applications/test-player.desktop
+
+      - name: With a working mixer
+        run: node tools/verify-linux.mjs
+
+      # And the CLI itself, the way someone on a box would actually use it.
+      - name: Drive it from the terminal
+        run: |
+          set -euo pipefail
+          node apps/cli/dist/main.js --platform linux --quiet "set volume to 30"
+          pactl get-sink-volume @DEFAULT_SINK@ | head -1
+          echo "what's the volume?" | node apps/cli/dist/main.js --platform linux --quiet
+
   # The Blits (WebGL) renderer lives outside the pnpm workspace on purpose — its
   # Vite/Blits toolchain must not become a dependency of packages/*. This job
   # builds it anyway so it can't silently rot when the shared view-model changes.
