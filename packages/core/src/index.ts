@@ -11,6 +11,10 @@ export {
 } from "./tools/registry.js";
 export { createTvTools } from "./tools/tv-tools.js";
 export {
+  tvOk, tvFail, classifyToolError, tvResultData,
+  type TvResult, type TvResultError,
+} from "./tools/result.js";
+export {
   runDiagnostics,
   reportToMarkdown,
   type DiagnosticsReport,

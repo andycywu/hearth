@@ -1,4 +1,5 @@
 import {
+  hasCapability,
   matchAppsByName,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey, type VoicePipeline,
@@ -130,7 +131,7 @@ export function createAospAdapter(): PlatformProvider {
       delete: async (k) => bridge.kvDelete(k),
     },
     ...(voice ? { voice } : {}),
-    has: (cap) => cap in provider && (provider as any)[cap] !== undefined,
+    has: (cap) => hasCapability(provider, cap),
     init: async () => { /* bridge is ready once WebView finished loading */ },
   };
   return provider;

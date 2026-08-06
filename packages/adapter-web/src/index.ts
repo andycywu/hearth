@@ -1,4 +1,5 @@
 import {
+  hasCapability,
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey,
@@ -59,7 +60,7 @@ export function createWebAdapter(): PlatformProvider {
       resume: async () => { console.info("[web] resume"); },
       seek: async (ms) => { console.info("[web] seek", ms); },
     },
-    has: (cap) => cap in provider && (provider as any)[cap] !== undefined,
+    has: (cap) => hasCapability(provider, cap),
     init: async () => { /* nothing to wire */ },
   };
   return provider;

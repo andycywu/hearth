@@ -123,6 +123,26 @@ export { assertProviderContract } from "./contract.js";
 export type { ContractOptions } from "./contract.js";
 export { createLocalStorageStore, createMemoryStore } from "./storage.js";
 export { createWebSpeechPipeline } from "./web-speech.js";
+export { detectSpeechEngines } from "./speech-engines.js";
+
+/**
+ * The one rule for `has()`: a capability exists when its slot is filled.
+ *
+ * All four adapters had this same line copied in, each with its own `as any`
+ * cast — the kind of duplication that stays right by luck. An adapter now writes
+ * `has: (cap) => hasCapability(provider, cap)`, and the cast lives in one place
+ * where it can be explained: `keyof PlatformProvider` includes `has` and `init`,
+ * which are methods rather than capability slots, so the index has to be widened
+ * to read them at all. They are always present, so they always answer true —
+ * which is correct, if not very interesting.
+ */
+export function hasCapability(
+  provider: PlatformProvider,
+  capability: keyof PlatformProvider,
+): boolean {
+  return capability in provider
+    && (provider as unknown as Record<string, unknown>)[capability] !== undefined;
+}
 
 /** Shared helper: case-insensitive substring match over app display names. */
 export function matchAppsByName(apps: AppEntry[], query: string): AppEntry[] {

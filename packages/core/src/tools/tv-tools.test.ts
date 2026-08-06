@@ -79,8 +79,8 @@ describe("createTvTools — system", () => {
     // `get_volume` reports the mute state alongside the level: on Android the
     // platform zeroes the stream while muted, so a bare "volume: 0" hides the
     // difference between muted and turned all the way down.
-    expect(await byName(tools, "get_volume").execute({})).toEqual({ volume: 20, muted: false });
-    expect(await byName(tools, "set_volume").execute({ level: 35 })).toEqual({ ok: true, volume: 35 });
+    expect(await byName(tools, "get_volume").execute({})).toEqual({ ok: true, data: { volume: 20, muted: false } });
+    expect(await byName(tools, "set_volume").execute({ level: 35 })).toEqual({ ok: true, data: { volume: 35 } });
     expect(calls.setVolume).toEqual([35]);
   });
 
@@ -89,10 +89,10 @@ describe("createTvTools — system", () => {
     // was a question the agent had no tool to answer.
     const { platform } = fakePlatform();
     const tools = createTvTools(platform);
-    expect(await byName(tools, "get_mute").execute({})).toEqual({ muted: false });
+    expect(await byName(tools, "get_mute").execute({})).toEqual({ ok: true, data: { muted: false } });
     await byName(tools, "set_mute").execute({ mute: true });
-    expect(await byName(tools, "get_mute").execute({})).toEqual({ muted: true });
-    expect(await byName(tools, "get_volume").execute({})).toMatchObject({ muted: true });
+    expect(await byName(tools, "get_mute").execute({})).toEqual({ ok: true, data: { muted: true } });
+    expect(await byName(tools, "get_volume").execute({})).toMatchObject({ data: { muted: true } });
   });
 
   it("coerces a string level to a number (models often send strings)", async () => {
@@ -104,15 +104,15 @@ describe("createTvTools — system", () => {
   it("mutes and reports the resulting state", async () => {
     const { platform, calls } = fakePlatform();
     const tools = createTvTools(platform);
-    expect(await byName(tools, "set_mute").execute({ mute: true })).toEqual({ ok: true, muted: true });
-    expect(await byName(tools, "set_mute").execute({ mute: false })).toEqual({ ok: true, muted: false });
+    expect(await byName(tools, "set_mute").execute({ mute: true })).toEqual({ ok: true, data: { muted: true } });
+    expect(await byName(tools, "set_mute").execute({ mute: false })).toEqual({ ok: true, data: { muted: false } });
     expect(calls.setMute).toEqual([true, false]);
   });
 
   it("reads and switches the input source", async () => {
     const { platform, calls } = fakePlatform();
     const tools = createTvTools(platform);
-    expect(await byName(tools, "get_input_source").execute({})).toEqual({ source: "tv" });
+    expect(await byName(tools, "get_input_source").execute({})).toEqual({ ok: true, data: { source: "tv" } });
     expect(await byName(tools, "set_input_source").execute({ source: "hdmi2" })).toEqual({ ok: true });
     expect(calls.setInputSource).toEqual(["hdmi2"]);
   });
@@ -133,13 +133,67 @@ describe("createTvTools — system", () => {
   });
 });
 
+describe("createTvTools — the result envelope", () => {
+  /**
+   * The reason the envelope exists. Adapters signal "this firmware can't"
+   * by throwing `Not supported: …` — a convention nothing parsed at runtime, so
+   * unsupported, failed and offline all reached the model as identical English
+   * prose and it had no way to tell "stop asking" from "try again".
+   */
+  const throwing = (message: string): PlatformProvider => {
+    const { platform } = fakePlatform();
+    platform.system.setInputSource = async () => { throw new Error(message); };
+    return platform;
+  };
+
+  it("classifies the adapters' unsupported convention", async () => {
+    const tools = createTvTools(throwing("Not supported: setInputSource needs a platform signature"));
+    expect(await byName(tools, "set_input_source").execute({ source: "hdmi1" })).toEqual({
+      ok: false,
+      error: "unsupported",
+      // The prefix is the machine-readable part and is consumed, not echoed.
+      message: "setInputSource needs a platform signature",
+    });
+  });
+
+  it("calls a dead network offline rather than a TV fault", async () => {
+    const tools = createTvTools(throwing("TypeError: Failed to fetch"));
+    expect(await byName(tools, "set_input_source").execute({ source: "hdmi1" }))
+      .toMatchObject({ ok: false, error: "offline" });
+  });
+
+  it("treats anything else as a failure, keeping the message", async () => {
+    const tools = createTvTools(throwing("the TV said no"));
+    expect(await byName(tools, "set_input_source").execute({ source: "hdmi1" }))
+      .toEqual({ ok: false, error: "failed", message: "the TV said no" });
+  });
+
+  it("never lets a tool throw past the boundary", async () => {
+    // The agent used to catch these itself and flatten them to a string. Tools
+    // resolve now, so there is exactly one place that shapes a result.
+    const tools = createTvTools(throwing("boom"));
+    await expect(byName(tools, "set_input_source").execute({ source: "hdmi1" })).resolves.toBeDefined();
+  });
+
+  it("wraps every registered tool, not just the ones with a payload", async () => {
+    const tools = createTvTools(fakePlatform().platform);
+    for (const tool of tools) {
+      const spec = tool.spec;
+      // Only the no-argument readers can be called blind; that's enough to prove
+      // the wrapper was applied across the list rather than to a chosen few.
+      if (Object.keys(spec.parameters).length) continue;
+      expect(await tool.execute({}), spec.name).toHaveProperty("ok", true);
+    }
+  });
+});
+
 describe("createTvTools — apps and navigation", () => {
   it("lists, searches and launches apps", async () => {
     const { platform, calls } = fakePlatform();
     const tools = createTvTools(platform);
-    expect(await byName(tools, "list_apps").execute({})).toHaveLength(2);
+    expect((await byName(tools, "list_apps").execute({}) as any).data).toHaveLength(2);
     expect(await byName(tools, "search_app_by_name").execute({ query: "netflix" }))
-      .toEqual([{ id: "com.netflix.ninja", name: "Netflix" }]);
+      .toEqual({ ok: true, data: [{ id: "com.netflix.ninja", name: "Netflix" }] });
     expect(await byName(tools, "launch_app").execute({ appId: "com.netflix.ninja" })).toEqual({ ok: true });
     expect(calls.launchApp).toEqual(["com.netflix.ninja"]);
   });

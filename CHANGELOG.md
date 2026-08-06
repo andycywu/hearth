@@ -8,6 +8,37 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+Architecture review pass — three small changes, no restructuring:
+
+- **Every TV tool answers in one shape.** `{ ok: true, data? }` or
+  `{ ok: false, error: "unsupported" | "failed" | "offline", message }`.
+  Previously "this TV can't do that" was a thrown `Error` whose message began
+  with `"Not supported: "` — a convention **nothing parsed at runtime**; only the
+  adapter tests asserted it. The agent flattened any tool error to
+  `{ error: "<english prose>" }`, so unsupported, failed and offline were
+  indistinguishable to the model, which is the difference between "stop asking"
+  and "worth a retry". Adapters were **not** changed — they still throw, and the
+  classification happens once at the tool boundary, so the working AOSP path was
+  untouched.
+  - The offline scripted brain had to learn to pair a result with its call id to
+    tell a reader's answer from a mutator's confirmation. It had been inferring
+    that from the payload's shape, which only worked because mutators happened to
+    carry `ok` and readers didn't.
+- **`hasCapability()` in platform-api.** All four adapters had the same `has()`
+  line copied in with their own `as any`; the cast now lives in one place with a
+  reason next to it.
+- **`detectSpeechEngines()` moved from core to platform-api.** It names Samsung's
+  and Android's globals, and the agent core must not know what a Samsung is.
+  platform-api is already the layer that touches platform surfaces. Left as a
+  global probe rather than hidden behind `PlatformProvider.voice`, deliberately:
+  the useful answer is what the firmware could support *whether or not* an
+  adapter wired voice up.
+- **The "one vocabulary" rule is now a test**, not a convention: no tool name may
+  contain an OS, the core vocabulary must be byte-identical across web / Tizen /
+  AOSP / webOS, and any tool that varies must be capability-gated. Writing it
+  caught that the sets already differ — by exactly the four `media_*` tools,
+  which is the intended capability gating and not an OS leak.
+
 It no longer looks like a test build. The screen used to open on an engineering
 status line, a grey disc and a line of grey hint text, and every surface had
 picked its own colours:

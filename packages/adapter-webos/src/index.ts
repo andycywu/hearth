@@ -1,4 +1,5 @@
 import {
+  hasCapability,
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey,
@@ -103,7 +104,7 @@ export function createWebosAdapter(): PlatformProvider {
       resume: async () => dispatchKey("playpause"),
       seek: async (_ms) => { /* app-managed */ },
     },
-    has: (cap) => cap in provider && (provider as any)[cap] !== undefined,
+    has: (cap) => hasCapability(provider, cap),
     init: async () => { /* nothing to wire; Luna is available immediately */ },
   };
   return provider;

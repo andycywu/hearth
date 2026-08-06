@@ -129,7 +129,52 @@ function fromUser(
 
 // --- decide what to do after a tool result comes back ---
 function followUp(toolMsg: ChatMessage, messages: ChatMessage[], lang: Lang): CompletionResult {
-  const data = safeParse(toolMsg.content);
+  const raw = safeParse(toolMsg.content);
+
+  // TV tools answer in an envelope. Which tool produced it decides what to say:
+  // a reader's payload is the answer, a mutator's readback is just confirmation.
+  //
+  // This used to be inferred from the payload's shape — mutators happened to
+  // include `ok: true` and readers didn't — which stopped working the moment
+  // every result carried `ok`. The call id was always the honest way to tell,
+  // and it is what a real client uses to pair a result with its request.
+  if (raw && typeof raw === "object" && "ok" in (raw as object)) {
+    const env = raw as { ok: boolean; data?: unknown; error?: string; message?: string };
+    if (env.ok === false) {
+      // `unsupported` is not a failure to apologise for and not worth retrying:
+      // this TV genuinely cannot do it, and saying so is the useful answer.
+      const reason = env.message ?? String(env.error);
+      return finalText(env.error === "unsupported"
+        ? tf("unsupported", lang, reason)
+        : tf("failed", lang, reason));
+    }
+    if (env.data === undefined || !isReadTool(toolNameFor(toolMsg, messages))) {
+      return finalText(t("done", lang));
+    }
+    return interpret(env.data, messages, lang);
+  }
+  // A skill's own tool, which is outside the TV envelope.
+  return interpret(raw, messages, lang);
+}
+
+/** The tool that produced this result, paired back through the call id. */
+function toolNameFor(toolMsg: ChatMessage, messages: ChatMessage[]): string | undefined {
+  if (!toolMsg.toolCallId) return undefined;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const call = messages[i]?.toolCalls?.find((tc) => tc.id === toolMsg.toolCallId);
+    if (call) return call.name;
+  }
+  return undefined;
+}
+
+/** Readers answer a question; everything else just confirms it happened. */
+function isReadTool(name: string | undefined): boolean {
+  if (!name) return true;      // unknown: fall through to the shape checks
+  return name.startsWith("get_") || name === "list_apps" || name === "search_app_by_name";
+}
+
+/** Turn a tool's payload into the next move. */
+function interpret(data: unknown, messages: ChatMessage[], lang: Lang): CompletionResult {
 
   // An app search returned candidates → launch the first match.
   if (Array.isArray(data)) {
@@ -148,16 +193,13 @@ function followUp(toolMsg: ChatMessage, messages: ChatMessage[], lang: Lang): Co
 
   if (data && typeof data === "object") {
     const o = data as Record<string, unknown>;
-    // Order matters: mutating tools return { ok: true, ... }; read tools return
-    // only the queried field. Check error/ok before the read-only fields so a
-    // successful action reports "Done." rather than echoing its readback.
+    // A skill's own tool, which is not in the TV envelope.
     if (o.error) return finalText(tf("failed", lang, String(o.error)));
     // Custom skill result (docs/skills.md example): { city, tempC, summary }.
     if (typeof o.tempC === "number" && typeof o.summary === "string") {
       const condition = lang === "en" ? o.summary.toLowerCase() : o.summary;
       return finalText(tf("weather", lang, String(o.city), o.tempC, condition));
     }
-    if (o.ok === true) return finalText(t("done", lang));
     if (typeof o.volume === "number") {
       // Relative-volume flow: the get_volume readback came back — apply ±step.
       const lastUser = lastUserText(messages);
@@ -220,6 +262,13 @@ function t(key: keyof typeof STRINGS, lang: Lang): string {
 const PHRASES = {
   found: { en: "Found: {0}.", zh: "找到:{0}。", ja: "見つかりました:{0}。" },
   failed: { en: "That didn't work: {0}", zh: "執行失敗:{0}", ja: "実行できませんでした:{0}" },
+  // Distinct from `failed`: nothing went wrong, this TV just can't do it — so
+  // the phrasing shouldn't suggest retrying.
+  unsupported: {
+    en: "This TV can't do that: {0}",
+    zh: "這台電視不支援:{0}",
+    ja: "このテレビでは対応していません:{0}",
+  },
   volumeIs: { en: "The volume is {0}.", zh: "目前音量是 {0}。", ja: "現在の音量は {0} です。" },
   inputNow: { en: "Input is now {0}.", zh: "輸入源已切換為 {0}。", ja: "入力を {0} に切り替えました。" },
   // {0} place, {1} temperature, {2} condition — from the example skill.
@@ -296,7 +345,7 @@ function lastLaunchedAppId(messages: ChatMessage[]): string | undefined {
     if (launch && typeof (launch.args as any).appId === "string") return (launch.args as any).appId;
     // Or the most recent app-search result.
     if (m.role === "tool") {
-      const data = safeParse(m.content);
+      const data = unwrapEnvelope(safeParse(m.content));
       if (Array.isArray(data) && data[0] && typeof (data[0] as any).id === "string") {
         return (data[0] as any).id;
       }
@@ -319,4 +368,12 @@ function chunkText(s: string): string[] {
 }
 function safeParse(s: string): unknown {
   try { return JSON.parse(s); } catch { return s; }
+}
+
+/** The payload inside a TV tool's envelope, or the value itself if it isn't one. */
+function unwrapEnvelope(value: unknown): unknown {
+  if (value && typeof value === "object" && (value as { ok?: unknown }).ok === true) {
+    return (value as { data?: unknown }).data;
+  }
+  return value;
 }

@@ -1,4 +1,5 @@
 import {
+  hasCapability,
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey, type KeyValueStore,
@@ -107,7 +108,7 @@ export function createTizenAdapter(): PlatformProvider {
       resume: async () => dispatchKey("playpause"),
       seek: async (_ms) => { /* app-managed; no generic Tizen seek API */ },
     },
-    has: (cap) => cap in provider && (provider as any)[cap] !== undefined,
+    has: (cap) => hasCapability(provider, cap),
     init: async () => {
       // Fill in the device info Samsung's webapis would have given us. This is
       // the standard Tizen API, so it works on builds without the proprietary

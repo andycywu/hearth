@@ -1,5 +1,6 @@
 import type { PlatformProvider, InputSource, RemoteKey } from "@tv-ai-agent/platform-api";
 import type { Tool } from "./registry.js";
+import { tvOk, classifyToolError } from "./result.js";
 
 /**
  * Factory that turns a PlatformProvider into a set of agent tools. This is the
@@ -56,7 +57,7 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
       },
       execute: async (args) => {
         await platform.system.setVolume(Number((args as any).level));
-        return { ok: true, volume: await platform.system.getVolume() };
+        return { volume: await platform.system.getVolume() };
       },
     },
     {
@@ -69,7 +70,7 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
       },
       execute: async (args) => {
         await platform.system.setMute(Boolean((args as any).mute));
-        return { ok: true, muted: await platform.system.getMute() };
+        return { muted: await platform.system.getMute() };
       },
     },
     {
@@ -96,7 +97,7 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
       },
       execute: async (args) => {
         await platform.system.setInputSource((args as any).source as InputSource);
-        return { ok: true };
+        return undefined;
       },
     },
     {
@@ -130,7 +131,7 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
       },
       execute: async (args) => {
         await platform.apps.launchApp(String((args as any).appId));
-        return { ok: true };
+        return undefined;
       },
     },
     {
@@ -148,7 +149,7 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
       },
       execute: async (args) => {
         await platform.navigation.sendKey((args as any).key as RemoteKey);
-        return { ok: true };
+        return undefined;
       },
     },
   ];
@@ -163,15 +164,15 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
           description: "Start playback of a media URI on the active player.",
           parameters: { uri: { type: "string", description: "Media URI", required: true } },
         },
-        execute: async (args) => { await media.play(String((args as any).uri)); return { ok: true }; },
+        execute: async (args) => { await media.play(String((args as any).uri)); },
       },
       {
         spec: { name: "media_pause", description: "Pause the current playback.", parameters: {} },
-        execute: async () => { await media.pause(); return { ok: true }; },
+        execute: async () => { await media.pause(); },
       },
       {
         spec: { name: "media_resume", description: "Resume paused playback.", parameters: {} },
-        execute: async () => { await media.resume(); return { ok: true }; },
+        execute: async () => { await media.resume(); },
       },
       {
         spec: {
@@ -179,10 +180,32 @@ export function createTvTools(platform: PlatformProvider): Tool[] {
           description: "Seek the current playback to an absolute position in milliseconds.",
           parameters: { positionMs: { type: "number", description: "Position in ms", required: true } },
         },
-        execute: async (args) => { await media.seek(Number((args as any).positionMs)); return { ok: true }; },
+        execute: async (args) => { await media.seek(Number((args as any).positionMs)); },
       },
     );
   }
 
-  return tools;
+  return tools.map(inTvEnvelope);
+}
+
+/**
+ * Put a tool's result in the shared envelope, and its failures in the typed one.
+ *
+ * Applied once to the whole list rather than written into each `execute`: there
+ * are fifteen of them, the wrapping is identical every time, and a tool author
+ * should be writing "what the TV did", not error taxonomy. It also means an
+ * adapter that throws — which all of them still do — produces a classified
+ * result without any adapter change.
+ */
+function inTvEnvelope(tool: Tool): Tool {
+  return {
+    spec: tool.spec,
+    execute: async (args) => {
+      try {
+        return tvOk(await tool.execute(args));
+      } catch (err) {
+        return classifyToolError(err);
+      }
+    },
+  };
 }
