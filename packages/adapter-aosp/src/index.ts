@@ -1,5 +1,6 @@
 import {
   hasCapability,
+  TvUnsupportedError,
   matchAppsByName,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey, type VoicePipeline,
@@ -227,6 +228,6 @@ function callNative(reason: string, fn: () => void): void {
   try {
     fn();
   } catch {
-    throw new Error(`Not supported: ${reason}`);
+    throw new TvUnsupportedError(reason);
   }
 }

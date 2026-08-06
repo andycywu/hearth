@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createTvTools } from "./tv-tools.js";
 import type { Tool } from "./registry.js";
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import { TvUnsupportedError, type PlatformProvider } from "@tv-ai-agent/platform-api";
 
 /** Records every HAL call so a tool can be checked against the platform. */
 interface Calls {
@@ -154,6 +154,29 @@ describe("createTvTools — the result envelope", () => {
       // The prefix is the machine-readable part and is consumed, not echoed.
       message: "setInputSource needs a platform signature",
     });
+  });
+
+  it("recognises a typed unsupported error whatever its wording", async () => {
+    // The point of the type. Previously classification matched the message's
+    // `"Not supported: "` prefix, so rewording it — a change that compiles,
+    // reviews fine and breaks nothing visibly — silently downgraded the result
+    // to `failed`, and the user got "try again" for something that never can.
+    const { platform } = fakePlatform();
+    const reworded = new TvUnsupportedError("powerStandby needs DEVICE_POWER");
+    reworded.message = "totally different wording";
+    platform.system.powerStandby = async () => { throw reworded; };
+
+    // `power_standby` isn't a registered tool, so drive it through one that is.
+    platform.system.setInputSource = async () => { throw reworded; };
+    const tools = createTvTools(platform);
+    expect(await byName(tools, "set_input_source").execute({ source: "hdmi1" }))
+      .toEqual({ ok: false, error: "unsupported", message: "totally different wording" });
+  });
+
+  it("still understands the old prefix, for an adapter outside this repo", async () => {
+    const tools = createTvTools(throwing("Not supported: some third-party adapter"));
+    expect(await byName(tools, "set_input_source").execute({ source: "hdmi1" }))
+      .toMatchObject({ ok: false, error: "unsupported" });
   });
 
   it("calls a dead network offline rather than a TV fault", async () => {

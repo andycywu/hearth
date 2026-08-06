@@ -1,4 +1,5 @@
 import {
+  TvUnsupportedError,
   hasCapability,
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
@@ -262,4 +263,5 @@ function tizenKeyValueStore(): KeyValueStore {
 }
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 function safe<T>(fn: () => T): T | undefined { try { return fn(); } catch { return undefined; } }
-function notSupported(what: string, ..._a: unknown[]): never { throw new Error(`Not supported: ${what}`); }
+/** The variadic tail just swallows the unused args at each call site. */
+function notSupported(what: string, ..._a: unknown[]): never { throw new TvUnsupportedError(what); }

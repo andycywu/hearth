@@ -17,6 +17,8 @@
  * `{ volume: 30, muted: false }` is the useful part.
  */
 
+import { isTvUnsupported } from "@tv-ai-agent/platform-api";
+
 export type TvResultError = "unsupported" | "failed" | "offline";
 
 export type TvResult =
@@ -41,8 +43,13 @@ export function tvFail(error: TvResultError, message: string): TvResult {
 export function classifyToolError(err: unknown): TvResult {
   const message = err instanceof Error ? err.message : String(err);
 
-  // The adapters' existing convention, now given a machine-readable meaning
-  // instead of only a human-readable one.
+  // The typed signal, which is what every adapter in this repo throws.
+  if (isTvUnsupported(err)) {
+    return tvFail("unsupported", message.replace(/^Not supported:\s*/i, ""));
+  }
+  // Prefix fallback, for an adapter written outside this repo that only follows
+  // the old convention. Best-effort by nature: a reworded prefix silently
+  // downgrades to `failed`, which is exactly why ours no longer rely on it.
   if (/^Not supported\b/i.test(message)) {
     return tvFail("unsupported", message.replace(/^Not supported:\s*/i, ""));
   }

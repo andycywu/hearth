@@ -20,6 +20,15 @@ Architecture review pass — three small changes, no restructuring:
   and "worth a retry". Adapters were **not** changed — they still throw, and the
   classification happens once at the tool boundary, so the working AOSP path was
   untouched.
+  - **Adapters now throw `TvUnsupportedError`** rather than a plain `Error` whose
+    message starts with `"Not supported: "`. Classifying on that prefix worked
+    and was one typo from silently not working: rewording it to `"Unsupported:"`
+    compiles, reviews fine, and quietly downgrades the result from *unsupported*
+    to *failed* — so the viewer is told "try again" about something that never
+    can. The prefix match survives as a fallback for adapters written outside
+    this repo, documented as best-effort. Verified on the emulator: asking to
+    switch input now answers "This TV can't do that: setInputSource (needs a
+    platform signature on most builds)".
   - The offline scripted brain had to learn to pair a result with its call id to
     tell a reader's answer from a mutator's confirmation. It had been inferring
     that from the payload's shape, which only worked because mutators happened to

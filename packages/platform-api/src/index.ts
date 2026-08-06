@@ -124,6 +124,7 @@ export type { ContractOptions } from "./contract.js";
 export { createLocalStorageStore, createMemoryStore } from "./storage.js";
 export { createWebSpeechPipeline } from "./web-speech.js";
 export { detectSpeechEngines } from "./speech-engines.js";
+export { TvUnsupportedError, isTvUnsupported } from "./errors.js";
 
 /**
  * The one rule for `has()`: a capability exists when its slot is filled.
