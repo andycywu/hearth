@@ -43,11 +43,18 @@ export const TV_FONT =
 
 export interface TvThemeOptions {
   /**
-   * Let whatever is behind the app show through. Default true.
+   * Let whatever is behind the app show through. Default false — **the host must
+   * opt in**, because only the host knows whether its window is actually
+   * composited over anything.
    *
-   * Set false for bring-up captures and screenshots, where a translucent window
-   * over a live channel makes it impossible to tell whether the app drew
-   * anything at all.
+   * It defaulted to true and that was wrong on two hosts out of three. A
+   * see-through page needs a see-through *window*, which on AOSP takes a
+   * translucent Activity theme and a cleared WebView background. Tizen and webOS
+   * run in a web runtime with no equivalent, so the page was drawing its scrim
+   * over the runtime's own pale backing instead of over content: the whole
+   * screen came out washed-out grey rather than the dark surface it was
+   * designed as. Opaque is the safe default; a host that has really made its
+   * window transparent passes true.
    */
   translucent?: boolean;
   /**
@@ -68,7 +75,7 @@ export interface TvThemeOptions {
  * environment with no DOM.
  */
 export function tvThemeCss(opts: TvThemeOptions = {}): string {
-  const translucent = opts.translucent ?? true;
+  const translucent = opts.translucent ?? false;
   const scrim = clamp01(opts.scrim ?? 0.86);
   const p = TV_PALETTE;
 
@@ -146,6 +153,10 @@ export function applyTvTheme(opts: TvThemeOptions = {}): HTMLStyleElement {
  */
 export function tvThemeOptionsFromUrl(search: string): TvThemeOptions {
   const opts: TvThemeOptions = {};
+  // Both directions, since the host's own answer can be wrong either way: a TV
+  // whose runtime does composite the page wants `?translucent`, and a bring-up
+  // capture on a host that opted in wants `?solid`.
+  if (/(?:^|[?&])translucent(?=[&=]|$)/.test(search)) opts.translucent = true;
   if (/(?:^|[?&])solid(?=[&=]|$)/.test(search)) opts.translucent = false;
   const scrim = /(?:^|[?&])scrim=([0-9.]+)/.exec(search);
   if (scrim) {

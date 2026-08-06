@@ -28,7 +28,8 @@ hardware.
 | LLM connectors (OpenAI-compatible + offline scripted) | ✅ done, with retry |
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
-| Avatar + on-screen keyboard | ✅ avatar is the default face, `?keyboard` to type — verified on the Android TV emulator |
+| Avatar + on-screen keyboard | ✅ avatar is the default face, `?keyboard` to type — verified on the Android TV **and** Tizen emulators |
+| Translucent overlay | ✅ AOSP only. Tizen/webOS web runtimes can't make a window see-through, so those hosts stay opaque; `?translucent` to try anyway |
 | CJK input | ✅ kana keyboard (real characters); Chinese as phrases — an IME is out of scope |
 | Confirmation dialog | ✅ focusable 10-foot modal, defaults to No; `window.confirm` only as a no-DOM fallback |
 | Skills — code (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |

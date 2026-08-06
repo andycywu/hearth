@@ -16,13 +16,18 @@ picked its own colours:
   that had drifted apart. The palette, the font stack and the glass treatment are
   tokens now, so the keyboard, the dialog and the avatar can't invent their own
   blue.
-- **The window is translucent** — the agent appears *over* what you were
-  watching and dims it rather than replacing it. On AOSP that needed the native
-  side too: a translucent theme and a transparent WebView background, because a
-  WebView paints opaque by default. The canvas also stopped filling itself with
-  opaque black, which was what made an overlay impossible however translucent the
-  window was. `?solid` for a bring-up capture, `?scrim=0.4` to see more of the
-  channel.
+- **The window is translucent on AOSP** — the agent appears *over* what you were
+  watching and dims it rather than replacing it. That needed the native side: a
+  translucent Activity theme and a cleared WebView background, because a WebView
+  paints opaque by default. The canvas also stopped filling itself with opaque
+  black, which was what made an overlay impossible however translucent the window
+  was. `?solid` for a bring-up capture, `?scrim=0.4` to see more of the channel.
+  - **Translucency is opt-in per host, and only AOSP opts in.** It was the
+    default at first, and that was wrong on two hosts out of three: Tizen and
+    webOS give a web app no way to make its window see-through, so the page
+    composited its scrim over the web runtime's own pale backing and the whole
+    screen came out washed-out grey. Caught on the Tizen emulator, not reasoned
+    about. `?translucent` forces it on where you want to try.
   - CSS cannot blur another native window — `backdrop-filter` only ever sees the
     page's own content — so dimming is the only tool there is, and the default
     scrim is heavier than it looks like it should be. At the first value tried the
@@ -64,6 +69,9 @@ picked its own colours:
   being received and discarded) and to `recognition.onend` in the shared Web
   Speech pipeline, so Tizen and webOS were affected identically. There's a 30 s
   backstop as well, because nothing here is worse than being stuck.
+  - Confirmed on the Tizen emulator over the Web Inspector: `startListening()`
+    resolves successfully and no transcript ever arrives, which is exactly the
+    case the old code read as "still listening". `onListeningEnd` fires once.
 - **Press again to give up.** The button was inert for the whole attempt, which is
   the wrong answer to "it isn't hearing me".
 

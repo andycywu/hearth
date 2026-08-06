@@ -31,11 +31,12 @@ async function boot(): Promise<void> {
     const platform = createWebosAdapter();
     await platform.init();
 
-    // The shared look, before anything is drawn: it makes the window itself
-    // transparent, so the agent sits over whatever was on screen. `?solid`
-    // turns that off for a bring-up capture, `?scrim=` tunes how much of the
-    // content behind stays visible.
-    applyTvTheme(tvThemeOptionsFromUrl(launchSearch()));
+    // The shared look, before anything is drawn. Opaque: this runtime gives a
+    // web app no way to make its window see-through, so a translucent page just
+    // composites the scrim over the runtime's own pale backing and the whole
+    // screen comes out washed-out grey. `?translucent` to try it anyway on a
+    // build that does composite, `?scrim=` to tune it.
+    applyTvTheme({ translucent: false, ...tvThemeOptionsFromUrl(launchSearch()) });
 
     // Bring-up mode: open with `?diag` to render a capability report.
     if (/(^|[?&])diag/.test(launchSearch())) {

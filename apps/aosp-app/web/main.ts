@@ -21,11 +21,12 @@ async function boot(): Promise<void> {
   const platform = createAospAdapter();
   await platform.init();
 
-  // The shared look, before anything is drawn: it makes the window itself
-  // transparent, so the agent sits over whatever was on screen. `?solid`
-  // turns that off for a bring-up capture, `?scrim=` tunes how much of the
-  // content behind stays visible.
-  applyTvTheme(tvThemeOptionsFromUrl(launchSearch()));
+  // The shared look, before anything is drawn. `translucent` is claimed here and
+  // only here: this host really has made its window see-through (a translucent
+  // Activity theme plus a cleared WebView background), so the agent sits over
+  // whatever was on screen. `?solid` turns it off for a bring-up capture,
+  // `?scrim=` tunes how much of the content behind stays visible.
+  applyTvTheme({ translucent: true, ...tvThemeOptionsFromUrl(launchSearch()) });
 
   // Bring-up mode: load with `?diag` to render an on-screen capability report.
   if (/(^|[?&])diag/.test(launchSearch())) {

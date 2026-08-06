@@ -9,14 +9,25 @@ const backdropRule = (css: string): string => {
 };
 
 describe("tvThemeCss", () => {
-  it("makes the page see-through by default, so the window's translucency shows", () => {
-    // The canvas used to paint an opaque fill over everything, which is what
-    // made an overlay impossible however translucent the native window was.
-    expect(tvThemeCss()).toContain("background:transparent");
+  it("is opaque unless the host says its window is really see-through", () => {
+    // This defaulted to translucent and it was wrong on two hosts out of three:
+    // Tizen and webOS give a web app no way to make its window transparent, so
+    // the scrim composited over the runtime's own pale backing and the screen
+    // came out washed-out grey. Measured on the Tizen emulator.
+    expect(backdropRule(tvThemeCss())).not.toContain("rgba");
+    expect(backdropRule(tvThemeCss())).not.toContain("backdrop-filter");
   });
 
-  it("blurs what's behind, which is what keeps text readable over live video", () => {
-    const css = tvThemeCss();
+  it("still leaves the page itself transparent, so an opted-in host shows through", () => {
+    // The canvas used to paint an opaque fill over everything, which is what
+    // made an overlay impossible however translucent the native window was. The
+    // backdrop layer carries the surface instead, in both modes.
+    expect(tvThemeCss()).toContain("background:transparent");
+    expect(tvThemeCss({ translucent: true })).toContain("background:transparent");
+  });
+
+  it("blurs what's behind once a host opts in", () => {
+    const css = tvThemeCss({ translucent: true });
     expect(css).toContain("backdrop-filter:blur");
     // TV Chromium builds are old enough to need the prefix, and shipping only
     // the modern spelling means no blur at all on the devices that need it most.
@@ -37,19 +48,19 @@ describe("tvThemeCss", () => {
   });
 
   it("carries the scrim through to the backdrop", () => {
-    expect(tvThemeCss({ scrim: 0.9 })).toContain("rgba(6,8,14,0.900)");
+    expect(tvThemeCss({ translucent: true, scrim: 0.9 })).toContain("rgba(6,8,14,0.900)");
   });
 
   it("dims hard enough by default to read over a bright screen behind", () => {
     // CSS cannot blur another native window, so dimming is the only tool there
     // is. At 0.62 the greeting was genuinely hard to read over the launcher.
-    const alpha = /rgba\(6,8,14,([0-9.]+)\)/.exec(tvThemeCss())?.[1];
+    const alpha = /rgba\(6,8,14,([0-9.]+)\)/.exec(tvThemeCss({ translucent: true }))?.[1];
     expect(Number(alpha)).toBeGreaterThanOrEqual(0.8);
   });
 
   it("clamps a scrim that would make the app invisible or opaque-by-accident", () => {
-    expect(tvThemeCss({ scrim: 5 })).toContain("rgba(6,8,14,1.000)");
-    expect(tvThemeCss({ scrim: -1 })).toContain("rgba(6,8,14,0.000)");
+    expect(tvThemeCss({ translucent: true, scrim: 5 })).toContain("rgba(6,8,14,1.000)");
+    expect(tvThemeCss({ translucent: true, scrim: -1 })).toContain("rgba(6,8,14,0.000)");
   });
 
   it("hides the engineering hint element the hosts still ship in their markup", () => {
@@ -64,9 +75,17 @@ describe("tvThemeCss", () => {
 });
 
 describe("tvThemeOptionsFromUrl", () => {
-  it("defaults to translucent — nothing in the URL means overlay", () => {
+  it("says nothing unless asked, leaving the host's own answer to stand", () => {
     expect(tvThemeOptionsFromUrl("")).toEqual({});
     expect(tvThemeOptionsFromUrl("?keyboard")).toEqual({});
+  });
+
+  it("can force translucency on, for a host that didn't opt in", () => {
+    expect(tvThemeOptionsFromUrl("?translucent")).toEqual({ translucent: true });
+  });
+
+  it("isn't switched on by a flag that merely starts with 'translucent'", () => {
+    expect(tvThemeOptionsFromUrl("?translucency")).toEqual({});
   });
 
   it("reads ?solid", () => {
