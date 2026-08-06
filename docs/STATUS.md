@@ -29,6 +29,8 @@ hardware.
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
 | Avatar + on-screen keyboard | ✅ avatar is the default face, `?keyboard` to type — verified on the Android TV **and** Tizen emulators |
+| CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal — `tv-agent "set volume to 30"`. Verified against the mock adapter |
+| Linux platform (`adapter-linux`) | ⚠️ passes the shared contract and its parsers are tested against real `wpctl`/`pactl`/`amixer` output, but **never run on real Linux hardware** |
 | Translucent overlay | ✅ AOSP only. Tizen/webOS web runtimes can't make a window see-through, so those hosts stay opaque; `?translucent` to try anyway |
 | CJK input | ✅ kana keyboard (real characters); Chinese as phrases — an IME is out of scope |
 | Confirmation dialog | ✅ focusable 10-foot modal, defaults to No; `window.confirm` only as a no-DOM fallback |

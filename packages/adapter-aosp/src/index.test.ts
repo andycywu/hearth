@@ -26,7 +26,15 @@ function installMockBridge(): void {
     listInstalledApps: () => JSON.stringify(apps),
     launchApp: () => {},
     getForegroundApp: () => "null",
-    sendKey: () => {},
+    // Mirrors TvNativeBridge.sendKey: the real one throws until the
+    // accessibility service is connected. A mock that accepted the key and did
+    // nothing let the adapter claim navigation worked when it didn't.
+    isAccessibilityEnabled: () => true,
+    sendKey: () => {
+      if (!(globalThis as any).TvNativeBridge.isAccessibilityEnabled?.()) {
+        throw new Error("Not supported: accessibility service not enabled");
+      }
+    },
     isOnline: () => true,
     connectionType: () => "ethernet",
     kvGet: (k: string) => state.kv.get(k) ?? "",
@@ -64,7 +72,7 @@ describe("adapter-aosp", () => {
 
     it("is unavailable on an older host that doesn't expose the check", async () => {
       // The bridge method is optional; assume "not ready" rather than "ready".
-      expect(bridge().isAccessibilityEnabled).toBeUndefined();
+      delete bridge().isAccessibilityEnabled;
       expect(await createAospAdapter().navigation.isAvailable!()).toBe(false);
     });
 

@@ -4,3 +4,4 @@ packages:
   - "apps/aosp-app"
   - "apps/webos-app"
   - "apps/dev-harness"
+  - "apps/cli"

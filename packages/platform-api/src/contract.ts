@@ -31,7 +31,7 @@ export async function assertProviderContract(
 
   // --- structure ---
   assert(p.device && typeof p.device.os === "string", "device.os must be a string");
-  assert(["aosp", "tizen", "webos", "web"].includes(p.device.os), `unexpected os: ${p.device.os}`);
+  assert(["aosp", "tizen", "webos", "web", "linux"].includes(p.device.os), `unexpected os: ${p.device.os}`);
   assert(typeof p.device.soc === "string", "device.soc must be a string");
   assert(typeof p.init === "function", "init() must exist");
   assert(typeof p.has === "function", "has() must exist");
@@ -83,8 +83,30 @@ export async function assertProviderContract(
   const conn = await p.network.connectionType();
   assert(["wifi", "ethernet", "none"].includes(conn), `bad connectionType: ${conn}`);
 
-  // --- navigation accepts a known key without throwing ---
-  await p.navigation.sendKey("ok");
+  // --- navigation, if this device can do it at all ---
+  //
+  // `isAvailable()` exists because some platforms genuinely can't inject keys:
+  // AOSP needs an accessibility service the user has to switch on, and a Linux
+  // box needs a display server and uinput access that a given image may not
+  // have. This used to call `sendKey` unconditionally, which contradicted the
+  // interface it was checking — a provider that answered "no" was still required
+  // to succeed.
+  //
+  // A provider that says no must then *say so when asked*, rather than accepting
+  // the key and doing nothing: silently swallowing navigation is the failure
+  // mode this pair of assertions exists to prevent.
+  const canNavigate = (await p.navigation.isAvailable?.()) ?? true;
+  if (canNavigate) {
+    await p.navigation.sendKey("ok");
+  } else {
+    let refused = false;
+    try {
+      await p.navigation.sendKey("ok");
+    } catch {
+      refused = true;
+    }
+    assert(refused, "navigation reports unavailable but sendKey succeeded anyway");
+  }
 
   // --- optional media, only if advertised ---
   if (p.has("media") && p.media) {

@@ -9,7 +9,12 @@
  */
 
 export interface DeviceInfo {
-  os: "aosp" | "tizen" | "webos" | "web";
+  /**
+   * `linux` is a device that *is* the TV and is driven from a shell on it — a
+   * set-top box, a Pi — as opposed to `web`, which is the in-memory adapter used
+   * for development and CI.
+   */
+  os: "aosp" | "tizen" | "webos" | "web" | "linux";
   osVersion: string;
   /** SoC vendor, e.g. "mediatek" | "novatek" | "unknown". */
   soc: string;

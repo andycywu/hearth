@@ -1,0 +1,26 @@
+{
+  "name": "@tv-ai-agent/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Run the TV agent from a terminal on the device itself \u2014 a set-top box, a Pi, any Linux box with Node. Same agent loop, same tools, no browser.",
+  "type": "module",
+  "bin": {
+    "tv-agent": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tv-ai-agent/core": "workspace:*",
+    "@tv-ai-agent/adapter-web": "workspace:*",
+    "@tv-ai-agent/llm-connectors": "workspace:*",
+    "@tv-ai-agent/platform-api": "workspace:*",
+    "@tv-ai-agent/adapter-linux": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  }
+}

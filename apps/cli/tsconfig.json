@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/adapter-web" },
+    { "path": "../../packages/adapter-linux" },
+    { "path": "../../packages/llm-connectors" },
+    { "path": "../../packages/platform-api" }
+  ],
+  "exclude": ["dist", "src/**/*.test.ts"]
+}
