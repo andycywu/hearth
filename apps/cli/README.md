@@ -98,6 +98,19 @@ That run is also where the quantisation question got a real answer. The card has
 rather than demanding the exact number. A test written to expect 30 would have
 passed everywhere it was written and failed on the first real device.
 
+It also turned up a defect no fake would have: on that machine, once a GNOME
+desktop session was also managing the sink, `wpctl set-volume` and
+`wpctl set-mute` sometimes had **no effect at all** while exiting 0 and printing
+nothing. Asking for 60% left the sink at 10% for two full seconds — not slow,
+not a stale read, simply lost. Retrying doesn't help; the writes that fail keep
+failing.
+
+The adapter can't make the write land, but it no longer claims it did: every
+`setVolume`/`setMute` reads back and throws if the change didn't take. The tool
+layer classifies that as `failed`, so the viewer is told "that didn't work"
+instead of "Done." A contended sink is normal on a desktop and shouldn't happen
+on a TV image, but the honest reporting is worth having either way.
+
 If you have a box, run the same script:
 
 ```bash

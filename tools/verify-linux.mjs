@@ -66,20 +66,52 @@ if (claimsAudio) {
   const wasMuted = await tv.system.getMute();
   check(before >= 0 && before <= 100, `getVolume returned ${before}, in 0..100`);
 
-  await tv.system.setVolume(30);
-  const after = await tv.system.getVolume();
-  // Every backend quantises: ALSA in steps, PipeWire in hundredths. Ask for a
-  // number in the right neighbourhood, not the exact one.
-  check(Math.abs(after - 30) <= 5, `set 30 → read back ${after} (within 5)`);
+  /**
+   * A write that doesn't take effect now throws, by design — the adapter refuses
+   * to call it a success. That is a result to report, not a reason to abandon
+   * the run: the remaining checks are still worth having, and more importantly
+   * the machine still needs putting back the way we found it. Letting the throw
+   * escape left a real box muted.
+   */
+  const attempt = async (what, fn) => {
+    try {
+      await fn();
+      check(true, what);
+    } catch (e) {
+      check(false, `${what} — ${e.message}`);
+    }
+  };
 
-  await tv.system.setMute(true);
-  check((await tv.system.getMute()) === true, "mute reports true");
-  await tv.system.setMute(false);
-  check((await tv.system.getMute()) === false, "unmute reports false");
-
-  await tv.system.setVolume(before);
-  await tv.system.setMute(wasMuted);
-  console.log(`  ..    restored: volume ${before}, muted ${wasMuted}`);
+  try {
+    // Every backend quantises: ALSA in steps, PipeWire in hundredths. Ask for a
+    // number in the right neighbourhood, not the exact one.
+    await attempt("set 30 → reads back near 30", async () => {
+      await tv.system.setVolume(30);
+      const after = await tv.system.getVolume();
+      if (Math.abs(after - 30) > 5) throw new Error(`read back ${after}`);
+    });
+    await attempt("mute reports true", async () => {
+      await tv.system.setMute(true);
+      if ((await tv.system.getMute()) !== true) throw new Error("still unmuted");
+    });
+    await attempt("unmute reports false", async () => {
+      await tv.system.setMute(false);
+      if ((await tv.system.getMute()) !== false) throw new Error("still muted");
+    });
+  } finally {
+    // Best effort, and reported: on a contended machine the restore can be the
+    // write that gets dropped, and silently leaving someone's TV muted while
+    // printing "restored" would be the worst of both.
+    let restored = true;
+    try {
+      await tv.system.setVolume(before);
+      await tv.system.setMute(wasMuted);
+    } catch (e) {
+      restored = false;
+      console.log(`  !!    could not fully restore (${e.message})`);
+    }
+    if (restored) console.log(`  ..    restored: volume ${before}, muted ${wasMuted}`);
+  }
 } else {
   // No mixer here. The adapter must say so as *unsupported*, not fail: the
   // difference is what the viewer is told, and whether a model retries.

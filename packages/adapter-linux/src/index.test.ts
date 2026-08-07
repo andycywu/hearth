@@ -3,6 +3,7 @@ import { assertProviderContract, isTvUnsupported } from "@tv-ai-agent/platform-a
 import { createLinuxAdapter } from "./index.js";
 import {
   parseWpctlVolume, parsePactlVolume, parseAmixerVolume, parseAmixerMuted, detectAudioBackend,
+  WIREPLUMBER,
 } from "./audio.js";
 import { parseDesktopEntry, execArgv, applicationDirs } from "./apps.js";
 import type { Runner, RunResult } from "./run.js";
@@ -103,8 +104,7 @@ describe("volume parsing — against real output", () => {
 
 describe("audio backend detection", () => {
   it("prefers PipeWire when it answers", async () => {
-    const run = runnerFor("wpctl", WPCTL_OUT);
-    expect((await detectAudioBackend(run))?.name).toBe("wireplumber");
+    expect((await detectAudioBackend(runnerFor("wpctl", WPCTL_OUT)))?.name).toBe("wireplumber");
   });
 
   it("falls to PulseAudio, then ALSA", async () => {
@@ -122,6 +122,50 @@ describe("audio backend detection", () => {
     const run: Runner = async (cmd) =>
       cmd === "wpctl" ? { code: 1, stdout: "", stderr: "no session" } : ok(PACTL_OUT);
     expect((await detectAudioBackend(run))?.name).toBe("pulseaudio");
+  });
+});
+
+describe("a write that silently does nothing", () => {
+  /**
+   * Measured on a real Ubuntu 26.04 desktop: `wpctl set-volume` sometimes has no
+   * effect at all while exiting 0 and printing nothing — asking for 60% left the
+   * sink at 10% for two seconds. It happens when another client (GNOME's volume
+   * control) manages the same sink. Retrying does not help; the writes that fail
+   * keep failing.
+   *
+   * The adapter cannot make the write land, but it must not report success. This
+   * is the case that used to answer "Done." to a mute that never happened.
+   */
+  const deaf = (): Runner => async (cmd, args) => {
+    if (cmd !== "wpctl") return missing;
+    const [verb, sink] = args;
+    if (verb === "get-volume" && sink === "@DEFAULT_AUDIO_SINK@") return ok("Volume: 0.10\n");
+    // Accepts every mutation, changes nothing — exactly what was observed.
+    return ok("");
+  };
+
+  it("refuses to call a lost volume write a success", async () => {
+    await expect(WIREPLUMBER.setVolume(deaf(), 60)).rejects.toThrow(/did not take effect/);
+  });
+
+  it("refuses to call a lost mute a success", async () => {
+    await expect(WIREPLUMBER.setMute(deaf(), true)).rejects.toThrow(/did not take effect/);
+  });
+
+  it("is not a plain failure dressed as unsupported", async () => {
+    // The device *can* do this; this attempt didn't work. A model should be free
+    // to try again, which `unsupported` would tell it not to.
+    await expect(WIREPLUMBER.setMute(deaf(), true)).rejects.not.toSatisfy(isTvUnsupported);
+  });
+
+  it("tolerates the quantisation a real mixer applies", async () => {
+    // A 32-step card reads back 29 when asked for 30. Rejecting that would fail
+    // on every real device while catching nothing.
+    const quantising: Runner = async (cmd, args) =>
+      cmd === "wpctl"
+        ? (args[0] === "get-volume" ? ok("Volume: 0.29\n") : ok(""))
+        : missing;
+    await expect(WIREPLUMBER.setVolume(quantising, 30)).resolves.toBeUndefined();
   });
 });
 

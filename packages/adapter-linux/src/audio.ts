@@ -63,15 +63,60 @@ function unparsable(cmd: string, out: string): never {
   throw new Error(`could not read the volume from ${cmd}: ${JSON.stringify(out.slice(0, 80))}`);
 }
 
+/**
+ * Largest gap between what we asked for and what we read back that is still
+ * "it worked".
+ *
+ * Every mixer quantises: an ALSA card measured on real hardware had 32 steps,
+ * so asking for 30 reads back 29. This has to absorb that while still catching
+ * the real failure below, where the level does not move at all — a miss of tens
+ * of points, not a few.
+ */
+const VOLUME_TOLERANCE = 10;
+
+/**
+ * Check that a write actually happened, and fail if it didn't.
+ *
+ * Measured on an Ubuntu 26.04 desktop running PipeWire 1.6.2 alongside GNOME:
+ * `wpctl set-volume` sometimes has **no effect at all** while exiting 0 and
+ * printing nothing. Asking for 60% left the sink at 10% for two full seconds —
+ * not a slow write and not a stale read, simply lost. It happens when another
+ * client (here GNOME's own volume control) is managing the same sink, which on
+ * a desktop is normal and on a TV image should not be, but neither is something
+ * this adapter can prevent.
+ *
+ * Retrying does not help: the writes that fail keep failing. So the useful thing
+ * is not to paper over it but to stop claiming it worked. Without this, the
+ * agent answers "Done." to a mute that did not happen. With it, the tool layer
+ * classifies the throw as `failed` and the viewer is told the truth.
+ */
+async function confirm<T>(
+  what: string,
+  wanted: T,
+  read: () => Promise<T>,
+  agrees: (got: T, want: T) => boolean = (a, b) => a === b,
+): Promise<void> {
+  const got = await read();
+  if (!agrees(got, wanted)) {
+    throw new Error(`${what} did not take effect: asked for ${wanted}, still ${got}`);
+  }
+}
+
 export const WIREPLUMBER: AudioBackend = {
   name: "wireplumber",
   getVolume: async (run) => {
     const out = await need(run, "wpctl", ["get-volume", SINK]);
     return parseWpctlVolume(out) ?? unparsable("wpctl", out);
   },
-  setVolume: async (run, level) => { await need(run, "wpctl", ["set-volume", SINK, `${clamp(level)}%`]); },
+  setVolume: async (run, level) => {
+    await need(run, "wpctl", ["set-volume", SINK, `${clamp(level)}%`]);
+    await confirm("set-volume", clamp(level), () => WIREPLUMBER.getVolume(run), (got, want) => Math.abs(got - want) <= VOLUME_TOLERANCE);
+  },
   getMute: async (run) => /\[MUTED\]/.test(await need(run, "wpctl", ["get-volume", SINK])),
-  setMute: async (run, mute) => { await need(run, "wpctl", ["set-mute", SINK, mute ? "1" : "0"]); },
+  setMute: async (run, mute) => {
+    await need(run, "wpctl", ["set-mute", SINK, mute ? "1" : "0"]);
+    await confirm("set-mute", mute, () => WIREPLUMBER.getMute(run));
+  },
 };
 
 export const PULSEAUDIO: AudioBackend = {
@@ -80,9 +125,15 @@ export const PULSEAUDIO: AudioBackend = {
     const out = await need(run, "pactl", ["get-sink-volume", PA_SINK]);
     return parsePactlVolume(out) ?? unparsable("pactl", out);
   },
-  setVolume: async (run, level) => { await need(run, "pactl", ["set-sink-volume", PA_SINK, `${clamp(level)}%`]); },
+  setVolume: async (run, level) => {
+    await need(run, "pactl", ["set-sink-volume", PA_SINK, `${clamp(level)}%`]);
+    await confirm("set-sink-volume", clamp(level), () => PULSEAUDIO.getVolume(run), (got, want) => Math.abs(got - want) <= VOLUME_TOLERANCE);
+  },
   getMute: async (run) => /Mute:\s*yes/i.test(await need(run, "pactl", ["get-sink-mute", PA_SINK])),
-  setMute: async (run, mute) => { await need(run, "pactl", ["set-sink-mute", PA_SINK, mute ? "1" : "0"]); },
+  setMute: async (run, mute) => {
+    await need(run, "pactl", ["set-sink-mute", PA_SINK, mute ? "1" : "0"]);
+    await confirm("set-sink-mute", mute, () => PULSEAUDIO.getMute(run));
+  },
 };
 
 export const ALSA: AudioBackend = {
@@ -91,9 +142,15 @@ export const ALSA: AudioBackend = {
     const out = await need(run, "amixer", ["get", "Master"]);
     return parseAmixerVolume(out) ?? unparsable("amixer", out);
   },
-  setVolume: async (run, level) => { await need(run, "amixer", ["set", "Master", `${clamp(level)}%`]); },
+  setVolume: async (run, level) => {
+    await need(run, "amixer", ["set", "Master", `${clamp(level)}%`]);
+    await confirm("amixer set", clamp(level), () => ALSA.getVolume(run), (got, want) => Math.abs(got - want) <= VOLUME_TOLERANCE);
+  },
   getMute: async (run) => parseAmixerMuted(await need(run, "amixer", ["get", "Master"])),
-  setMute: async (run, mute) => { await need(run, "amixer", ["set", "Master", mute ? "mute" : "unmute"]); },
+  setMute: async (run, mute) => {
+    await need(run, "amixer", ["set", "Master", mute ? "mute" : "unmute"]);
+    await confirm("amixer mute", mute, () => ALSA.getMute(run));
+  },
 };
 
 /**
