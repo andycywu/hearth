@@ -10,7 +10,6 @@
  * Intended for a Linux device that is itself the TV — a set-top box, a Pi —
  * where there is a shell but no browser worth using.
  */
-import { createInterface } from "node:readline";
 import { createInterface as createPromptInterface } from "node:readline/promises";
 import { stdin, stdout, stderr, argv, env, exit } from "node:process";
 import { Agent } from "@tv-ai-agent/core";
@@ -20,6 +19,7 @@ import {
 } from "@tv-ai-agent/llm-connectors";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import { parseArgs, HELP, type CliOptions } from "./args.js";
+import { readLines } from "./terminal.js";
 
 const VERSION = "0.1.0";
 
@@ -72,30 +72,6 @@ async function main(): Promise<number> {
   }
   // A non-zero exit for a failed turn, so this composes in a shell script.
   return failures ? 1 : 0;
-}
-
-/**
- * Lines from stdin, one command each.
- *
- * A prompt is written only when stdin is a terminal: `echo … | tv-agent` should
- * emit the answer and nothing else, and a prompt would land in the pipe.
- */
-async function* readLines(): AsyncGenerator<string> {
-  const interactive = stdin.isTTY === true;
-  if (interactive) stderr.write("tv-agent — type a command, or Ctrl-D to leave\n");
-  const rl = createInterface({ input: stdin, terminal: interactive });
-  if (interactive) stderr.write("> ");
-  let first = true;
-  for await (const line of rl) {
-    // A byte-order mark on the first line, which anything piped from a Windows
-    // tool or a UTF-8-with-BOM file carries. Invisible, and it becomes part of
-    // the command: it survived here only because the offline brain matches
-    // loosely, and a stricter model would have been handed "﻿mute".
-    yield first ? line.replace(/^﻿/, "") : line;
-    first = false;
-    if (interactive) stderr.write("> ");
-  }
-  if (interactive) stderr.write("\n");
 }
 
 /**
