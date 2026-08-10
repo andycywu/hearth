@@ -221,6 +221,26 @@ export interface DeviceShellOptions {
  * renderer choice decide whether anything listens — `ui.setSpeaking?.(true)` is
  * a no-op under the overlay.
  */
+/**
+ * Start a turn from a UI gesture and stop caring about the promise.
+ *
+ * A turn that fails has already reached the screen — the agent emits `error`
+ * and the view model paints it — so there is nothing left to handle here. What
+ * is left is the rejection itself: discarded with a bare `void`, it surfaces as
+ * an unhandled promise rejection, which on some TV runtimes is a crash rather
+ * than a console line.
+ *
+ * Not hypothetical: on the Tizen emulator `tizen.application.launch` accepts an
+ * app id and then never calls back, so "open Gallery" runs out its 30-second
+ * budget and the turn rejects. The screen showed the warning correctly and the
+ * rejection went nowhere.
+ */
+function askAndForget(ui: Pick<OverlayController, "ask">, text: string): void {
+  void ui.ask(text).catch(() => {
+    /* already rendered via the agent's `error` event */
+  });
+}
+
 export interface DeviceShellController extends OverlayController {
   setListening?(listening: boolean): void;
   setSpeaking?(speaking: boolean): void;
@@ -288,7 +308,7 @@ export function mountDeviceShell(
   // Opt-in per host because bring-up runs want the screen to themselves.
   const keyboard = opts.keyboard
     ? mountOnScreenKeyboard({
-        onSubmit: (text) => ui.ask(text),
+        onSubmit: (text) => askAndForget(ui, text),
         // Speech goes through the same field, so a transcript can be corrected
         // before sending and both input methods share one place on screen.
         ...(voice ? { onMic: () => void mic?.toggle() } : {}),
@@ -332,7 +352,7 @@ export function mountDeviceShell(
       void mic.stop();
       // Send it straight away: on a TV, making someone walk to "Send" after
       // speaking defeats the point of speaking.
-      if (text.trim()) void ui.ask(text.trim());
+      if (text.trim()) askAndForget(ui, text.trim());
     });
 
     document.addEventListener("keydown", (e) => {
@@ -465,7 +485,9 @@ export async function runStartupCommands(
 
   const demo = demoFromUrl(opts.search);
   if (demo) {
-    void runDemo((command) => ui.ask(command), demo.commands, {
+    // Same reasoning as `askAndForget`: one bad command must not end the demo
+    // loop or raise an unhandled rejection on a TV left running it all day.
+    void runDemo((command) => ui.ask(command).catch(() => {}), demo.commands, {
       loop: demo.loop,
       onCommand: (command, i, total) => show(`▶ ${command}   (${i + 1}/${total})`),
       onDone: () => show(demo.loop ? "" : "Demo finished — relaunch with ?demo to run it again."),
@@ -475,7 +497,11 @@ export async function runStartupCommands(
 
   for (const command of commandsFromUrl(opts.search)) {
     show(`▶ ${command}`);
-    await ui.ask(command);
+    // A command that fails is not a boot failure. Hosts wrap this call in the
+    // try/catch that paints "Boot error: …", so letting the rejection out
+    // replaced a working app with a message blaming startup for a turn that
+    // simply didn't work — and the turn's own error is already on screen.
+    await ui.ask(command).catch(() => { show(`▶ ${command} — didn't work`); });
   }
 }
 

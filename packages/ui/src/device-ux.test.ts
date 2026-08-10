@@ -4,8 +4,9 @@ import type { Agent, ConfirmRequest } from "@tv-ai-agent/core";
 import type { PlatformProvider, VoicePipeline } from "@tv-ai-agent/platform-api";
 import {
   createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, speakReplies, keyboardOption,
-  renderOption, inviteText, debugRequested, confirmQuestion,
+  renderOption, inviteText, debugRequested, confirmQuestion, runStartupCommands,
 } from "./device-ux.js";
+import type { OverlayController } from "./overlay.js";
 
 const request = (over: Partial<ConfirmRequest> = {}): ConfirmRequest => ({
   name: "set_input_source",
@@ -307,5 +308,38 @@ describe("confirmQuestion", () => {
     // gate — which is why it stays reachable rather than being deleted.
     expect(confirmQuestion(req("set_input_source", { source: "hdmi1" }), true))
       .toBe("Allow set_input_source(source=hdmi1)?");
+  });
+});
+
+describe("a turn that fails", () => {
+  /**
+   * The Tizen emulator accepts `tizen.application.launch("…Gallery")` and then
+   * never calls back, so the turn runs out its 30-second budget and rejects.
+   * The screen showed the warning — the agent emits `error` and the view model
+   * paints it — but the promise itself went nowhere.
+   */
+  const failing = (): OverlayController => ({
+    ask: async () => { throw new Error("Turn exceeded time budget of 30000ms"); },
+    destroy: () => {},
+  } as unknown as OverlayController);
+
+  /**
+   * Just the one element `runStartupCommands` reads. This package has no DOM
+   * test environment and this behaviour doesn't warrant adding one.
+   */
+  function stubHint(): { textContent: string } {
+    const hint = { textContent: "" };
+    (globalThis as any).document = { getElementById: (id: string) => (id === "hint" ? hint : null) };
+    return hint;
+  }
+  afterEach(() => { delete (globalThis as any).document; });
+
+  it("doesn't blame startup for a `?ask=` command that didn't work", async () => {
+    // Hosts wrap this in the try/catch that paints "Boot error: …", so a
+    // rejection escaping here replaced a working app with a boot failure.
+    const hint = stubHint();
+    await expect(runStartupCommands(failing(), { search: "?ask=open%20Gallery" }))
+      .resolves.toBeUndefined();
+    expect(hint.textContent).toMatch(/didn't work/);
   });
 });
