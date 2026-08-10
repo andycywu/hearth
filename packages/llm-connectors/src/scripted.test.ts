@@ -238,3 +238,60 @@ describe("scripted client — full agent loop (offline)", () => {
     expect(launch?.args).toMatchObject({ appId: "com.netflix.ninja" });
   });
 });
+
+describe("asking about mute rather than commanding it", () => {
+  /**
+   * "靜音了嗎" contains the mute word, so it was obeyed as an order and the
+   * question *changed* the thing it asked about. Caught on the Android TV
+   * emulator: the reply was "完成。" and the TV went silent.
+   *
+   * English survived only by luck — `\bmute\b` doesn't match "muted" — which is
+   * exactly the kind of accident that hides a bug in the other languages.
+   */
+  const ask = async (text: string) => {
+    const { platform, agent } = makeAgent();
+    const tools: string[] = [];
+    agent.events.on("tool:call", (e) => tools.push(e.name));
+    const output = await agent.run(text);
+    return { tools, output, muted: await platform.system.getMute() };
+  };
+
+  it("answers a Chinese question without muting the TV", async () => {
+    const { tools, muted } = await ask("靜音了嗎");
+    expect(tools).toEqual(["get_mute"]);
+    expect(muted, "asking must not change the state").toBe(false);
+  });
+
+  it("handles the other ways of asking", async () => {
+    for (const q of ["有沒有靜音", "靜音了沒有", "是不是靜音了?"]) {
+      expect((await ask(q)).tools, q).toEqual(["get_mute"]);
+    }
+  });
+
+  it("answers in English and Japanese too", async () => {
+    expect((await ask("is it muted?")).tools).toEqual(["get_mute"]);
+    expect((await ask("ミュートですか")).tools).toEqual(["get_mute"]);
+  });
+
+  it("answers the question rather than reporting an action", async () => {
+    // "Unmuted." to "is it muted?" reads as "I have just unmuted it" — the
+    // agent claiming to have done something it was only asked about.
+    const { output } = await ask("is it muted?");
+    expect(output).toMatch(/isn't muted|is muted/);
+    expect(output).not.toBe("Unmuted.");
+  });
+
+  it("still performs the action when it was an action", async () => {
+    // Mutations answer "Done." — the envelope carries success, so there is no
+    // readback to narrate. What matters is that the TV actually changed.
+    const { platform, agent } = makeAgent();
+    expect(await agent.run("mute")).toBe("Done.");
+    expect(await platform.system.getMute()).toBe(true);
+  });
+
+  it("still obeys a plain command", async () => {
+    expect((await ask("靜音")).tools).toEqual(["set_mute"]);
+    expect((await ask("mute")).tools).toEqual(["set_mute"]);
+    expect((await ask("取消靜音")).tools).toEqual(["set_mute"]);
+  });
+});

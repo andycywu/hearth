@@ -101,6 +101,20 @@ function fromUser(
   ) {
     return toolCall("get_volume", {});
   }
+  // Asking *about* mute, before either command — "靜音了嗎" contains the mute
+  // word and was being obeyed as an order to mute, so a question about the state
+  // changed it. English escapes that by accident (`\bmute\b` doesn't match
+  // "muted"); Chinese and Japanese have no word boundary to save them.
+  if (
+    available.has("get_mute") && (
+      /\b(is|are)\b.*\bmuted\b|\bmuted\b\s*\?/.test(text) ||
+      /(靜音|静音).*(嗎|吗|沒有|没有|了没|\?|？)/.test(text) ||
+      /有沒有(靜音|静音)/.test(text) ||
+      /(ミュート|消音).*(ですか|してる|されて|\?|？)/.test(text)
+    )
+  ) {
+    return toolCall("get_mute", {});
+  }
   // Unmute first: "ミュート解除" and "取消靜音" both contain the mute word.
   if (/\bunmute\b|取消靜音|開聲音|(?:ミュート|消音).*解除|解除.*(?:ミュート|消音)/.test(text)) {
     return toolCall("set_mute", { mute: false });
@@ -148,10 +162,9 @@ function followUp(toolMsg: ChatMessage, messages: ChatMessage[], lang: Lang): Co
         ? tf("unsupported", lang, reason)
         : tf("failed", lang, reason));
     }
-    if (env.data === undefined || !isReadTool(toolNameFor(toolMsg, messages))) {
-      return finalText(t("done", lang));
-    }
-    return interpret(env.data, messages, lang);
+    const tool = toolNameFor(toolMsg, messages);
+    if (env.data === undefined || !isReadTool(tool)) return finalText(t("done", lang));
+    return interpret(env.data, messages, lang, tool);
   }
   // A skill's own tool, which is outside the TV envelope.
   return interpret(raw, messages, lang);
@@ -174,7 +187,7 @@ function isReadTool(name: string | undefined): boolean {
 }
 
 /** Turn a tool's payload into the next move. */
-function interpret(data: unknown, messages: ChatMessage[], lang: Lang): CompletionResult {
+function interpret(data: unknown, messages: ChatMessage[], lang: Lang, tool?: string): CompletionResult {
 
   // An app search returned candidates → launch the first match.
   if (Array.isArray(data)) {
@@ -207,7 +220,11 @@ function interpret(data: unknown, messages: ChatMessage[], lang: Lang): Completi
       if (isQuieter(lastUser)) return toolCall("set_volume", { level: Math.max(0, o.volume - 10) });
       return finalText(tf("volumeIs", lang, o.volume));
     }
-    if (typeof o.muted === "boolean") return finalText(o.muted ? t("muted", lang) : t("unmuted", lang));
+    if (typeof o.muted === "boolean") {
+      // Answering a question, not reporting an action — see the strings above.
+      if (tool === "get_mute") return finalText(t(o.muted ? "isMuted" : "isNotMuted", lang));
+      return finalText(o.muted ? t("muted", lang) : t("unmuted", lang));
+    }
     if (typeof o.source === "string") return finalText(tf("inputNow", lang, o.source));
   }
 
@@ -243,8 +260,14 @@ const STRINGS = {
     zh: "離線模式只認得幾個示範城市的座標。接上真實模型就能問任何地方。",
     ja: "オフラインでは数都市の座標しか持っていません。実際のモデルに接続すればどこでも尋ねられます。",
   },
+  // Two pairs, because these answer two different things. After `set_mute` the
+  // reply reports an action; after `get_mute` it answers a question, and
+  // "Unmuted." there reads as "I have just unmuted it" — the agent claiming to
+  // have done something it was only asked about.
   muted: { en: "Muted.", zh: "已靜音。", ja: "ミュートしました。" },
   unmuted: { en: "Unmuted.", zh: "已取消靜音。", ja: "ミュートを解除しました。" },
+  isMuted: { en: "Yes, the TV is muted.", zh: "是的，目前是靜音。", ja: "はい、ミュート中です。" },
+  isNotMuted: { en: "No, the TV isn't muted.", zh: "沒有，目前不是靜音。", ja: "いいえ、ミュートされていません。" },
   help: {
     en: 'I can set volume, mute, switch input, or open an app. Try "open Netflix".',
     zh: '我可以調整音量、靜音、切換輸入源或開啟應用程式。試試「開啟 Netflix」。',
