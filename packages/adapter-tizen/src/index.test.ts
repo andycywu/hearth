@@ -157,3 +157,35 @@ describe("adapter-tizen", () => {
     expect(p.device.model).toBe("unknown");
   });
 });
+
+describe("a build with no audio control API", () => {
+  /**
+   * Exactly what the Tizen emulator is: neither Samsung's `webapis.audiocontrol`
+   * nor the standard `tizen.tvaudiocontrol`. Found by running there — the
+   * viewer was told "That didn't work", which invites retrying something that
+   * can never work on this firmware.
+   */
+  beforeEach(() => {
+    installTizenMocks();
+    delete (globalThis as any).webapis.audiocontrol;
+    delete (globalThis as any).tizen.tvaudiocontrol;
+  });
+
+  it("reports volume as unsupported, not as a failure", async () => {
+    const { isTvUnsupported } = await import("@tv-ai-agent/platform-api");
+    await expect(createTizenAdapter().system.getVolume()).rejects.toSatisfy(isTvUnsupported);
+  });
+
+  it("says the same about mute instead of confidently answering false", async () => {
+    // getMute used to swallow the error and return false, so "is the TV muted?"
+    // got a confident "no" from a TV that cannot tell — while getVolume on the
+    // very same build threw. One of the two had to be wrong.
+    const { isTvUnsupported } = await import("@tv-ai-agent/platform-api");
+    await expect(createTizenAdapter().system.getMute()).rejects.toSatisfy(isTvUnsupported);
+  });
+
+  it("names both APIs it looked for, since that is the fix", async () => {
+    await expect(createTizenAdapter().system.getVolume())
+      .rejects.toThrow(/webapis\.audiocontrol.*tizen\.tvaudiocontrol/s);
+  });
+});

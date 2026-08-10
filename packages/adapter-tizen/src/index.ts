@@ -45,7 +45,11 @@ export function createTizenAdapter(): PlatformProvider {
     system: {
       getVolume: async () => Number(audio().getVolume()),
       setVolume: async (l) => audio().setVolume(clamp(l)),
-      getMute: async () => Boolean(safe(() => webapis?.audiocontrol?.getMute?.()) ?? false),
+      // Through `audio()` like the other three, so a build with no audio API
+      // says so. It used to swallow the failure and answer `false`, which meant
+      // "is the TV muted?" got a confident "no" from a TV that cannot tell —
+      // and `getVolume` on the same build threw. One of those was wrong.
+      getMute: async () => Boolean(audio().getMute()),
       setMute: async (m) => audio().setMute(m),
       getInputSource: async () => mapTizenSource(safe(() => webapis?.tvinfo?.getCurrentSource?.())),
       setInputSource: async (s) => { notSupported("setInputSource on this firmware", s); },
@@ -148,7 +152,11 @@ function audio(): any {
   if (samsung) return samsung;
   const standard = typeof tizen !== "undefined" ? (tizen as any)?.tvaudiocontrol : undefined;
   if (standard) return standard;
-  throw new Error(
+  // Typed, not a plain Error: this firmware genuinely has no audio API, so it is
+  // *unsupported* rather than a failure worth retrying. As a plain Error it
+  // reached the viewer as "That didn't work" — advice to try again at something
+  // that can never work. Caught on the Tizen emulator, where neither API exists.
+  throw new TvUnsupportedError(
     "no audio control API on this build — neither Samsung's webapis.audiocontrol " +
     '(host page needs <script src="$WEBAPIS/webapis/webapis.js">) nor tizen.tvaudiocontrol',
   );
