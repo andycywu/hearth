@@ -38,7 +38,7 @@ jobs:
           mkdir -p _site
           cp apps/dev-harness/index.html apps/dev-harness/main.js _site/
           touch _site/.nojekyll
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with: { path: _site }
 
   deploy:
