@@ -15,6 +15,17 @@ export class ConversationContext {
     // Keep only the most recent maxTurns (system prompt is prepended fresh).
     const overflow = this.messages.length - this.maxTurns;
     if (overflow > 0) this.messages.splice(0, overflow);
+    // The cut lands wherever the count says, which can leave a tool result whose
+    // assistant `tool_calls` was just trimmed away. Every OpenAI-compatible
+    // server rejects that outright ("a message with role 'tool' must be a
+    // response to a preceding message with tool_calls"), so the whole
+    // conversation 400s from then on — not one bad turn, every turn after it.
+    //
+    // Invisible offline: the scripted client never looks at history shape. It
+    // takes a mix of tool-using and plain turns to reach, which is what a real
+    // session is: four questions, two commands, then an "open Netflix" (that
+    // one is two calls).
+    while (this.messages[0]?.role === "tool") this.messages.shift();
   }
 
   toMessages(): ChatMessage[] {
