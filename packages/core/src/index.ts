@@ -24,7 +24,7 @@ export {
 } from "./diagnostics/probe.js";
 export { ConversationContext } from "./memory/context.js";
 export { EventBus, type AgentEvents } from "./events/bus.js";
-export { launchSearch, launchSearchSource, redactSecrets } from "./launch-flags.js";
+export { launchSearch, launchSearchSource, redactSecrets, turnTimeoutFromUrl } from "./launch-flags.js";
 export type {
   LlmClient,
   ChatMessage,

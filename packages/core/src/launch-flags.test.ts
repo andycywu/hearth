@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { launchSearch, launchSearchSource , redactSecrets } from "./launch-flags.js";
+import { launchSearch, launchSearchSource , redactSecrets, turnTimeoutFromUrl} from "./launch-flags.js";
 
 const g = globalThis as Record<string, unknown>;
 
@@ -120,5 +120,33 @@ describe("redactSecrets", () => {
 
   it("handles nothing at all", () => {
     expect(redactSecrets("")).toBe("");
+  });
+});
+
+describe("turnTimeoutFromUrl", () => {
+  /**
+   * The 30s default assumes a model that answers in a couple of seconds. A
+   * local one on modest hardware took 40-70s a turn, so every turn timed out
+   * and the runtime looked broken when it was only slow. This is the knob that
+   * says "wait longer" without repackaging the app.
+   */
+  it("reads seconds and returns milliseconds", () => {
+    expect(turnTimeoutFromUrl("?timeout=90")).toBe(90_000);
+    expect(turnTimeoutFromUrl("?llm=http://x/v1&timeout=45")).toBe(45_000);
+  });
+
+  it("keeps the caller's default when unset", () => {
+    expect(turnTimeoutFromUrl("")).toBeUndefined();
+    expect(turnTimeoutFromUrl("?ask=mute")).toBeUndefined();
+  });
+
+  it("refuses values that are certainly a mistake", () => {
+    // Someone passing milliseconds by habit would otherwise get 30000 seconds,
+    // i.e. a turn that never times out at all — the opposite of a budget.
+    expect(turnTimeoutFromUrl("?timeout=30000")).toBeUndefined();
+    expect(turnTimeoutFromUrl("?timeout=0")).toBeUndefined();
+    expect(turnTimeoutFromUrl("?timeout=-5")).toBeUndefined();
+    expect(turnTimeoutFromUrl("?timeout=soon")).toBeUndefined();
+    expect(turnTimeoutFromUrl("?timeout=")).toBeUndefined();
   });
 });

@@ -84,3 +84,24 @@ export function launchSearchSource(): "url" | "baked" | "none" {
   if (fromUrl && fromUrl !== "?") return "url";
   return launchSearch() ? "baked" : "none";
 }
+
+/**
+ * `?timeout=90` — the per-turn budget, in seconds.
+ *
+ * The 30-second default assumes a model that answers in a couple of seconds.
+ * A local model on modest hardware does not: qwen2.5:7b on a CPU-only desktop
+ * took 40-70s a turn, so *every* turn timed out and the runtime looked broken
+ * when it was merely slow. Being able to say "wait longer" without repackaging
+ * is the difference between diagnosing that in a minute and in an afternoon.
+ *
+ * Bounded at both ends: below a second is certainly a mistake (someone passed
+ * milliseconds), and past ten minutes a TV viewer has long since given up.
+ * Returns undefined when unset or unparseable, so callers keep their default.
+ */
+export function turnTimeoutFromUrl(search = launchSearch()): number | undefined {
+  const raw = new URLSearchParams(search).get("timeout");
+  if (raw === null) return undefined;
+  const seconds = Number(raw.trim());
+  if (!Number.isFinite(seconds) || seconds < 1 || seconds > 600) return undefined;
+  return Math.round(seconds * 1000);
+}

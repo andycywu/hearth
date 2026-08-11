@@ -1,4 +1,4 @@
-import { Agent, runDiagnostics, reportToMarkdown, launchSearch } from "@tv-ai-agent/core";
+import { Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl} from "@tv-ai-agent/core";
 import { createWebosAdapter } from "@tv-ai-agent/adapter-webos";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
@@ -73,7 +73,10 @@ async function boot(): Promise<void> {
     // Parity with the dev harness: gate the high-impact tools and speak replies
     // when the device has a voice pipeline.
     const confirm = confirmOverrideFromUrl() ?? createConfirmHandler();
-    const agent = new Agent({ platform, llm, confirm });
+    // `?timeout=90` when the model is slow — a local model on modest hardware
+    // can take a minute a turn, and the 30s default makes that look broken.
+    const turnTimeoutMs = turnTimeoutFromUrl();
+    const agent = new Agent({ platform, llm, confirm, ...(turnTimeoutMs ? { turnTimeoutMs } : {}) });
     window.__tvAgent = agent;
     window.__tvPlatform = platform;
 
