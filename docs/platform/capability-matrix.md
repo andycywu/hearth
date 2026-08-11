@@ -8,8 +8,8 @@ deferred until a self-signed eng board — see [`../POC.md`](../POC.md).
 
 | Capability        | AOSP emu | AOSP+MTK | AOSP+NVT | Tizen+MTK | Tizen+NVT |
 |-------------------|----------|----------|----------|-----------|-----------|
-| set/get volume    | ✅       | ❔       | ❔       | ❔        | ❔        |
-| mute              | ✅       | ❔       | ❔       | ❔        | ❔        |
+| set/get volume    | ✅       | ❔       | ❔       | ❔⁴       | ❔⁴       |
+| mute              | ✅       | ❔       | ❔       | ❔⁴       | ❔⁴       |
 | list apps         | ✅       | ❔       | ❔       | ❔        | ❔        |
 | launch app        | ✅       | ❔       | ❔       | ❔        | ❔        |
 | input source      | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ⚠️        |
@@ -25,9 +25,17 @@ matching target (see the notes under the report below).
 ² `adapter-aosp` implements no `MediaControl`, so `has("media")` is false and the
 `media_*` tools are hidden — even though the bridge's `getDeviceInfo` advertises
 `capabilities.media: true`. Inconsistent: the device-info flag is cosmetic today.
-³ `adapter-aosp` exposes no `VoicePipeline`. Android voice would come through the
-native bridge, and the WebView page is deliberately not a secure context (see
-`apps/aosp-app/README.md`), so Web Speech isn't available there either.
+³ Stale as written: `adapter-aosp` *does* expose a `VoicePipeline` now, through
+the native bridge, and it is verified in both directions on the Android TV
+emulator. Web Speech is still unavailable in that WebView — the page is
+deliberately not a secure context (see `apps/aosp-app/README.md`) — which is
+exactly why the bridge exists.
+
+⁴ Not merely untested — **unexercised**. The Tizen TV 10.0 emulator has neither
+`webapis.audiocontrol` nor `tizen.tvaudiocontrol` (both globals read
+`undefined`), so no audio code path on that platform has ever run. The adapter
+reports this as `unsupported` rather than failing, and `?diag` prints which API
+it looked for. See [`../HARDWARE_VERIFICATION.md`](../HARDWARE_VERIFICATION.md).
 
 Record firmware version, WebView/Chromium version, and required privileges next
 to each result.

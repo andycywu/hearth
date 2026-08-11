@@ -3,14 +3,17 @@
 A snapshot of what's built, what's verified, and what remains. For the full plan
 see [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md).
 
-_Last updated: 2026-08-05 · target release: v0.1.0_
+_Last updated: 2026-08-11 · target release: v0.1.0_
 
 **The agent runs end-to-end on two TV emulators, and you can talk to it.** On
 Android TV the capability probe is clean (11 ok / 0 errors), the CI acceptance
 script passes unchanged, a real local model drives it, and speech works both ways
 through the native bridge. On the Samsung Tizen TV emulator the app installs,
-volume/mute/apps/storage all pass, `?diag` reports **zero** unsupported
-capabilities, and the built-in demo runs the whole agent loop — including Chinese
+apps/storage/network pass and a real local model drives it — but **that emulator
+has no audio API at all** (neither `webapis.audiocontrol` nor
+`tizen.tvaudiocontrol`), so volume and mute on Tizen are unexercised code and
+need a retail TV; an earlier version of this page claimed they passed. The
+built-in demo runs the whole agent loop — including Chinese
 and Japanese commands moving real device state — with **no network, no endpoint
 and no API key**. There is an avatar and a remote-driven on-screen keyboard, so a
 TV is no longer limited to whatever was baked into the launch flags. Packaging is
@@ -37,13 +40,14 @@ hardware.
 | Skills — code (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
 | Skills — data (JSON manifests, bundled + installable) | ✅ `packages/skill-manifest`, [ADR-0002](adr/0002-declarative-skill-manifests.md) |
 | Offline demo on device (`?demo`, no network) | ✅ verified on the Android **and** Tizen emulators |
-| Tests / CI / lint / bundle-size / license / SBOM | ✅ 348 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM | ✅ 480 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
 | **Tizen / webOS packaging** | ✅ signed `.wgt` + `.ipk` verified |
-| **Tizen TV emulator bring-up** | ✅ installs, runs, capabilities pass, offline demo runs |
-| **Tizen against a real model** | ⛔ the emulator's NAT is broken ([details](platform/capability-matrix.md)); needs a retail TV |
+| **Tizen TV emulator bring-up** | ✅ installs, runs, offline demo runs — but no audio API on that build, so volume/mute are untested |
+| **Tizen against a real model** | ✅ works. The earlier "the emulator's NAT is broken" was a misdiagnosis: `config.xml` declared no `<access>` origin, so the app could not reach *any* host. Fixed |
+| **Tizen audio (volume, mute)** | ⛔ needs a retail Samsung TV — see [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) |
 | **webOS install run** | ⛔ needs a TV emulator image or a TV in Developer Mode |
 | **Real MTK/NVT device bring-up** | ⛔ needs hardware |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
@@ -135,10 +139,11 @@ adapter-webos 6 · adapter-web 5 · acceptance 5.
    browser/device).
 3. **On-device model benchmark.** Measure model size vs. RAM/latency on real
    silicon; finalize cloud/on-device routing policy.
-4. **A real model on Tizen.** Everything else on that platform works; the
-   emulator's NAT can't reach one, so this needs a retail TV in Developer Mode —
-   which is also where Samsung's `webapis` actually exists, so it settles two
-   questions at once.
+4. **Tizen audio on a retail TV.** A real model on Tizen now works (the blocker
+   was a missing `<access>` origin, not the emulator's NAT). What remains is
+   audio: the emulator exposes neither audio API, so `volume` and `mute` have
+   never executed on this platform. A retail TV in Developer Mode is also where
+   Samsung's `webapis` exists, so it settles the rest of that surface at once.
 5. **npm publish.** Waiting on the `@tv-ai-agent` npm organization; GitHub Pages
    needs enabling in the repo settings for the hosted demo.
 

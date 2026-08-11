@@ -187,22 +187,25 @@ run on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 194 tests |
+| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 480 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
-| Real local model driving a TV | ✅ works; needs >1.5B for reliable tool chaining |
+| Real local model driving a TV | ✅ on the Android **and** Tizen emulators; needs >1.5B for reliable tool chaining |
+| Tizen audio (volume, mute) | ⛔ **unexercised** — that emulator has no audio API at all |
+| webOS on a device | ⛔ the `.ipk` builds and has never been installed |
 | Retail MTK / NVT hardware | ⛔ not yet |
-| Tizen / webOS on-device run | ⛔ needs an emulator image or a TV |
 | Privileged controls (input switch, standby) | ⛔ by design — needs vendor signing |
 
-[`docs/STATUS.md`](docs/STATUS.md) has the detail, including
-[the five device-only bugs](CHANGELOG.md) that only appeared once it ran on real
-Android.
+[`docs/HARDWARE_VERIFICATION.md`](docs/HARDWARE_VERIFICATION.md) is the per-OS
+list of what a real TV is still needed for, and why an emulator cannot answer it.
+[`docs/STATUS.md`](docs/STATUS.md) has the rest of the detail, including
+[the device-only bugs](CHANGELOG.md) that only appeared once it ran on real
+hardware.
 
 ## Documentation
 
 - [Writing a cross-vendor skill](docs/skills.md) · [Extending (tools, persistence, new OS)](docs/extending.md) · [API reference](docs/api.md)
-- [On-device inference](docs/on-device-inference.md) · [Architecture](docs/ARCHITECTURE.md) · [Project status](docs/STATUS.md)
+- [On-device inference](docs/on-device-inference.md) · [Architecture](docs/ARCHITECTURE.md) · [Project status](docs/STATUS.md) · [What still needs a real TV](docs/HARDWARE_VERIFICATION.md)
 - Bring-up: [POC plan (no vendor signing)](docs/POC.md) · [emulator setup](docs/EMULATOR_SETUP.md) · [checklist](docs/BRINGUP_CHECKLIST.md) · [capability matrix](docs/platform/capability-matrix.md)
 - [Security review](docs/SECURITY_REVIEW.md) · [Releasing](docs/RELEASING.md) · [Roadmap](docs/DEVELOPMENT_PLAN.md)
 
