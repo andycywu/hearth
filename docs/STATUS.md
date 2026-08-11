@@ -40,7 +40,7 @@ hardware.
 | Skills — code (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
 | Skills — data (JSON manifests, bundled + installable) | ✅ `packages/skill-manifest`, [ADR-0002](adr/0002-declarative-skill-manifests.md) |
 | Offline demo on device (`?demo`, no network) | ✅ verified on the Android **and** Tizen emulators |
-| Tests / CI / lint / bundle-size / license / SBOM | ✅ 480 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM | ✅ 484 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
@@ -48,7 +48,7 @@ hardware.
 | **Tizen TV emulator bring-up** | ✅ installs, runs, offline demo runs — but no audio API on that build, so volume/mute are untested |
 | **Tizen against a real model** | ✅ works. The earlier "the emulator's NAT is broken" was a misdiagnosis: `config.xml` declared no `<access>` origin, so the app could not reach *any* host. Fixed |
 | **Tizen audio (volume, mute)** | ⛔ needs a retail Samsung TV — see [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) |
-| **webOS install run** | ⛔ needs a TV emulator image or a TV in Developer Mode |
+| **webOS install run** | ✅ runs on the webOS TV 26 Simulator — first run found that the app shipped no webOSTV.js, so every capability threw `ReferenceError`. Audio/apps are stubs there; needs an LG TV |
 | **Real MTK/NVT device bring-up** | ⛔ needs hardware |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |

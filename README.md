@@ -187,12 +187,12 @@ run on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 480 tests |
+| Core, HAL, 4 adapters, tools, UI, connectors | ✅ done, 484 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
 | Real local model driving a TV | ✅ on the Android **and** Tizen emulators; needs >1.5B for reliable tool chaining |
 | Tizen audio (volume, mute) | ⛔ **unexercised** — that emulator has no audio API at all |
-| webOS on a device | ⛔ the `.ipk` builds and has never been installed |
+| webOS | ⚠️ runs on the TV 26 simulator; audio and app management are stubs there, so unverified |
 | Retail MTK / NVT hardware | ⛔ not yet |
 | Privileged controls (input switch, standby) | ⛔ by design — needs vendor signing |
 

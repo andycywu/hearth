@@ -15,7 +15,7 @@ not have, the emulator cannot test, and its silence reads exactly like success.*
 | OS | State | What a real device is for |
 |----|-------|---------------------------|
 | **Tizen** | Emulator only | **All audio.** The emulator has no audio API at all, so volume and mute have never run. Plus Samsung's whole `webapis.*` surface, and retail signing. |
-| **webOS** | **Nothing has ever run** | Everything. The `.ipk` builds and has never been installed. |
+| **webOS** | Simulator, first run | Audio and app management — the simulator stubs those Luna services. Plus partner APIs and a real TV's method names. |
 | **Android TV / AOSP** | Emulator, thoroughly | Input switching, standby, real remotes, real apps, and MTK/NVT performance. |
 | **Linux** | Real machine ✅ | Nothing outstanding — verified on Ubuntu with a real sound card. |
 
@@ -50,14 +50,38 @@ audio API was found, verbatim. If it still says "no audio control API on this
 build", the host page is missing
 `<script src="$WEBAPIS/webapis/webapis.js">` — the message names the fix.
 
-## webOS — completely unverified
+## webOS — runs now, on a simulator that stubs most of the bus
 
-The `.ipk` packages and that is the entire extent of it. It has never been
-installed, never launched, never run a single turn.
+Verified on the webOS TV 26 Simulator (1.5.0): the app installs into the app
+bar, launches, boots the agent, reports `webos` / `WEBOS26_SIMULATOR`, and
+network status comes back from the real Luna service bus.
 
-Everything in the table above applies, plus: input switching and standby are
-LG partner APIs and are not implemented. Treat webOS as **written but unproven**
-until an LG TV in Developer Mode or the webOS simulator says otherwise.
+That first run immediately found the reason none of this had ever worked:
+`webOS.service.request` is **not** a platform global. It ships in LG's
+webOSTV.js, which the *app* must include, and this one did not — so every
+capability threw `ReferenceError: webOS is not defined`. The adapter now falls
+back to `WebOSServiceBridge`, the native object that library wraps, so nothing
+needs to be bundled.
+
+| Capability | State on the simulator |
+|---|---|
+| Network status / connection type | ✅ real answers from `com.palm.connectionmanager` |
+| Volume, mute | ⛔ `com.webos.audio` exists but answers "Unknown method" — the simulator stubs it |
+| App list, launch, foreground app | ⛔ same, `com.webos.applicationManager` is a stub |
+| Input switching, standby | ⛔ LG partner APIs, not implemented |
+| Voice | Web Speech detected; no microphone, so unexercised |
+| Remote key codes | Synthetic events only; no real magic remote has been used |
+
+**What a real LG TV is for:** confirming the Luna method names for audio and
+app management. Ours are unverified against a device — the simulator can only
+say "that service is a stub here", which is not the same as "your URI is
+wrong". Both are plausible and only a TV can separate them.
+
+**Note for whoever runs the simulator next:** it is an Electron app, and it
+exits instantly with status 0 if `ELECTRON_RUN_AS_NODE` is set in the
+environment — which some editor-integrated terminals do set. If it seems not to
+launch at all, that is why. Launch it with
+`ares-launch <appDir> -s 26 -sp <simulatorDir>`.
 
 ## Android TV / AOSP — verified, with named exceptions
 
