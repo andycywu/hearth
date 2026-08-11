@@ -19,21 +19,100 @@ import {
  */
 declare const webOS: any;
 declare const webOSSystem: any;
+declare const WebOSServiceBridge: any;
+declare const PalmServiceBridge: any;
 
-/** Promisified Luna request. */
+/** How long to wait for the Luna bus before deciding the call is lost. */
+const LUNA_TIMEOUT_MS = 10_000;
+
+/**
+ * Promisified Luna request.
+ *
+ * Two transports, because the obvious one is not always there.
+ * `webOS.service.request` comes from LG's **webOSTV.js**, a library the *app*
+ * has to ship — the platform does not inject it. This app never did, so on the
+ * webOS TV 26 simulator every single capability failed with a bare
+ * `ReferenceError: webOS is not defined`: volume, mute, apps, network, all of
+ * it, on the first run this adapter ever had outside a unit test.
+ *
+ * `WebOSServiceBridge` is the native object webOSTV.js is itself a wrapper
+ * around, and it is present without shipping anything. Verified on the
+ * simulator: a call to `luna://com.palm.connectionmanager/getStatus` comes back
+ * with real connection state. So prefer the library when an app has bundled it,
+ * and fall back to the bridge underneath rather than requiring it.
+ *
+ * If neither exists this is not a webOS runtime at all, and that is
+ * `unsupported` rather than a failure worth retrying.
+ */
 function luna(uri: string, method: string, parameters: Record<string, unknown> = {}): Promise<any> {
   return new Promise((resolve, reject) => {
+    if (typeof webOS !== "undefined" && webOS?.service?.request) {
+      try {
+        webOS.service.request(uri, {
+          method,
+          parameters,
+          onSuccess: (res: any) => resolve(res),
+          onFailure: (err: any) => reject(new Error(String(err?.errorText ?? err))),
+        });
+      } catch (e) {
+        reject(e as Error);
+      }
+      return;
+    }
+
+    const Bridge = bridgeConstructor();
+    if (!Bridge) {
+      reject(new TvUnsupportedError(
+        "no Luna service bridge on this build — the page has no webOSTV.js " +
+        "(`webOS.service.request`) and no native WebOSServiceBridge/PalmServiceBridge",
+      ));
+      return;
+    }
+
     try {
-      webOS.service.request(uri, {
-        method,
-        parameters,
-        onSuccess: (res: any) => resolve(res),
-        onFailure: (err: any) => reject(new Error(String(err?.errorText ?? err))),
-      });
+      const bridge = new Bridge();
+      // The bus can simply not answer; without this the turn hangs to its own
+      // budget with nothing to show for it.
+      const timer = setTimeout(
+        () => reject(new Error(`Luna call timed out after ${LUNA_TIMEOUT_MS}ms: ${uri}/${method}`)),
+        LUNA_TIMEOUT_MS,
+      );
+      bridge.onservicecallback = (raw: string) => {
+        clearTimeout(timer);
+        let res: any;
+        try {
+          res = JSON.parse(raw);
+        } catch {
+          reject(new Error(`Luna returned something that isn't JSON: ${String(raw).slice(0, 120)}`));
+          return;
+        }
+        // The bridge reports service-level failures in the payload, not by
+        // throwing, so an unknown method would otherwise look like success
+        // with every field undefined.
+        if (res?.returnValue === false) {
+          const text = String(res.errorText ?? `Luna error ${res.errorCode ?? "?"}`);
+          // "Unknown method" and "Service does not exist" mean this build does
+          // not offer the capability at all, which is `unsupported` — telling
+          // the viewer "that didn't work" invites retrying something that never
+          // will. Anything else (a real service saying no) stays a failure.
+          reject(/unknown method|service does not exist/i.test(text)
+            ? new TvUnsupportedError(`${text} — ${uri}/${method}`)
+            : new Error(text));
+          return;
+        }
+        resolve(res);
+      };
+      bridge.call(`${uri}/${method}`, JSON.stringify(parameters));
     } catch (e) {
       reject(e as Error);
     }
   });
+}
+
+function bridgeConstructor(): any {
+  if (typeof WebOSServiceBridge !== "undefined") return WebOSServiceBridge;
+  if (typeof PalmServiceBridge !== "undefined") return PalmServiceBridge;
+  return undefined;
 }
 
 const AUDIO = "luna://com.webos.audio";

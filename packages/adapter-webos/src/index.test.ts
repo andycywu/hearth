@@ -85,3 +85,59 @@ describe("adapter-webos", () => {
     await expect(createWebosAdapter().network.isOnline()).rejects.toThrow(/service unavailable/);
   });
 });
+
+describe("a page with no webOSTV.js", () => {
+  /**
+   * `webOS.service.request` is not a platform global — it comes from LG's
+   * webOSTV.js, which the *app* has to ship. This app never did, so on the
+   * webOS TV 26 simulator every capability failed with a bare
+   * `ReferenceError: webOS is not defined` on the adapter's first run outside
+   * a unit test. The unit tests could not see it: they install a `webOS` mock,
+   * which is precisely the thing a real page was missing.
+   *
+   * `WebOSServiceBridge` is the native object webOSTV.js wraps, and it is there
+   * without shipping anything. Verified on the simulator against
+   * `com.palm.connectionmanager/getStatus`, which returns real state.
+   */
+  let calls: string[];
+
+  beforeEach(() => {
+    installWebosMocks();
+    delete (globalThis as any).webOS;   // exactly what a page without the library has
+    calls = [];
+    (globalThis as any).WebOSServiceBridge = class {
+      onservicecallback: ((raw: string) => void) | undefined;
+      call(uri: string, _params: string): void {
+        calls.push(uri);
+        const reply = uri.endsWith("/getStatus")
+          ? { returnValue: true, isInternetConnectionAvailable: true, wired: { state: "connected" } }
+          : { returnValue: false, errorCode: -1, errorText: `Unknown method "x" for category "/"` };
+        setTimeout(() => this.onservicecallback?.(JSON.stringify(reply)), 0);
+      }
+    };
+  });
+
+  afterEach(() => { delete (globalThis as any).WebOSServiceBridge; });
+
+  it("falls back to the native bridge instead of throwing ReferenceError", async () => {
+    await expect(createWebosAdapter().network.isOnline()).resolves.toBe(true);
+    expect(calls).toEqual(["luna://com.palm.connectionmanager/getStatus"]);
+  });
+
+  it("reads a real answer through it", async () => {
+    await expect(createWebosAdapter().network.connectionType()).resolves.toBe("ethernet");
+  });
+
+  it("calls a method the build doesn't have `unsupported`, not `failed`", async () => {
+    // The bridge reports service errors in the payload rather than throwing, so
+    // without this an unknown method looked like success with undefined fields.
+    const { isTvUnsupported } = await import("@tv-ai-agent/platform-api");
+    await expect(createWebosAdapter().system.getVolume()).rejects.toSatisfy(isTvUnsupported);
+  });
+
+  it("says so plainly when there is no bridge at all", async () => {
+    delete (globalThis as any).WebOSServiceBridge;
+    const { isTvUnsupported } = await import("@tv-ai-agent/platform-api");
+    await expect(createWebosAdapter().network.isOnline()).rejects.toSatisfy(isTvUnsupported);
+  });
+});
