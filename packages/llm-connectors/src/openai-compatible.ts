@@ -1,5 +1,6 @@
 import type {
   LlmClient, CompletionRequest, CompletionResult, ChatMessage, ToolCall, StreamHandlers,
+  ToolParameter,
 } from "@tv-ai-agent/core";
 
 export interface OpenAiCompatibleOptions {
@@ -68,7 +69,7 @@ export function createOpenAiCompatibleClient(opts: OpenAiCompatibleOptions): Llm
           description: t.description,
           parameters: {
             type: "object",
-            properties: t.parameters,
+            properties: jsonSchemaProperties(t.parameters),
             required: Object.entries(t.parameters).filter(([, p]) => p.required).map(([k]) => k),
           },
         },
@@ -172,6 +173,41 @@ export class StreamAccumulator {
     const message: ChatMessage = { role: "assistant", content: this.content, toolCalls };
     return { message, wantsToolCalls: !!toolCalls && toolCalls.length > 0 };
   }
+}
+
+/**
+ * Our `ToolParameter` is JSON-schema-*ish*, not JSON Schema: it carries a
+ * `required: boolean` on each property because that is the convenient way to
+ * declare a tool. JSON Schema spells requiredness as an array of names on the
+ * parent object -- which we do emit -- and reserves `required` *inside* a
+ * property for that property's own nested object. So a stray boolean there is
+ * not a harmless extra key, it is the wrong type for a real one.
+ *
+ * OpenAI ignores it. Ollama is strictly typed and refuses the whole request:
+ *
+ *   400 json: cannot unmarshal bool into Go struct field
+ *   ToolFunctionParameters.tools.function.parameters.properties.required
+ *   of type []string
+ *
+ * Every turn, so the agent could not call a single tool. Found the first time
+ * this was pointed at a local model; no amount of offline testing would have,
+ * because the offline client never sees a schema.
+ *
+ * Allow-list rather than delete-the-one-key: anything we invent on
+ * ToolParameter later is ours, and does not belong on the wire either.
+ */
+function jsonSchemaProperties(
+  params: Record<string, ToolParameter>,
+): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const [name, p] of Object.entries(params)) {
+    out[name] = {
+      type: p.type,
+      description: p.description,
+      ...(p.enum ? { enum: p.enum } : {}),
+    };
+  }
+  return out;
 }
 
 function toApiMessage(m: ChatMessage): Record<string, unknown> {

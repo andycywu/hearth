@@ -132,7 +132,9 @@ describe("createOpenAiCompatibleClient request mapping", () => {
         parameters: {
           type: "object",
           properties: {
-            source: { type: "string", description: "Input id", required: true, enum: ["hdmi1", "tv"] },
+            // No `required` in here: our ToolParameter carries one as a
+            // convenience, JSON Schema does not. See the test below.
+            source: { type: "string", description: "Input id", enum: ["hdmi1", "tv"] },
             force: { type: "boolean", description: "Skip checks" },
           },
           required: ["source"],   // only the required ones, derived from the spec
@@ -189,6 +191,62 @@ describe("createOpenAiCompatibleClient request mapping", () => {
     const r = await client.complete({ messages: [], tools: [] });
     expect(r.message.toolCalls?.[0]?.args).toEqual({});
   });
+
+  describe("the properties we put on the wire must be real JSON Schema", () => {
+  /**
+   * `ToolParameter` is JSON-schema-*ish*: it carries `required: boolean` per
+   * property because that is the convenient way to declare a tool. JSON Schema
+   * spells requiredness as an array of names on the parent object, and reserves
+   * `required` *inside* a property for that property's own nested object — so a
+   * boolean there is not a harmless extra key, it is the wrong type for a real
+   * one.
+   *
+   * OpenAI ignores it, which is why this shipped. Ollama is strictly typed and
+   * refused every request:
+   *
+   *   400 json: cannot unmarshal bool into Go struct field
+   *   ToolFunctionParameters.tools.function.parameters.properties.required
+   *   of type []string
+   *
+   * Not one bad turn — the tool list goes out with every request, so the agent
+   * could not call a single tool. Found the first time it was pointed at a
+   * local model. The suite passed throughout: the offline client never sees a
+   * schema, so nothing offline could have caught it.
+   */
+  it("never emits a boolean `required` inside a property", async () => {
+    const { client, seen } = capturingClient();
+    await client.complete({
+      messages: [],
+      tools: [{
+        name: "set_volume",
+        description: "Set volume",
+        parameters: { level: { type: "number", description: "0-100", required: true } },
+      }],
+    });
+    const props = (seen.body.tools as any)[0].function.parameters.properties;
+    expect(props.level).not.toHaveProperty("required");
+    // …and the requiredness still reaches the model, in the place it belongs.
+    expect((seen.body.tools as any)[0].function.parameters.required).toEqual(["level"]);
+  });
+
+  it("passes through only keys JSON Schema defines", async () => {
+    // An allow-list, not a delete-one-key: whatever we add to ToolParameter
+    // next is ours too, and does not belong on the wire either.
+    const { client, seen } = capturingClient();
+    await client.complete({
+      messages: [],
+      tools: [{
+        name: "t",
+        description: "d",
+        parameters: {
+          a: { type: "string", description: "x", required: true, enum: ["p"], mine: 1 } as never,
+        },
+      }],
+    });
+    const props = (seen.body.tools as any)[0].function.parameters.properties;
+    expect(Object.keys(props.a).sort()).toEqual(["description", "enum", "type"]);
+  });
+});
 });
 
 describe("createOpenAiCompatibleClient.completeStream", () => {
@@ -217,3 +275,4 @@ describe("createOpenAiCompatibleClient.completeStream", () => {
     expect(r.message.content).toBe("Hi there");
   });
 });
+
