@@ -25,6 +25,23 @@
   <tizen:privilege name="http://tizen.org/privilege/internet"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
 
+  <!--
+    Required for the app to reach *any* network host. The `internet` privilege
+    above is necessary but not sufficient: the Widget Access Request Policy
+    denies every external origin unless one is declared here, and a widget with
+    no access element at all reaches nothing.
+
+    Without it the model call fails as a bare "TypeError: Failed to fetch",
+    which reads exactly like a CSP block or a dead server, and is neither. The
+    Tizen emulator's own shell could curl the endpoint fine while the app
+    could not.
+
+    `*` because the endpoint is chosen at runtime (`?llm=`), so there is no host
+    to name at package time. The narrower gate stays the `connect-src` CSP in
+    index.html; tighten this to your own endpoint for a retail build.
+  -->
+  <access origin="*" subdomains="true"/>
+
   <tizen:setting screen-orientation="landscape"
                  context-menu="disable"
                  background-support="disable"
