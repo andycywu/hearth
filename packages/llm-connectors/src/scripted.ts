@@ -49,7 +49,31 @@ export function createScriptedClient(opts: ScriptedClientOptions = {}): LlmClien
 }
 
 // --- intent parsing from the user's message ---
+/**
+ * Match an intent, then refuse to propose a tool this device doesn't have.
+ *
+ * The check is here, once, rather than in each of the ten branches below: a
+ * branch is easy to add and the guard is easy to forget, and forgetting it
+ * produces a confusing answer rather than an obvious bug. On the Tizen emulator
+ * "set volume to 30" came back "That didn't work: Unknown tool: set_volume" when
+ * the truth was that the TV has no audio API — the agent had already withdrawn
+ * the tool and only the brain hadn't noticed.
+ */
 function fromUser(
+  raw: string,
+  messages: ChatMessage[],
+  lang: Lang,
+  available: Set<string>,
+): CompletionResult {
+  const result = matchIntent(raw, messages, lang, available);
+  const proposed = result.message.toolCalls?.[0]?.name;
+  if (proposed && !available.has(proposed)) {
+    return finalText(tf("unsupported", lang, `${proposed} isn't available on this device`));
+  }
+  return result;
+}
+
+function matchIntent(
   raw: string,
   messages: ChatMessage[],
   lang: Lang,
@@ -138,7 +162,7 @@ function fromUser(
   const openJa = text.match(/(.+?)\s*を\s*(?:開いて|開く|起動|再生|見せて|つけて)/);
   if (openJa?.[1]) return toolCall("search_app_by_name", { query: openJa[1].trim() });
 
-  return finalText(t("help", lang));
+  return finalText(helpText(lang, available));
 }
 
 // --- decide what to do after a tool result comes back ---
@@ -273,7 +297,49 @@ const STRINGS = {
     zh: '我可以調整音量、靜音、切換輸入源或開啟應用程式。試試「開啟 Netflix」。',
     ja: '音量調整、ミュート、入力切替、アプリの起動ができます。「Netflix を開いて」とどうぞ。',
   },
+  nothing: {
+    en: "This device hasn't given me anything I can control.",
+    zh: "這台裝置沒有提供我可以控制的功能。",
+    ja: "この機器から操作できる機能が提供されていません。",
+  },
 };
+
+/**
+ * The abilities to name, from the tools that are actually registered.
+ *
+ * The fixed sentence above listed volume and mute unconditionally, so on the
+ * Tizen emulator — which has no audio API, and where the agent had already
+ * withdrawn those tools — "what can you do?" still answered "I can set volume,
+ * mute, …" and then declined. The agent's tool list was honest and its own
+ * description of itself was not.
+ *
+ * Composed rather than looked up per combination: there are four groups here and
+ * a table of every subset is sixteen strings per language to keep in step.
+ */
+const ABILITIES: Array<{ tool: string; label: Record<Lang, string> }> = [
+  { tool: "set_volume", label: { en: "set volume", zh: "調整音量", ja: "音量調整" } },
+  { tool: "set_mute", label: { en: "mute", zh: "靜音", ja: "ミュート" } },
+  { tool: "set_input_source", label: { en: "switch input", zh: "切換輸入源", ja: "入力切替" } },
+  { tool: "launch_app", label: { en: "open an app", zh: "開啟應用程式", ja: "アプリの起動" } },
+];
+
+function helpText(lang: Lang, available: Set<string>): string {
+  const labels = ABILITIES.filter((a) => available.has(a.tool)).map((a) => a.label[lang]);
+  if (!labels.length) return t("nothing", lang);
+  // Unchanged wording when everything is present, so the full-capability case
+  // reads exactly as it always did.
+  if (labels.length === ABILITIES.length) return t("help", lang);
+  const canOpen = available.has("launch_app");
+  if (lang === "en") {
+    const list = labels.length === 1 ? labels[0]
+      : `${labels.slice(0, -1).join(", ")} or ${labels[labels.length - 1]}`;
+    return `I can ${list}.${canOpen ? ' Try "open Netflix".' : ""}`;
+  }
+  if (lang === "ja") {
+    return `${labels.join("、")}ができます。${canOpen ? "「Netflix を開いて」とどうぞ。" : ""}`;
+  }
+  return `我可以${labels.join("、")}。${canOpen ? "試試「開啟 Netflix」。" : ""}`;
+}
 function t(key: keyof typeof STRINGS, lang: Lang): string {
   return STRINGS[key][lang];
 }

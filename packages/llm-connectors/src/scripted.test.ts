@@ -295,3 +295,98 @@ describe("asking about mute rather than commanding it", () => {
     expect((await ask("取消靜音")).tools).toEqual(["set_mute"]);
   });
 });
+
+describe("saying what it can do, on a device that can't do everything", () => {
+  /**
+   * The help sentence used to name volume and mute unconditionally. On the Tizen
+   * emulator — no audio API, and the agent had already withdrawn those tools —
+   * "what can you do?" still answered "I can set volume, mute, …" and then
+   * declined every one of them. The tool list was honest; the self-description
+   * was not.
+   */
+  const ask = async (drop: string[], text = "what can you do") => {
+    const platform = createWebAdapter();
+    const agent = new Agent({ platform, llm: createScriptedClient(), tools: [] });
+    for (const name of drop) agent.toolRegistry.unregister(name);
+    return agent.run(text);
+  };
+
+  it("stops offering audio when the audio tools are gone", async () => {
+    const out = await ask(["get_volume", "set_volume", "get_mute", "set_mute"]);
+    expect(out).not.toMatch(/volume|mute/i);
+    expect(out).toMatch(/switch input/);
+    expect(out).toMatch(/open an app/);
+  });
+
+  it("reads as one sentence, not a list with a hole in it", async () => {
+    const out = await ask(["get_volume", "set_volume", "get_mute", "set_mute"]);
+    expect(out).toBe('I can switch input or open an app. Try "open Netflix".');
+  });
+
+  it("keeps the original wording when the device can do everything", async () => {
+    // The full-capability case is the common one and must not drift.
+    const out = await ask([]);
+    expect(out).toBe('I can set volume, mute, switch input, or open an app. Try "open Netflix".');
+  });
+
+  it("drops the Netflix hint when there is nothing to launch", async () => {
+    const out = await ask(["list_apps", "search_app_by_name", "launch_app"]);
+    expect(out).not.toMatch(/Netflix/);
+    expect(out).toMatch(/set volume/);
+  });
+
+  it("admits it plainly when nothing is left", async () => {
+    const out = await ask([
+      "get_volume", "set_volume", "get_mute", "set_mute",
+      "get_input_source", "set_input_source",
+      "list_apps", "search_app_by_name", "launch_app",
+    ]);
+    expect(out).toMatch(/hasn't given me anything I can control/);
+  });
+
+  it("does the same in Chinese and Japanese", async () => {
+    const drop = ["get_volume", "set_volume", "get_mute", "set_mute"];
+    const zh = await ask(drop, "你可以做什麼");
+    expect(zh).toBe("我可以切換輸入源、開啟應用程式。試試「開啟 Netflix」。");
+    const ja = await ask(drop, "ちょっと何かしてくれる?");
+    expect(ja).toBe("入力切替、アプリの起動ができます。「Netflix を開いて」とどうぞ。");
+  });
+});
+
+describe("not proposing a tool the device withdrew", () => {
+  /**
+   * Withdrawal made this reachable: the brain matched "set volume to 30" and
+   * proposed `set_volume` after the agent had already removed it, so the reply
+   * was "That didn't work: Unknown tool: set_volume" — a true sentence that
+   * says nothing about the actual reason (the TV has no audio API).
+   */
+  const withoutAudio = async (text: string) => {
+    const platform = createWebAdapter();
+    const agent = new Agent({ platform, llm: createScriptedClient(), tools: [] });
+    for (const name of ["get_volume", "set_volume", "get_mute", "set_mute"]) {
+      agent.toolRegistry.unregister(name);
+    }
+    const tools: string[] = [];
+    agent.events.on("tool:call", (e) => tools.push(e.name));
+    return { output: await agent.run(text), tools };
+  };
+
+  it("says the TV can't, instead of calling a tool that isn't there", async () => {
+    const { output, tools } = await withoutAudio("set volume to 30");
+    expect(tools).toEqual([]);
+    expect(output).not.toMatch(/didn't work|Unknown tool/);
+    expect(output).toMatch(/can't do that/i);
+  });
+
+  it("covers the mute path and the Chinese one too", async () => {
+    expect((await withoutAudio("mute")).tools).toEqual([]);
+    const zh = await withoutAudio("音量調到 30");
+    expect(zh.tools).toEqual([]);
+    expect(zh.output).toMatch(/不支援/);
+  });
+
+  it("still calls the tools that are there", async () => {
+    const { tools } = await withoutAudio("open Netflix");
+    expect(tools).toEqual(["search_app_by_name", "launch_app"]);
+  });
+});
