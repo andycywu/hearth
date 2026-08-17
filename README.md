@@ -153,6 +153,7 @@ you paste straight into
 ```bash
 adb shell am start -n tv.aiagent.harness/.MainActivity -e start 'index.html?diag\&writes'
 node tools/device-acceptance.mjs      # runs the CI acceptance script on the device
+node tools/device-acceptance-tizen.mjs   # the same run, on a Tizen TV or board
 ```
 
 Verified on an Android TV emulator: 12 capabilities OK, 0 errors, and the

@@ -114,6 +114,37 @@ node tools/device-acceptance.mjs         # PASS/FAIL + platform notes
 See the verified emulator results in
 [`platform/capability-matrix.md`](platform/capability-matrix.md).
 
+### Automated acceptance run (Tizen)
+
+Same script, same expectations, against a Tizen TV or reference board:
+
+```bash
+sdb connect <board-ip>:26101             # or plug in USB; `sdb devices` must list it
+node tools/mock-llm-server.mjs --host 0.0.0.0 &
+node tools/package-tizen.mjs --profile tizen-dev      --flags confirm=auto --flags "llm=http://<this-host>:8080/v1"
+tizen install -n tizen-app.wgt -- apps/tizen-app/Debug
+node tools/device-acceptance-tizen.mjs   # PASS/FAIL + platform notes
+```
+
+Three things differ from Android and all three have bitten us:
+
+- **Flags go in at package time.** Tizen's web runtime drops the query string
+  from config.xml's `<content src>`, so there is no `-e start` equivalent. The
+  runner checks they arrived and says so if not, because an app that boots
+  perfectly and ignores every flag is the worst failure available.
+- **A build with no audio API is a different run, not a failure.** The runner
+  detects which of `webapis.audiocontrol` / `tizen.tvaudiocontrol` exists,
+  excludes the audio steps when neither does, and labels the report `no-audio`.
+  Grading a platform limitation as a regression teaches you to ignore the
+  report.
+- **The volume readback may be self-reported.** Android has `dumpsys audio` as
+  an independent channel; Tizen has `vconftool`, which is not on every build.
+  When it answers, the report shows it; when it does not, the report says the
+  number came from the adapter describing itself.
+
+On the TV 10.0 emulator (which has neither audio API) this passes in `no-audio`
+mode against the mock brain.
+
 ### Gotchas we actually hit (Android TV)
 - **`adb shell am force-stop` disables navigation.** Stopping the package makes
   Android drop it from `enabled_accessibility_services`, so navigation goes
