@@ -2,6 +2,7 @@ import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 import type { LlmClient } from "../llm/client.js";
 import { ToolRegistry, type Tool } from "../tools/registry.js";
 import { createTvTools } from "../tools/tv-tools.js";
+import { probeCapabilities, type CapabilityProbe } from "../tools/capability-probe.js";
 import { ConversationContext } from "../memory/context.js";
 import { EventBus, type AgentEvents } from "../events/bus.js";
 
@@ -75,6 +76,39 @@ export class Agent {
     for (const tool of createTvTools(opts.platform)) this.tools.register(tool);
     for (const tool of opts.tools ?? []) this.tools.register(tool);
     this.registerHelpTool();
+  }
+
+  /**
+   * Ask the device which of its tools actually work here, and withdraw the rest.
+   *
+   * Explicitly called by the host after `platform.init()` rather than hidden
+   * inside the first turn: it costs a handful of reads, and a cost on the boot
+   * path should be visible at the place that pays it. Skipping it is allowed and
+   * only means the first "what can you do?" may over-promise, since a tool still
+   * withdraws itself the first time it answers `unsupported`.
+   *
+   * Safe to call again — a later probe can only withdraw more.
+   */
+  async probeCapabilities(): Promise<CapabilityProbe> {
+    const probe = await probeCapabilities(this.opts.platform);
+    const withdrawn: string[] = [];
+    for (const name of probe.withdrawn) {
+      if (this.withdraw(name, reasonFor(name, probe), "probe")) withdrawn.push(name);
+    }
+    return { withdrawn, notes: probe.notes };
+  }
+
+  /**
+   * Remove a tool the device cannot back, once.
+   *
+   * `help` is never withdrawn: it lists what is left, and a device with no
+   * capabilities at all should still be able to say so.
+   */
+  private withdraw(name: string, reason: string, at: "probe" | "call"): boolean {
+    if (name === "help") return false;
+    if (!this.tools.unregister(name)) return false;
+    this.events.emit("tool:withdrawn", { name, reason, at });
+    return true;
   }
 
   /** A built-in tool so the user can ask "what can you do?". */
@@ -212,6 +246,19 @@ export class Agent {
           toolResult = { error: (err as Error).message, tool: call.name };
         }
         this.events.emit("tool:result", { name: call.name, result: toolResult });
+        // A tool that reports `unsupported` has told us something permanent
+        // about this device, so stop offering it. The result still goes back to
+        // the model for this turn — it has to be able to explain the refusal —
+        // but the tool is gone from the list it sees next time. Deliberately not
+        // `failed`: that is a bad moment, not a missing capability, and
+        // withdrawing over one would disable a working TV on a single hiccup.
+        //
+        // This is what covers what the boot probe cannot reach: `set_input_source`
+        // has no side-effect-free read to probe with, since `getInputSource`
+        // working says nothing about whether setting does.
+        if (isUnsupportedResult(toolResult)) {
+          this.withdraw(call.name, unsupportedMessage(toolResult), "call");
+        }
         this.ctx.add({ role: "tool", toolCallId: call.id, content: JSON.stringify(toolResult) });
       }
     }
@@ -219,4 +266,32 @@ export class Agent {
     this.events.emit("turn:end", { output: msg });
     return msg;
   }
+}
+
+/** Is this tool result the envelope's "this device can't do that"? */
+function isUnsupportedResult(result: unknown): boolean {
+  return !!result
+    && typeof result === "object"
+    && (result as { ok?: unknown }).ok === false
+    && (result as { error?: unknown }).error === "unsupported";
+}
+
+function unsupportedMessage(result: unknown): string {
+  const message = (result as { message?: unknown })?.message;
+  return typeof message === "string" && message ? message : "reported unsupported";
+}
+
+/**
+ * Which probe note explains this tool's withdrawal.
+ *
+ * The probe reports per capability group and withdraws per tool, so the note has
+ * to be matched back by name rather than carried alongside — worth it because a
+ * bare "withdrawn" in `?diag` sends someone reading it to the wrong place.
+ */
+function reasonFor(name: string, probe: CapabilityProbe): string {
+  const group = name.includes("volume") ? "volume"
+    : name.includes("mute") ? "mute"
+    : name.includes("app") ? "apps"
+    : "input source";
+  return probe.notes.find((n) => n.startsWith(`${group}:`)) ?? "unsupported on this device";
 }

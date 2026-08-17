@@ -77,6 +77,12 @@ async function boot(): Promise<void> {
     // can take a minute a turn, and the 30s default makes that look broken.
     const turnTimeoutMs = turnTimeoutFromUrl();
     const agent = new Agent({ platform, llm, confirm, ...(turnTimeoutMs ? { turnTimeoutMs } : {}) });
+    // Ask the device which tools actually work here before anything can ask
+    // what we can do. On a build missing a capability inside a required
+    // member — Tizen with no audio API — the alternative is promising it and
+    // then declining.
+    const capabilities = await agent.probeCapabilities();
+    for (const note of capabilities.notes) console.info(`[capability] ${note}`);
     window.__tvAgent = agent;
     window.__tvPlatform = platform;
 

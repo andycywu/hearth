@@ -22,5 +22,11 @@ export interface AgentEvents {
   "token": { delta: string };
   "tool:call": { name: string; args: unknown };
   "tool:result": { name: string; result: unknown };
+  /**
+   * A tool was withdrawn because this device cannot do it — either the boot
+   * probe said so, or the tool itself answered `unsupported`. Hosts surface it
+   * in `?diag`; nothing has to listen.
+   */
+  "tool:withdrawn": { name: string; reason: string; at: "probe" | "call" };
   "error": { error: Error };
 }

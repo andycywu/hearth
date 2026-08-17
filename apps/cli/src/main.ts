@@ -45,6 +45,15 @@ async function main(): Promise<number> {
     confirm: confirmer(opts),
   });
 
+  // Same as the TV hosts: find out what this machine can actually do before
+  // offering it. On Linux with no audio backend that is the difference between
+  // "I can set volume" and being able to.
+  const capabilities = await agent.probeCapabilities();
+  if (!opts.quiet && !opts.json) {
+    for (const note of capabilities.notes) stderr.write(`tv-agent: ${note}
+`);
+  }
+
   if (!opts.quiet && !opts.json) {
     agent.events.on("tool:call", ({ name, args }) => {
       stderr.write(`  · ${name}(${compactArgs(args)})\n`);

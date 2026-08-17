@@ -18,6 +18,7 @@
  */
 
 import { isTvUnsupported } from "@tv-ai-agent/platform-api";
+import { UnknownToolError } from "./registry.js";
 
 export type TvResultError = "unsupported" | "failed" | "offline";
 
@@ -43,6 +44,17 @@ export function tvFail(error: TvResultError, message: string): TvResult {
 export function classifyToolError(err: unknown): TvResult {
   const message = err instanceof Error ? err.message : String(err);
 
+  // A tool that isn't registered cannot run on this device, so this is
+  // `unsupported`, not a failure. It arises two ways and the answer suits both:
+  // a model inventing a tool name should be told it does not exist rather than
+  // invited to retry, and a tool the agent *withdrew* — because this firmware
+  // can't back it — must not come back as "that didn't work". Withdrawal made
+  // the second case reachable: on the Tizen emulator `set volume to 30` reported
+  // "That didn't work: Unknown tool: set_volume" when the truth was that this TV
+  // has no audio API.
+  if (err instanceof UnknownToolError) {
+    return tvFail("unsupported", `${err.tool} isn't available on this device`);
+  }
   // The typed signal, which is what every adapter in this repo throws.
   if (isTvUnsupported(err)) {
     return tvFail("unsupported", message.replace(/^Not supported:\s*/i, ""));

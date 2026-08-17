@@ -4,6 +4,7 @@ import { defineTool } from "../tools/registry.js";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 import type { LlmClient, CompletionResult } from "../llm/client.js";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import { TvUnsupportedError } from "@tv-ai-agent/platform-api";
 
 const finalLlm: LlmClient = {
   id: "echo",
@@ -202,5 +203,144 @@ describe("Agent", () => {
     a2.reset();
     const a3 = new Agent({ platform, llm: finalLlm, persistKey: "sess-1" });
     expect(await a3.restore()).toBe(false); // cleared
+  });
+});
+
+describe("only offering what the device can do", () => {
+  /**
+   * `has()` answers a structural question — is there a `system` object — and
+   * `system` exists on every adapter, so the volume tools were always
+   * registered. On the Tizen emulator the agent said "I can set volume, mute,
+   * switch input, or open an app" and then declined every audio request,
+   * because that build has no audio API. It promised, then refused.
+   */
+  const noAudio = (): PlatformProvider => {
+    const p = fakePlatform();
+    const refuse = () => { throw new TvUnsupportedError("no audio control API on this build"); };
+    return { ...p, system: { ...p.system, getVolume: refuse, getMute: refuse, setVolume: refuse, setMute: refuse } };
+  };
+
+  const names = (agent: Agent) => agent.toolRegistry.list().map((s) => s.name);
+
+  it("withdraws the audio tools at boot when the read says unsupported", async () => {
+    const agent = new Agent({ platform: noAudio(), llm: finalLlm });
+    expect(names(agent)).toContain("set_volume");   // before probing
+    const probe = await agent.probeCapabilities();
+    expect(probe.withdrawn.sort()).toEqual(["get_mute", "get_volume", "set_mute", "set_volume"]);
+    expect(names(agent)).not.toContain("set_volume");
+    expect(names(agent)).not.toContain("get_mute");
+  });
+
+  it("keeps everything the device can still do", async () => {
+    const agent = new Agent({ platform: noAudio(), llm: finalLlm });
+    await agent.probeCapabilities();
+    // The point is a shorter honest list, not a broken one.
+    expect(names(agent)).toContain("launch_app");
+    expect(names(agent)).toContain("press_key");
+    expect(names(agent)).toContain("help");
+  });
+
+  it("never withdraws help — a device with nothing left must still say so", async () => {
+    const p = fakePlatform();
+    const refuse = () => { throw new TvUnsupportedError("nothing works here"); };
+    const agent = new Agent({
+      platform: {
+        ...p,
+        system: { ...p.system, getVolume: refuse, getMute: refuse, getInputSource: refuse },
+        apps: { ...p.apps, listInstalledApps: refuse },
+      },
+      llm: finalLlm,
+    });
+    await agent.probeCapabilities();
+    expect(names(agent)).toContain("help");
+  });
+
+  it("leaves a tool alone when the read merely failed", async () => {
+    // A bad moment is not a missing capability. Withdrawing over one would
+    // disable a working TV on a single hiccup.
+    const p = fakePlatform();
+    const agent = new Agent({
+      platform: { ...p, system: { ...p.system, getVolume: async () => { throw new Error("read timed out"); } } },
+      llm: finalLlm,
+    });
+    const probe = await agent.probeCapabilities();
+    expect(probe.withdrawn).toEqual([]);
+    expect(names(agent)).toContain("set_volume");
+  });
+
+  it("reports why, so ?diag doesn't just say 'gone'", async () => {
+    const agent = new Agent({ platform: noAudio(), llm: finalLlm });
+    const events: Array<{ name: string; reason: string; at: string }> = [];
+    agent.events.on("tool:withdrawn", (e) => events.push(e));
+    const probe = await agent.probeCapabilities();
+    expect(probe.notes.join(" ")).toMatch(/no audio control API/);
+    expect(events.every((e) => e.at === "probe")).toBe(true);
+    expect(events.find((e) => e.name === "set_volume")?.reason).toMatch(/no audio control API/);
+  });
+
+  it("withdraws a write-only tool the first time it refuses", async () => {
+    // `set_input_source` has no side-effect-free read, so the boot probe cannot
+    // reach it — doing it *is* the probe. This is the backstop that covers it,
+    // and an API that only appears after boot.
+    const p = fakePlatform();
+    const platform: PlatformProvider = {
+      ...p,
+      system: {
+        ...p.system,
+        setInputSource: () => { throw new TvUnsupportedError("setInputSource on this firmware"); },
+      },
+    };
+    let step = 0;
+    const llm: LlmClient = {
+      id: "one-call",
+      complete: async (): Promise<CompletionResult> => (step++ === 0
+        ? {
+          wantsToolCalls: true,
+          message: {
+            role: "assistant", content: "",
+            toolCalls: [{ id: "c1", name: "set_input_source", args: { source: "hdmi2" } }],
+          },
+        }
+        : { wantsToolCalls: false, message: { role: "assistant", content: "can't" } }),
+    };
+    const agent = new Agent({ platform, llm });
+    const withdrawn: string[] = [];
+    agent.events.on("tool:withdrawn", (e) => withdrawn.push(`${e.name}@${e.at}`));
+
+    expect(agent.toolRegistry.list().map((s) => s.name)).toContain("set_input_source");
+    await agent.run("switch to hdmi2");
+    expect(withdrawn).toEqual(["set_input_source@call"]);
+    expect(agent.toolRegistry.list().map((s) => s.name)).not.toContain("set_input_source");
+  });
+
+  it("still tells the model about the refusal on the turn it happened", async () => {
+    // Withdrawing must not swallow the result: the model needs it to explain.
+    const p = fakePlatform();
+    const platform: PlatformProvider = {
+      ...p,
+      system: {
+        ...p.system,
+        setInputSource: () => { throw new TvUnsupportedError("setInputSource on this firmware"); },
+      },
+    };
+    let step = 0;
+    const seen: unknown[] = [];
+    const llm: LlmClient = {
+      id: "one-call",
+      complete: async (req): Promise<CompletionResult> => {
+        seen.push(req.messages.filter((m) => m.role === "tool").map((m) => m.content));
+        return step++ === 0
+          ? {
+            wantsToolCalls: true,
+            message: {
+              role: "assistant", content: "",
+              toolCalls: [{ id: "c1", name: "set_input_source", args: { source: "hdmi2" } }],
+            },
+          }
+          : { wantsToolCalls: false, message: { role: "assistant", content: "no" } };
+      },
+    };
+    await new Agent({ platform, llm }).run("switch to hdmi2");
+    expect(JSON.stringify(seen)).toMatch(/unsupported/);
   });
 });

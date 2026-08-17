@@ -10,6 +10,7 @@ export {
   type ToolParameter,
 } from "./tools/registry.js";
 export { createTvTools } from "./tools/tv-tools.js";
+export { probeCapabilities, type CapabilityProbe } from "./tools/capability-probe.js";
 export {
   tvOk, tvFail, classifyToolError, tvResultData,
   type TvResult, type TvResultError,

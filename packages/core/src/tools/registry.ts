@@ -129,6 +129,16 @@ export class ToolRegistry {
     return this.tools.has(name);
   }
 
+  /**
+   * Take a tool away, because this device turned out not to be able to do it.
+   *
+   * Returns whether there was one to remove, so a caller can tell "withdrawn"
+   * from "was never here" without checking first.
+   */
+  unregister(name: string): boolean {
+    return this.tools.delete(name);
+  }
+
   /** The spec for a registered tool, if any. */
   getSpec(name: string): ToolSpec | undefined {
     return this.tools.get(name)?.spec;
