@@ -15,6 +15,17 @@ import type { Constraint, StateEffect, StatePredicate, Verification } from "../c
 export interface Goal {
   id: string;
   desiredState: StatePredicate[];
+  /**
+   * The user's own words, when no set of predicates captures what they asked
+   * for.
+   *
+   * The deterministic planner ignores this — it can only close a gap it can
+   * measure. The LLM planner reads it, which is what lets goal mode handle an
+   * utterance nobody wrote a skill for. A goal with an intent and no
+   * `desiredState` is honest about the trade: there is nothing to verify the
+   * *goal* against afterwards, only each step.
+   */
+  intent?: string;
   /** Nice to have. A failure here never fails the plan. */
   optional?: StatePredicate[];
   constraints?: Constraint[];
@@ -54,6 +65,21 @@ export interface Plan {
   rationale?: string;
   /** Goal predicates that no capability on this device can satisfy. */
   unreachable?: StatePredicate[];
+  /**
+   * Steps that were proposed and thrown out before anything ran.
+   *
+   * Kept rather than silently dropped: a plan that quietly lost half its steps
+   * looks like a plan that succeeded, and when the proposer is a model this is
+   * the only place the reason survives.
+   */
+  rejections?: PlanRejection[];
+}
+
+export interface PlanRejection {
+  /** What was asked for, as proposed — capability id may not even exist. */
+  capabilityId: string;
+  args?: Record<string, unknown>;
+  reason: string;
 }
 
 export type StepStatus =

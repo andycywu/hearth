@@ -5,10 +5,11 @@
   "description": "webOS (LG) web-app host — bundles the agent runtime into an .ipk for webOS TVs.",
   "scripts": {
     "build": "node ../../tools/bundle.mjs webos",
-    "typecheck": "echo \"webos-app: bundled via esbuild\" && exit 0"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@tv-ai-agent/core": "workspace:*",
+    "@tv-ai-agent/platform-api": "workspace:*",
     "@tv-ai-agent/adapter-webos": "workspace:*",
     "@tv-ai-agent/llm-connectors": "workspace:*",
     "@tv-ai-agent/ui": "workspace:*"

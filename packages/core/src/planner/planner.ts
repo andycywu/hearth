@@ -135,21 +135,39 @@ export class GoalPlanner implements Planner {
   }
 
   private step(capability: Capability, args: Record<string, unknown>, optional: boolean): PlanStep {
-    const alternates = this.graph.providers(capability.id)
-      .filter((c) => c.provider !== capability.provider && c.status !== "withdrawn")
-      .map((c) => ({ capabilityId: c.id, args }));
-
-    return {
-      id: `${capability.id}#${Object.values(args).join(",")}`,
-      action: { capabilityId: capability.id, args },
-      preconditions: (capability.preconditions ?? []).map((p) => resolve(p, args)),
-      expectedResult: (capability.sideEffects ?? []).map((e) => ({ ...e, set: interpolate(e.set, args) })),
-      ...(capability.verification ? { verification: resolveVerification(capability, args) } : {}),
-      ...(alternates.length ? { fallbacks: alternates } : {}),
-      ...(optional ? { optional } : {}),
-      maxRetries: 1,
-    };
+    return buildStep(this.graph, capability, args, optional);
   }
+}
+
+/**
+ * One plan step for one capability, with everything that is *ours* filled in.
+ *
+ * Shared with the LLM planner on purpose, and it is the safety property of the
+ * whole arrangement: a proposer picks the capability and the arguments, and the
+ * preconditions, expected effects, verification and fallback providers come from
+ * the graph. A model cannot weaken a check it is not asked to write, and cannot
+ * claim an effect the capability does not declare.
+ */
+export function buildStep(
+  graph: CapabilityGraph,
+  capability: Capability,
+  args: Record<string, unknown>,
+  optional = false,
+): PlanStep {
+  const alternates = graph.providers(capability.id)
+    .filter((c) => c.provider !== capability.provider && c.status !== "withdrawn")
+    .map((c) => ({ capabilityId: c.id, args }));
+
+  return {
+    id: `${capability.id}#${Object.values(args).join(",")}`,
+    action: { capabilityId: capability.id, args },
+    preconditions: (capability.preconditions ?? []).map((p) => resolve(p, args)),
+    expectedResult: (capability.sideEffects ?? []).map((e) => ({ ...e, set: interpolate(e.set, args) })),
+    ...(capability.verification ? { verification: resolveVerification(capability, args) } : {}),
+    ...(alternates.length ? { fallbacks: alternates } : {}),
+    ...(optional ? { optional: true } : {}),
+    maxRetries: 1,
+  };
 }
 
 /**

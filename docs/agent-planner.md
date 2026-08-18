@@ -121,15 +121,54 @@ Two, and they coexist:
 1. **`SkillPlanner` (deterministic).** A skill declares a goal and an ordered
    recipe over capability *ids*. Fast, predictable, testable, offline. This is
    what runs the P0 scenarios and what the acceptance test pins.
-2. **`LlmPlanner`.** The model receives the world summary, the available
-   capabilities (with preconditions and effects) and the goal, and returns a
-   `Plan` as JSON, which is then validated against the graph — a step naming an
-   unknown capability, or one whose preconditions cannot be met, is rejected
-   before anything executes. Handles the long tail.
+2. **`createLlmPlanner`** *(done)*. The model receives the world summary, the
+   available capabilities (with parameters and preconditions) and the goal, and
+   returns steps as JSON. Handles the long tail — the goals nobody wrote a skill
+   for.
 
 Both emit the same `Plan`, so the executor, policy and verification are shared.
 Free-form conversation keeps today's direct LLM tool-calling path; planning is
 for goals, not chat.
+
+### How much of a plan a model may author
+
+The capability id and the arguments. Nothing else. Preconditions, expected
+effects, verification and fallback providers all come from the graph via
+`buildStep`, so a model cannot weaken a check it was never asked to write, cannot
+claim an effect a capability does not declare, and cannot invent a way to mark its
+own work as verified. What it can do is *choose badly*, and five checks run before
+anything executes:
+
+1. the capability does not exist, or this device withdrew it;
+2. the arguments do not fit its schema — the same `validateArgs` the tool layer
+   uses, so an enum violation is caught here and coercion behaves identically;
+3. a required argument is missing;
+4. a precondition is *false* and no earlier accepted step makes it true (unknown
+   is not a rejection — it is a reason to look);
+5. policy denies it outright.
+
+Everything thrown out is recorded on `Plan.rejections` with its reason. A plan
+that quietly lost half its steps looks like a plan that worked, and when the
+proposer is a model this is the only place the reason survives. Prose, an
+apology, fenced JSON, a bare array and an empty answer are all handled; anything
+unparseable yields *no steps*, which is a plan that does nothing rather than one
+that does something unintended.
+
+### Which planner runs
+
+The deterministic one always goes first. For a goal it can measure it is faster,
+free, offline and identical every time, and asking a model to re-derive a computed
+answer is paying for a chance to be wrong. The model is consulted only when the
+graph could not close the gap — no measurable desired state, or predicates nothing
+here can produce — and only when the host opted in with `llmPlanning: true`.
+
+```ts
+await agent.pursueIntent("shush for a second");
+// -> a known skill if one matches; otherwise the model's plan, validated;
+//    otherwise `undefined`, meaning "this is conversation, call run()"
+```
+
+`?plan=llm` in the dev harness turns it on.
 
 ## Execution
 

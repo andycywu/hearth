@@ -7,10 +7,13 @@ import { CapabilityGraph } from "../capabilities/graph.js";
 import { DeviceGraph } from "../devices/graph.js";
 import { PolicyEngine, capabilityForTool } from "../policy/policy.js";
 import { GoalPlanner } from "../planner/planner.js";
+import { createLlmPlanner } from "../planner/llm-planner.js";
 import { PlanExecutor } from "../planner/executor.js";
 import { summarizeOutcome } from "../planner/report.js";
-import type { Goal, PlanOutcome } from "../planner/types.js";
+import { remainingGap } from "../planner/planner.js";
+import type { Goal, Plan, PlanOutcome, Planner } from "../planner/types.js";
 import { findSkill, type Skill } from "../skills/scenarios.js";
+import { isPlannable, matchSkill } from "../skills/match.js";
 import { WorldModel } from "../world/model.js";
 import { observeResult } from "../world/from-tools.js";
 import { probeCapabilities, type CapabilityProbe } from "../tools/capability-probe.js";
@@ -71,6 +74,16 @@ export interface AgentOptions {
    * ask should not take the screen away from whoever is watching.
    */
   unattended?: boolean;
+  /**
+   * Let the model plan when the deterministic planner has nothing to offer.
+   *
+   * Off by default. The deterministic planner always goes first: for a goal it
+   * can measure, it is faster, free, offline and predictable, and there is no
+   * argument for asking a model to re-derive an answer we can compute. This is
+   * for the long tail — the goals nobody wrote a skill for — and everything the
+   * model proposes is validated against the Capability Graph before it runs.
+   */
+  llmPlanning?: boolean;
 }
 
 export interface ConfirmRequest {
@@ -318,8 +331,7 @@ export class Agent {
    * it got. Both paths share the same tools, the same policy and the same world.
    */
   async pursue(goal: Goal, runOpts: RunOptions = {}): Promise<PlanOutcome> {
-    const planner = new GoalPlanner({ graph: this.capabilities, world: this.world });
-    const plan = await planner.plan(goal);
+    const plan = await this.buildPlan(goal);
     this.events.emit("plan:start", { plan });
 
     const executor = new PlanExecutor({
@@ -346,6 +358,51 @@ export class Agent {
     const outcome = await executor.run(plan, runOpts.signal);
     this.events.emit("plan:end", { outcome });
     return outcome;
+  }
+
+  /**
+   * The deterministic planner first, the model only if it came back empty.
+   *
+   * Deliberately not a race or a merge. For a goal that can be measured, the
+   * deterministic plan is the better answer by every measure that matters on a
+   * television — no latency, no tokens, no network, same steps every time — and
+   * asking a model to re-derive it would be paying for a chance to be wrong. The
+   * fallback fires exactly when the graph could not close the gap: a goal with no
+   * measurable desired state, or one whose predicates nothing here can produce.
+   */
+  private async buildPlan(goal: Goal): Promise<Plan> {
+    const direct = await new GoalPlanner({ graph: this.capabilities, world: this.world }).plan(goal);
+    if (direct.steps.length || !this.opts.llmPlanning) return direct;
+
+    // Nothing to do because it is already true is not a gap worth a model call.
+    const gap = remainingGap(this.world, goal);
+    if (!gap.length && !goal.intent) return direct;
+
+    return this.llmPlanner().plan(goal);
+  }
+
+  private llmPlanner(): Planner {
+    return createLlmPlanner({
+      llm: this.opts.llm,
+      graph: this.capabilities,
+      world: this.world,
+      policy: this.policy,
+    });
+  }
+
+  /**
+   * Take an utterance the plan way: a known scenario if one matches, otherwise
+   * the model's plan for it, and if neither can, nothing.
+   *
+   * Returns `undefined` when this is not plan work at all, so a host can hand it
+   * to `run()` and keep conversation exactly as it was. That is the whole routing
+   * rule, and it lives here rather than in three hosts.
+   */
+  async pursueIntent(text: string, runOpts: RunOptions = {}): Promise<PlanOutcome | undefined> {
+    const match = matchSkill(text);
+    if (match && isPlannable(match)) return this.pursueSkill(match.skill, match.params, runOpts);
+    if (!this.opts.llmPlanning) return undefined;
+    return this.pursue({ id: "freeform", intent: text, desiredState: [] }, runOpts);
   }
 
   /**

@@ -5,10 +5,11 @@
   "description": "Web bundle entry for the AOSP host WebView. Bundled into app/src/main/assets/main.js by tools/bundle.mjs.",
   "scripts": {
     "build": "node ../../tools/bundle.mjs aosp",
-    "typecheck": "echo \"aosp-web: bundled via esbuild\" && exit 0"
+    "typecheck": "tsc --noEmit -p tsconfig.web.json"
   },
   "dependencies": {
     "@tv-ai-agent/core": "workspace:*",
+    "@tv-ai-agent/platform-api": "workspace:*",
     "@tv-ai-agent/adapter-aosp": "workspace:*",
     "@tv-ai-agent/llm-connectors": "workspace:*",
     "@tv-ai-agent/ui": "workspace:*"

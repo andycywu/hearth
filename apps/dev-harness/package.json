@@ -5,7 +5,7 @@
   "description": "Browser dev harness — run the agent end-to-end with the web/mock adapter, the UI overlay and an offline scripted brain. No TV, no API key required.",
   "scripts": {
     "build": "node ../../tools/bundle.mjs dev",
-    "typecheck": "echo \"dev-harness: bundled via esbuild\" && exit 0"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@tv-ai-agent/core": "workspace:*",

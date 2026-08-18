@@ -170,3 +170,71 @@ describe("plan mode — the two paths", () => {
     expect(agent.world.value("tv.input")).toBe("hdmi2");
   });
 });
+
+/**
+ * The two planners, in the order that matters: the deterministic one owns
+ * anything it can measure, and the model gets the rest — if the host asked for it
+ * at all.
+ */
+describe("plan mode — the long tail", () => {
+  const proposing = (content: string): LlmClient => ({
+    id: "planner",
+    complete: async (): Promise<CompletionResult> => ({
+      wantsToolCalls: false,
+      message: { role: "assistant", content },
+    }),
+  });
+
+  function agentWith(content: string, opts: { llmPlanning?: boolean } = {}) {
+    const platform = createWebAdapter();
+    const agent = new Agent({
+      platform,
+      llm: proposing(content),
+      confirm: () => true,
+      ...(opts.llmPlanning === false ? {} : { llmPlanning: true }),
+    });
+    return { agent, platform };
+  }
+
+  it("never asks the model for a goal it can plan itself", async () => {
+    // The model here would propose nonsense. It is never consulted, because the
+    // graph can close this gap on its own.
+    const { agent, platform } = agentWith('{"steps":[{"capability":"door.unlock"}]}');
+    const outcome = await agent.pursue({
+      id: "input_switched",
+      desiredState: [{ path: "tv.input", equals: "hdmi2" }],
+    });
+    expect(outcome.plan.steps.map((s) => s.action.capabilityId)).toEqual(["tv.input.switch"]);
+    expect(outcome.plan.rejections).toBeUndefined();
+    expect(await platform.system.getInputSource()).toBe("hdmi2");
+  });
+
+  it("plans an utterance nobody wrote a skill for", async () => {
+    const { agent, platform } = agentWith('{"steps":[{"capability":"tv.audio.set_mute","args":{"mute":true}}]}');
+    const outcome = await agent.pursueIntent("shush for a second");
+    expect(outcome?.plan.steps.map((s) => s.action.capabilityId)).toEqual(["tv.audio.set_mute"]);
+    expect(await platform.system.getMute()).toBe(true);
+  });
+
+  it("hands an unrecognised utterance back to conversation when planning is off", async () => {
+    const { agent } = agentWith("{}", { llmPlanning: false });
+    // `undefined` is the routing answer: not plan work, so the host calls run().
+    expect(await agent.pursueIntent("what's on tonight?")).toBeUndefined();
+  });
+
+  it("still prefers a known scenario over asking the model", async () => {
+    const { agent, platform } = agentWith('{"steps":[{"capability":"door.unlock"}]}');
+    await platform.system.setVolume(40);
+    const outcome = await agent.pursueIntent("小聲一點");
+    expect(outcome?.plan.steps[0]?.action).toEqual({ capabilityId: "tv.audio.set_volume", args: { level: 30 } });
+  });
+
+  it("runs nothing when the model proposes only things this device cannot do", async () => {
+    const { agent } = agentWith('{"steps":[{"capability":"tv.display.enable_hdr"},{"capability":"door.unlock"}]}');
+    const outcome = await agent.pursueIntent("make it cinematic");
+    expect(outcome?.outcomes).toEqual([]);
+    expect(outcome?.plan.rejections?.map((r) => r.capabilityId)).toEqual(["tv.display.enable_hdr", "door.unlock"]);
+    // The user hears something specific rather than a shrug.
+    expect(agent.describe(outcome!)).toMatch(/can't do that on this TV|Nothing to do/);
+  });
+});

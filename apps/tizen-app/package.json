@@ -5,10 +5,11 @@
   "description": "Tizen web-app host that packages the agent runtime into a .wgt for Samsung/MTK/NVT Tizen TVs.",
   "scripts": {
     "build": "node ../../tools/bundle.mjs tizen",
-    "typecheck": "echo \"tizen-app: bundled via esbuild\" && exit 0"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@tv-ai-agent/core": "workspace:*",
+    "@tv-ai-agent/platform-api": "workspace:*",
     "@tv-ai-agent/adapter-tizen": "workspace:*",
     "@tv-ai-agent/llm-connectors": "workspace:*",
     "@tv-ai-agent/ui": "workspace:*"

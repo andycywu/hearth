@@ -1,7 +1,7 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, summarizeOutcome,
   DeviceGraph, createManualSource, createPlatformSource, createStoredSource,
-  runDiscovery, saveDevices, deviceTreeText, matchSkill, isPlannable,
+  runDiscovery, saveDevices, deviceTreeText,
   type LlmClient,
 } from "@tv-ai-agent/core";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
@@ -124,6 +124,10 @@ async function boot(): Promise<void> {
     llm,
     tools: skills,
     devices,
+    // `?plan=llm` lets the model plan the goals no skill covers. Off by default:
+    // the deterministic planner is faster, offline and predictable, and it goes
+    // first either way.
+    ...(params.get("plan") === "llm" ? { llmPlanning: true } : {}),
     // Demonstrate the confirmation gate: confirm-required tools (launch app,
     // switch input) prompt before running. Same handler the device hosts use.
     confirm: createConfirmHandler(),
@@ -154,29 +158,30 @@ async function boot(): Promise<void> {
     pending = "";
   });
 
-  /**
-   * The two paths. A recognised scenario becomes a goal and gets planned,
-   * verified and reported; everything else is a conversation, exactly as before.
-   * `?plan=off` forces the chat path, which is how you see the difference: ask
-   * for HDMI2 both ways and watch one of them check whether it worked.
-   */
-  const planMode = params.get("plan") !== "off";
-  async function ask(text: string): Promise<void> {
-    const match = planMode ? matchSkill(text) : undefined;
-    if (match && isPlannable(match)) {
-      pending = text;
-      await agent.pursueSkill(match.skill, match.params);
-      return;
-    }
-    await ui.ask(text);
-  }
-  function appendLog(who: string, text: string, opacity: number) {
+  function appendLog(who: string, text: string, opacity: number): void {
     if (!log) return;
     const line = document.createElement("div");
     line.style.opacity = String(opacity);
     line.textContent = `${who}: ${text}`;
     log.appendChild(line);
     log.scrollTop = log.scrollHeight;
+  }
+
+  /**
+   * The two paths, and the agent decides which. A goal it can plan is planned,
+   * verified and reported; everything else is a conversation, exactly as before.
+   * `?plan=off` forces the chat path, which is how you see the difference: ask for
+   * HDMI2 both ways and watch only one of them check whether it worked.
+   */
+  const planMode = params.get("plan") !== "off";
+  async function ask(text: string): Promise<void> {
+    if (planMode) {
+      pending = text;
+      const outcome = await agent.pursueIntent(text);
+      if (outcome) return;
+      pending = "";
+    }
+    await ui.ask(text);
   }
 
   // Optional voice: speak replies and accept spoken commands when supported.

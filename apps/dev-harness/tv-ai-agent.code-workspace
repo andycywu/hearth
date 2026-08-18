@@ -1,0 +1,10 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"tizen.v2.actions.autoOpenPanel": true
+	}
+}

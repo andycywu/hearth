@@ -280,7 +280,7 @@ Ordered. Each is independently shippable.
 - **Risk** — medium, mostly privacy design rather than code.
 - **Complexity** — M.
 
-### 9. LLM planner alongside the deterministic one
+### 9. LLM planner alongside the deterministic one — **done**
 
 - **Goal** — the model proposes a `Plan` as JSON; it is validated against the
   Capability Graph before anything runs.
@@ -293,6 +293,18 @@ Ordered. Each is independently shippable.
 - **Risk** — medium: this is where a model gets to compose actions, so
   validation must be total.
 - **Complexity** — L.
+- **Outcome** — `createLlmPlanner` proposes only capability ids and arguments;
+  `buildStep` supplies preconditions, effects, verification and fallbacks from the
+  graph, so a model cannot weaken its own checks. Five rejections run before
+  execution (unknown/withdrawn capability, schema violation, missing argument,
+  false precondition, policy denial), all recorded on `Plan.rejections`.
+  `agent.pursueIntent(text)` is the routing rule in one place: known skill, else
+  model plan, else `undefined` meaning "this is conversation". Deterministic
+  planning still goes first for any goal it can measure.
+  A side finding: this turn's harness edit deleted a function that nothing
+  typechecked, because four app hosts had `typecheck` stubbed out as an `echo`.
+  They are real now, and adding them surfaced a latent bug — three hosts imported
+  `@tv-ai-agent/platform-api` without declaring it as a dependency.
 
 ### 10. Titan OS and Xumo adapter stubs with contract tests — **done**
 
