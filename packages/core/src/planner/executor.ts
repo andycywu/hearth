@@ -56,8 +56,10 @@ export class PlanExecutor {
       // A required step that failed invalidates everything built on top of it —
       // carrying on would run step 4's "enable game mode" against an input that
       // never switched. Optional steps never stop a plan.
-      if (outcome.status === "failed" && !step.optional) break;
-      if (outcome.status === "denied" && !step.optional) break;
+      // A required step that could not run invalidates everything built on top
+      // of it — carrying on would enable game mode on an input that never
+      // switched.
+      if (!step.optional && STOPS.has(outcome.status)) break;
     }
 
     const unmet = remainingGap(this.opts.world, plan.goal);
@@ -93,6 +95,9 @@ export class PlanExecutor {
     const routes: Action[] = [step.action, ...(step.fallbacks ?? [])];
     let attempts = 0;
     let lastDetail = "";
+    // Set only when every route we tried said "this device cannot", so a plan
+    // that ran out of *working* routes is still reported as a failure.
+    let unsupported = false;
 
     for (const action of routes) {
       const capability = this.opts.graph.get(action.capabilityId);
@@ -115,10 +120,12 @@ export class PlanExecutor {
           // it and route to another provider.
           this.opts.graph.withdrawProvider(capability.id, capability.provider, result.detail);
           lastDetail = result.detail;
+          unsupported = true;
           break; // next route; retrying an unsupported capability is pointless
         }
         if (!result.ok) {
           lastDetail = result.detail;
+          unsupported = false;   // it tried, so this is a bad moment, not absence
           continue; // a bad moment, not a missing capability: retry
         }
 
@@ -141,7 +148,7 @@ export class PlanExecutor {
 
     return {
       step,
-      status: step.optional ? "skipped" : "failed",
+      status: step.optional ? "skipped" : unsupported ? "unsupported" : "failed",
       attempts,
       ...(lastDetail ? { detail: lastDetail } : {}),
     };
@@ -251,6 +258,8 @@ export class PlanExecutor {
 }
 
 const OK = new Set<StepStatus>(["satisfied", "verified", "unverified", "skipped"]);
+/** Statuses that end a plan: nothing after them can be built on. */
+const STOPS = new Set<StepStatus>(["failed", "unsupported", "denied"]);
 
 function satisfiedAlready(world: WorldModel, effects: StateEffect[]): boolean {
   return effects.every((e) => world.known(e.path) && Object.is(world.value(e.path), e.set));

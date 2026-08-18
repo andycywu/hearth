@@ -209,10 +209,30 @@ const outcome = await verify(step.verification, { world, capabilities, tools });
   say so if the user asks.
 - `failed` — the read-back contradicted the expectation. Do not commit; retry,
   fall back, or replan.
+- `unsupported` — this device cannot do it at all. Withdraw the capability and
+  say so; never retry.
 
-`unverified` and `failed` are different answers and must never be collapsed. The
-existing `TvResult` envelope already draws the analogous distinction for tool
-errors (`unsupported` vs `failed`), and this reuses that discipline one level up.
+None of these may be collapsed into another. The `TvResult` envelope already draws
+the `unsupported` / `failed` distinction for tool errors, and this reuses that
+discipline one level up.
+
+### Three honest answers to one plan
+
+Switching an input is the same plan on every target, and
+[`plan-acceptance.test.ts`](../packages/acceptance/src/plan-acceptance.test.ts)
+pins what actually happens:
+
+| Target | Outcome | Why |
+|---|---|---|
+| web, titan, xumo | `verified` | the write took and the read-back agrees |
+| tizen, webos | `unsupported` | the adapter refuses up front — partner-signed API |
+| aosp | `failed` | the write is **accepted and does nothing** |
+
+The last row is the reason this design exists. On Android a third-party app cannot
+switch the system TV input: the Intent is best-effort, it returns without
+complaint, and the read afterwards still reports the old source. `execute -> assume
+success` would have reported that as done — and then the World Model would have
+been wrong, and every plan built on top of it too.
 
 ## Skills as declarative scenarios
 

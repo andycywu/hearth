@@ -24,6 +24,7 @@ export function summarizeOutcome(outcome: PlanOutcome): string {
   const already = outcome.outcomes.filter((o) => o.status === "satisfied");
   const denied = outcome.outcomes.filter((o) => o.status === "denied");
   const failed = outcome.outcomes.filter((o) => o.status === "failed");
+  const unsupported = outcome.outcomes.filter((o) => o.status === "unsupported");
   const skipped = outcome.outcomes.filter((o) => o.status === "skipped");
 
   if (!outcome.plan.steps.length) {
@@ -38,9 +39,10 @@ export function summarizeOutcome(outcome: PlanOutcome): string {
     lines.push(`Asked the TV to ${names(assumed)}, but this device can't confirm it.`);
   }
   if (denied.length) lines.push(`Skipped ${names(denied)}: ${reason(denied)}`);
+  if (unsupported.length) lines.push(`This TV can't ${names(unsupported)}: ${reason(unsupported)}`);
   if (failed.length) lines.push(`Couldn't ${names(failed)}: ${reason(failed)}`);
   if (skipped.length) lines.push(`This TV can't ${names(skipped)}, so I left it.`);
-  if (outcome.unmet.length && !failed.length && !denied.length) {
+  if (outcome.unmet.length && !failed.length && !denied.length && !unsupported.length) {
     lines.push(`Still not where you asked: ${outcome.unmet.map((p) => p.path).join(", ")}.`);
   }
   return lines.join(" ");

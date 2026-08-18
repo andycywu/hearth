@@ -478,10 +478,17 @@ export class Agent {
     const capability = this.capabilities.get(capabilityId);
     if (!capability?.tool || !this.tools.has(capability.tool)) return;
     try {
+      // Emitted like any other tool call: a read the agent makes on its own
+      // initiative is still something a transcript, a `?diag` view or a latency
+      // budget needs to see. It was silent, and the first cross-target test to
+      // count tool calls noticed.
+      this.events.emit("tool:call", { name: capability.tool, args: {} });
       const result = await this.tools.call(capability.tool, {});
+      this.events.emit("tool:result", { name: capability.tool, result });
       observeResult(this.world, capability, result);
-    } catch {
-      /* a read that failed leaves the world as it was, which is the truth */
+    } catch (err) {
+      // A read that failed leaves the world as it was, which is the truth.
+      this.events.emit("tool:result", { name: capability.tool, result: { error: (err as Error).message } });
     }
   }
 

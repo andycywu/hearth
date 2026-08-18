@@ -77,7 +77,10 @@ Verification → World Model.
   assumption dressed up as success.
 - Moving the PS5 to another HDMI port changes the plan and changes no code.
 - Withdrawn capabilities never reach the model, and `?diag` says why.
-- `packages/acceptance` gains a plan-level scenario suite.
+- ✅ `packages/acceptance` gains a plan-level scenario suite —
+  [`plan-acceptance.test.ts`](../packages/acceptance/src/plan-acceptance.test.ts),
+  six targets. The **plan** is identical everywhere; the outcome is honest per
+  platform, and pinned by name so it cannot quietly become "verified".
 
 **Explicitly out of P0:** CEC, IR, real hardware, camera, IoT, Titan, Xumo, Roku.
 

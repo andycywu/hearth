@@ -86,6 +86,13 @@ export type StepStatus =
   | "satisfied"      // already true; nothing to do
   | "verified"       // ran, and the read-back agreed
   | "unverified"     // ran, and nothing on this device can check it
+  /**
+   * This device cannot do it at all — the same distinction the tool layer draws
+   * between `unsupported` and `failed`, one level up. "This TV can't switch
+   * inputs" and "it tried and it didn't take" need different words from the
+   * agent, and collapsing them sends someone to debug a TV that is working.
+   */
+  | "unsupported"
   | "failed"
   | "skipped"        // optional, and not possible here
   | "denied";        // policy said no
