@@ -128,7 +128,7 @@ core.
 
 Ordered. Each is independently shippable.
 
-### 1. Generate tools from the Capability Graph
+### 1. Generate tools from the Capability Graph — **done**
 
 - **Goal** — one source of truth for what the agent can do. `createTvTools`
   becomes a projection of `createTvCapabilities`.
@@ -140,6 +140,13 @@ Ordered. Each is independently shippable.
 - **Risk** — medium: this is the LLM-facing surface, and a changed description
   changes model behaviour.
 - **Complexity** — M (1–2 days).
+- **Outcome** — `capabilities/to-tools.ts` projects specs; `tv-tools.ts` is
+  handlers only; `confirm` derives from `riskLevel`. Two behaviour changes fell
+  out and were kept: switching input is `medium` (it takes the screen away from
+  whoever is watching, which is what the old `confirm: true` already meant), and
+  the planner now refuses a capability whose required arguments the goal cannot
+  supply — it was picking `content.play` over `content.resume` for a goal that
+  said nothing about what to play.
 
 ### 2. Wire the World Model into the agent loop
 

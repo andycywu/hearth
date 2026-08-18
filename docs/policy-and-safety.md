@@ -20,8 +20,8 @@ execution (because the world may have changed since the plan was made).
 
 | Level | Meaning | Default | Examples |
 |---|---|---|---|
-| `low` | Reversible, no privacy or money impact | allow | volume, mute, switch input, picture mode, navigation keys |
-| `medium` | Privacy-relevant, disruptive, or not trivially reversible | ask | camera access, microphone access, standby, launching an app over active playback, IoT lights |
+| `low` | Reversible, and it does not take the screen away from anyone | allow | volume, mute, picture mode, navigation keys, playing something the user just asked for |
+| `medium` | Privacy-relevant, disruptive, or not trivially reversible | ask | switching input, launching an app over active playback, camera access, microphone access, standby, IoT lights |
 | `high` | Money, identity, or persistent account state | ask, always | purchase content, subscribe, account or profile changes, factory-adjacent settings |
 | `critical` | Physical safety or security | deny by default; explicit, out-of-band grant only | door locks, garage, heating above a threshold, disabling a camera used for security |
 

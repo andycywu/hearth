@@ -89,11 +89,19 @@ export class GoalPlanner implements Planner {
     };
   }
 
-  /** Best capability that produces this predicate's path, if any. */
+  /**
+   * Best capability that produces this predicate's path, if any.
+   *
+   * "Best" excludes any whose required arguments the goal cannot supply.
+   * `content.play` and `content.resume` both claim to leave playback running,
+   * but only one of them can be called from a goal that says nothing about
+   * *what* to play — and picking it anyway would produce a plan that fails
+   * schema validation at execution time, which is a worse way to learn this.
+   */
   private choose(predicate: StatePredicate): Capability | undefined {
     const target = targetValue(predicate);
-    const direct = this.graph.achieving(predicate.path, target);
-    return direct[0];
+    return this.graph.achieving(predicate.path, target)
+      .find((c) => callable(c, argsFor(c, predicate)));
   }
 
   /**
@@ -117,7 +125,7 @@ export class GoalPlanner implements Planner {
       if (truth === "true") continue;
       const fixer = truth === "unknown"
         ? this.graph.reading(pre.path)[0]
-        : this.graph.achieving(pre.path, targetValue(pre))[0];
+        : this.graph.achieving(pre.path, targetValue(pre)).find((c) => callable(c, argsFor(c, pre)));
       if (!fixer || fixer.id === capability.id) continue;
       out.push(this.step(fixer, truth === "unknown" ? {} : argsFor(fixer, pre), true));
     }
@@ -163,6 +171,12 @@ export function argsFor(capability: Capability, predicate: StatePredicate): Reco
     if (target !== undefined) args[param] = target;
   }
   return args;
+}
+
+/** Can this capability be called with the arguments the goal implies? */
+export function callable(capability: Capability, args: Record<string, unknown>): boolean {
+  return Object.entries(capability.parameters)
+    .every(([name, param]) => !param.required || args[name] !== undefined);
 }
 
 function resolve(predicate: StatePredicate, params: Record<string, unknown>): StatePredicate {

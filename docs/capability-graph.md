@@ -14,10 +14,11 @@ verification cannot check what did not declare how it is checked. And it is the
 piece that makes "add Titan OS by adding an adapter" true rather than
 aspirational — an adapter's job becomes *contributing capabilities*.
 
-Today's approximation: a flat `ToolSpec[]` plus `capability-probe.ts`, which
-withdraws tools whose group read reports `unsupported` and maps groups back to
-tools by string matching on the tool name. It works, and it is a Capability Graph
-trying to be born inside a naming convention.
+Where it came from: a flat `ToolSpec[]` plus `capability-probe.ts`, which
+withdrew tools whose group read reported `unsupported` and mapped groups back to
+tools by string matching on the tool name. It worked, and it was a Capability
+Graph trying to be born inside a naming convention. The tools are now projected
+from the graph (M1); the probe still matches by name and is next (M3).
 
 ## The descriptor
 
@@ -48,8 +49,8 @@ which is what lets the planner chain steps without any hard-coded knowledge:
   id: "tv.input.switch",
   preconditions: [{ path: "tv.power", equals: "on" }],
   sideEffects:  [{ path: "tv.input", set: "{source}" }],
-  verification: { kind: "read_back", capability: "tv.input.get", path: "tv.input", equals: "{source}" },
-  riskLevel: "low",
+  verification: { kind: "read_back", capability: "tv.input.get_source", predicate: { path: "tv.input", equals: "{source}" } },
+  riskLevel: "medium",   // it takes the screen away from whoever is watching
 }
 ```
 
@@ -132,10 +133,10 @@ Tools become a *projection* of the graph, filtered by status, by policy and by
 the current activity. The LLM never sees a withdrawn capability, and never sees a
 capability whose preconditions are unsatisfiable in the current world state.
 
-Migration (M1 in [architecture](architecture.md#4-migration-plan-no-big-bang)):
-`createTvTools()` becomes `createTvCapabilities()`, and `toolsFromCapabilities()`
-generates the same fifteen tools. `packages/acceptance` proves the behaviour did
-not change.
+**Done (M1).** `createTvCapabilities()` is the source of truth; `createTvTools()`
+supplies only the platform calls, and `toolsFromCapabilities()` projects the
+rest. `confirm` is derived from `riskLevel`, so the two can no longer drift.
+`packages/acceptance` proves the model-facing vocabulary did not change.
 
 ## What the graph gives the planner
 
@@ -143,8 +144,8 @@ not change.
 graph.list({ domain: "audio", device: "tv" })
 graph.get("tv.input.switch")
 graph.achieving({ path: "tv.input", value: "hdmi2" })  // which capabilities set this?
-graph.available()                                       // status === "available"
-graph.toToolSpecs({ world })                            // filtered projection for the LLM
+graph.usable()                                          // not withdrawn
+toolsFromCapabilities(graph.usable(), handlers)         // the projection the LLM sees
 ```
 
 `achieving()` is the planner's entry point: goal-based planning is a search from

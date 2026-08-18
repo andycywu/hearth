@@ -1,211 +1,86 @@
 import type { PlatformProvider, InputSource, RemoteKey } from "@tv-ai-agent/platform-api";
+import type { Capability } from "../capabilities/types.js";
+import {
+  createTvCapabilities, createMediaCapabilities,
+} from "../capabilities/tv-capabilities.js";
+import { toolsFromCapabilities, type CapabilityHandler } from "../capabilities/to-tools.js";
 import type { Tool } from "./registry.js";
-import { tvOk, classifyToolError } from "./result.js";
 
 /**
- * Factory that turns a PlatformProvider into a set of agent tools. This is the
- * single bridge between "what the LLM can ask for" and "what the platform can
- * do" — swap the provider (Tizen/AOSP/web) and the same tools keep working.
+ * The bridge between "what the agent can do" and "what this platform can do".
  *
- * Tools that depend on an optional capability (e.g. media) are only registered
- * when the provider advertises it via `has(...)`, so the LLM never sees a tool
- * the current device can't fulfil.
+ * Everything declarative — the tool name, the sentence the model chooses on, the
+ * parameter schema, whether it needs confirming — now comes from the capability
+ * catalogue, and this file supplies only the part that cannot be data: the call
+ * into the HAL. Swap the provider (Tizen/AOSP/webOS/web) and the same
+ * capabilities keep working, which was always the claim; the difference is that
+ * there is no longer a second, hand-written list of tools that could disagree
+ * with the first.
  */
-const INPUT_SOURCES: InputSource[] = [
-  "hdmi1", "hdmi2", "hdmi3", "hdmi4", "tv", "av", "component", "usb", "app",
-];
-const REMOTE_KEYS: RemoteKey[] = [
-  "up", "down", "left", "right", "ok", "back", "home",
-  "playpause", "stop", "rewind", "fastforward", "channelup", "channeldown", "menu",
-];
+
+/** Which capabilities this device can offer, before any probing narrows it. */
+export function capabilitiesForPlatform(platform: PlatformProvider): Capability[] {
+  const provider = `adapter:${platform.device.os}`;
+  return [
+    ...createTvCapabilities(provider),
+    // Optional HAL member: a device without it must never be offered the tools.
+    ...(platform.has("media") && platform.media ? createMediaCapabilities(provider) : []),
+  ];
+}
 
 export function createTvTools(platform: PlatformProvider): Tool[] {
-  const tools: Tool[] = [
-    {
-      spec: {
-        name: "get_volume",
-        // Both, in one call: "the volume is 0" and "the volume is 0 because the
-        // TV is muted" are different answers, and a model that has to make two
-        // calls to tell them apart usually makes one and guesses.
-        description: "Get the current TV volume (0-100) and whether the TV is muted.",
-        parameters: {},
-      },
-      execute: async () => ({
-        volume: await platform.system.getVolume(),
-        muted: await platform.system.getMute(),
-      }),
-    },
-    {
-      spec: {
-        name: "get_mute",
-        description: "Check whether the TV audio is currently muted.",
-        parameters: {},
-      },
-      // There was a `set_mute` with nothing to read it back, so "is the TV
-      // muted?" was a question the agent could not answer — and after muting,
-      // `get_volume` reports 0 on Android (the platform zeroes the stream while
-      // muted), which hides the difference between muted and turned down.
-      execute: async () => ({ muted: await platform.system.getMute() }),
-    },
-    {
-      spec: {
-        name: "set_volume",
-        description: "Set the TV volume to an absolute level between 0 and 100.",
-        parameters: {
-          level: { type: "number", description: "Volume 0-100", required: true },
-        },
-      },
-      execute: async (args) => {
-        await platform.system.setVolume(Number((args as any).level));
-        return { volume: await platform.system.getVolume() };
-      },
-    },
-    {
-      spec: {
-        name: "set_mute",
-        description: "Mute or unmute the TV audio.",
-        parameters: {
-          mute: { type: "boolean", description: "true to mute, false to unmute", required: true },
-        },
-      },
-      execute: async (args) => {
-        await platform.system.setMute(Boolean((args as any).mute));
-        return { muted: await platform.system.getMute() };
-      },
-    },
-    {
-      spec: {
-        name: "get_input_source",
-        description: "Get the currently active input source.",
-        parameters: {},
-      },
-      execute: async () => ({ source: await platform.system.getInputSource() }),
-    },
-    {
-      spec: {
-        name: "set_input_source",
-        description: "Switch the active input source.",
-        confirm: true,
-        parameters: {
-          source: {
-            type: "string",
-            description: "Input source id",
-            required: true,
-            enum: INPUT_SOURCES,
-          },
-        },
-      },
-      execute: async (args) => {
-        await platform.system.setInputSource((args as any).source as InputSource);
-        return undefined;
-      },
-    },
-    {
-      spec: {
-        name: "list_apps",
-        description: "List installed applications available to launch.",
-        parameters: {},
-      },
-      execute: async () => platform.apps.listInstalledApps(),
-    },
-    {
-      spec: {
-        name: "search_app_by_name",
-        description:
-          "Find installed apps whose display name matches a query (case-insensitive). Use this to resolve a spoken app name into an app id before launching.",
-        parameters: {
-          query: { type: "string", description: "Part of the app's name, e.g. 'netflix'", required: true },
-        },
-      },
-      execute: async (args) => platform.apps.findAppsByName(String((args as any).query)),
-    },
-    {
-      spec: {
-        name: "launch_app",
-        description:
-          "Launch an installed application by its id. Resolve the id with search_app_by_name first if unsure.",
-        confirm: true,
-        parameters: {
-          appId: { type: "string", description: "Application id", required: true },
-        },
-      },
-      execute: async (args) => {
-        await platform.apps.launchApp(String((args as any).appId));
-        return undefined;
-      },
-    },
-    {
-      spec: {
-        name: "press_key",
-        description: "Inject a remote-control key to navigate the on-screen UI.",
-        parameters: {
-          key: {
-            type: "string",
-            description: "Remote key",
-            required: true,
-            enum: REMOTE_KEYS,
-          },
-        },
-      },
-      execute: async (args) => {
-        await platform.navigation.sendKey((args as any).key as RemoteKey);
-        return undefined;
-      },
-    },
-  ];
-
-  // --- media transport: only registered when the platform advertises it ---
-  if (platform.has("media") && platform.media) {
-    const media = platform.media;
-    tools.push(
-      {
-        spec: {
-          name: "media_play",
-          description: "Start playback of a media URI on the active player.",
-          parameters: { uri: { type: "string", description: "Media URI", required: true } },
-        },
-        execute: async (args) => { await media.play(String((args as any).uri)); },
-      },
-      {
-        spec: { name: "media_pause", description: "Pause the current playback.", parameters: {} },
-        execute: async () => { await media.pause(); },
-      },
-      {
-        spec: { name: "media_resume", description: "Resume paused playback.", parameters: {} },
-        execute: async () => { await media.resume(); },
-      },
-      {
-        spec: {
-          name: "media_seek",
-          description: "Seek the current playback to an absolute position in milliseconds.",
-          parameters: { positionMs: { type: "number", description: "Position in ms", required: true } },
-        },
-        execute: async (args) => { await media.seek(Number((args as any).positionMs)); },
-      },
-    );
-  }
-
-  return tools.map(inTvEnvelope);
+  return toolsFromCapabilities(capabilitiesForPlatform(platform), tvHandlers(platform));
 }
 
 /**
- * Put a tool's result in the shared envelope, and its failures in the typed one.
+ * Capability id -> the platform call that performs it.
  *
- * Applied once to the whole list rather than written into each `execute`: there
- * are fifteen of them, the wrapping is identical every time, and a tool author
- * should be writing "what the TV did", not error taxonomy. It also means an
- * adapter that throws — which all of them still do — produces a classified
- * result without any adapter change.
+ * A handler returns what the TV said and nothing else: no error taxonomy, no
+ * result envelope. Both are applied once, in the projection.
  */
-function inTvEnvelope(tool: Tool): Tool {
-  return {
-    spec: tool.spec,
-    execute: async (args) => {
-      try {
-        return tvOk(await tool.execute(args));
-      } catch (err) {
-        return classifyToolError(err);
-      }
+export function tvHandlers(platform: PlatformProvider): Record<string, CapabilityHandler> {
+  const handlers: Record<string, CapabilityHandler> = {
+    "tv.audio.get_volume": async () => ({
+      volume: await platform.system.getVolume(),
+      muted: await platform.system.getMute(),
+    }),
+    // There was a `set_mute` with nothing to read it back, so "is the TV muted?"
+    // was a question the agent could not answer — and after muting, `get_volume`
+    // reports 0 on Android (the platform zeroes the stream while muted), which
+    // hides the difference between muted and turned down.
+    "tv.audio.get_mute": async () => ({ muted: await platform.system.getMute() }),
+    "tv.audio.set_volume": async (args) => {
+      await platform.system.setVolume(Number(args.level));
+      return { volume: await platform.system.getVolume() };
+    },
+    "tv.audio.set_mute": async (args) => {
+      await platform.system.setMute(Boolean(args.mute));
+      return { muted: await platform.system.getMute() };
+    },
+    "tv.input.get_source": async () => ({ source: await platform.system.getInputSource() }),
+    "tv.input.switch": async (args) => {
+      await platform.system.setInputSource(args.source as InputSource);
+      return undefined;
+    },
+    "tv.app.list": async () => platform.apps.listInstalledApps(),
+    "tv.app.search": async (args) => platform.apps.findAppsByName(String(args.query)),
+    "tv.app.launch": async (args) => {
+      await platform.apps.launchApp(String(args.appId));
+      return undefined;
+    },
+    "tv.nav.press_key": async (args) => {
+      await platform.navigation.sendKey(args.key as RemoteKey);
+      return undefined;
     },
   };
+
+  const media = platform.media;
+  if (platform.has("media") && media) {
+    handlers["content.play"] = async (args) => { await media.play(String(args.uri)); };
+    handlers["content.pause"] = async () => { await media.pause(); };
+    handlers["content.resume"] = async () => { await media.resume(); };
+    handlers["content.seek"] = async (args) => { await media.seek(Number(args.positionMs)); };
+  }
+
+  return handlers;
 }

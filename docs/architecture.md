@@ -186,7 +186,7 @@ architecture is holding.
 | Stage | Change | Risk |
 |---|---|---|
 | **M0** — *done in this change* | Add `world/`, `capabilities/`, `devices/`, `perception/`, `planner/`, `policy/`, `skills/` as **additive** modules with their own tests. Nothing in the existing loop changes; the 484 existing tests stay green. | none |
-| **M1** | Derive the Capability Graph from the HAL + boot probe; generate the tool list from it. `tv-tools.ts` becomes a capability *catalogue*, not a hand-written tool list. Delete the string matching in `reasonFor`. | low — behaviour-equivalent, covered by `packages/acceptance` |
+| **M1** — *done* | Tools are generated from the capability catalogue; `tv-tools.ts` now holds only the platform calls, and `confirm` is derived from `riskLevel`. Behaviour-equivalent, proved by `packages/acceptance`. (The string matching in `reasonFor` moves in M3.) | low |
 | **M2** | Feed every `tool:result` into the World Model. Inject a compact world snapshot into the system prompt. | low — additive prompt context |
 | **M3** | Add the verification loop: each capability declares how it is verified; the executor runs it and reports `verified` / `unverified` / `failed`. | medium — needs a read-back per capability |
 | **M4** | Introduce `Planner` alongside LLM tool-calling. Goal-based path for the four P0 scenarios; free-form chat keeps the existing path. | medium — two paths coexist by design |

@@ -1,19 +1,29 @@
+import type { InputSource, RemoteKey } from "@tv-ai-agent/platform-api";
 import { W } from "../world/state.js";
 import type { Capability } from "./types.js";
 
 /**
- * The host TV's capabilities, described in the planner's vocabulary.
+ * The host TV's capabilities — and, since `toolsFromCapabilities` projects them,
+ * the single source of the tools the model is offered.
  *
- * This is deliberately a *description of tools that already exist* rather than a
- * second implementation of them. `createTvTools()` stays the thing that talks to
- * the HAL; this says what each of those tools requires, changes, risks and how
- * it is checked. Migration M1 inverts the pair — the tool list gets generated
- * from here — and until then the only cost of the duplication is that a new tool
- * needs an entry in both places, which a test catches.
+ * Everything declarative lives here: the name the model calls, the sentence it
+ * chooses on, the parameter schema, what must be true first, what changes, what
+ * it risks, and how anyone would know it worked. `tv-tools.ts` supplies only the
+ * platform calls. Adding a capability adds a tool; there is no second list to
+ * keep in step.
  *
- * `provider` is the adapter, filled in by the caller, because "who can do this"
- * is the one field that differs per device rather than per capability.
+ * `provider` is filled in by the caller, because "who can do this" is the one
+ * field that differs per device rather than per capability.
  */
+
+const INPUT_SOURCES: InputSource[] = [
+  "hdmi1", "hdmi2", "hdmi3", "hdmi4", "tv", "av", "component", "usb", "app",
+];
+const REMOTE_KEYS: RemoteKey[] = [
+  "up", "down", "left", "right", "ok", "back", "home",
+  "playpause", "stop", "rewind", "fastforward", "channelup", "channeldown", "menu",
+];
+
 export function createTvCapabilities(provider: string): Capability[] {
   const base = { device: "tv", provider, confidence: 1, status: "available" } as const;
 
@@ -22,11 +32,26 @@ export function createTvCapabilities(provider: string): Capability[] {
       ...base,
       id: "tv.audio.get_volume",
       name: "Read volume",
-      description: "Read the TV volume and mute state.",
+      // Both, in one call: "the volume is 0" and "the volume is 0 because the TV
+      // is muted" are different answers, and a model that has to make two calls
+      // to tell them apart usually makes one and guesses.
+      description: "Get the current TV volume (0-100) and whether the TV is muted.",
       domain: "audio",
       parameters: {},
       tool: "get_volume",
       reads: { volume: W.tvVolume, muted: W.tvMuted },
+      riskLevel: "low",
+      verification: { kind: "none", because: "a read has nothing to verify" },
+    },
+    {
+      ...base,
+      id: "tv.audio.get_mute",
+      name: "Read mute",
+      description: "Check whether the TV audio is currently muted.",
+      domain: "audio",
+      parameters: {},
+      tool: "get_mute",
+      reads: { muted: W.tvMuted },
       riskLevel: "low",
       verification: { kind: "none", because: "a read has nothing to verify" },
     },
@@ -54,23 +79,11 @@ export function createTvCapabilities(provider: string): Capability[] {
     },
     {
       ...base,
-      id: "tv.audio.get_mute",
-      name: "Read mute",
-      description: "Check whether the TV audio is muted.",
-      domain: "audio",
-      parameters: {},
-      tool: "get_mute",
-      reads: { muted: W.tvMuted },
-      riskLevel: "low",
-      verification: { kind: "none", because: "a read has nothing to verify" },
-    },
-    {
-      ...base,
       id: "tv.audio.set_mute",
       name: "Mute or unmute",
       description: "Mute or unmute the TV audio.",
       domain: "audio",
-      parameters: { mute: { type: "boolean", description: "true to mute", required: true } },
+      parameters: { mute: { type: "boolean", description: "true to mute, false to unmute", required: true } },
       tool: "set_mute",
       reads: { muted: W.tvMuted },
       sideEffects: [{ path: W.tvMuted, set: "{mute}" }],
@@ -85,7 +98,7 @@ export function createTvCapabilities(provider: string): Capability[] {
       ...base,
       id: "tv.input.get_source",
       name: "Read input source",
-      description: "Read the active input source.",
+      description: "Get the currently active input source.",
       domain: "input",
       parameters: {},
       tool: "get_input_source",
@@ -100,20 +113,18 @@ export function createTvCapabilities(provider: string): Capability[] {
       status: "unverified",
       id: "tv.input.switch",
       name: "Switch input",
-      description: "Switch the TV to another input source.",
+      description: "Switch the active input source.",
       domain: "input",
       parameters: {
-        source: {
-          type: "string",
-          description: "Input source id",
-          required: true,
-          enum: ["hdmi1", "hdmi2", "hdmi3", "hdmi4", "tv", "av", "component", "usb", "app"],
-        },
+        source: { type: "string", description: "Input source id", required: true, enum: INPUT_SOURCES },
       },
       tool: "set_input_source",
       preconditions: [{ path: W.tvPower, notEquals: "off", unknownOk: true }],
       sideEffects: [{ path: W.tvInput, set: "{source}" }],
-      riskLevel: "low",
+      // Not because switching is dangerous — it is trivially reversible — but
+      // because it takes the screen away from whoever is watching. Disruption is
+      // what `medium` means here, and it is what makes this ask first.
+      riskLevel: "medium",
       verification: {
         kind: "read_back",
         capability: "tv.input.get_source",
@@ -135,9 +146,12 @@ export function createTvCapabilities(provider: string): Capability[] {
       ...base,
       id: "tv.app.search",
       name: "Find an app by name",
-      description: "Resolve a spoken app name into an app id.",
+      description:
+        "Find installed apps whose display name matches a query (case-insensitive). Use this to resolve a spoken app name into an app id before launching.",
       domain: "app",
-      parameters: { query: { type: "string", description: "Part of the app name", required: true } },
+      parameters: {
+        query: { type: "string", description: "Part of the app's name, e.g. 'netflix'", required: true },
+      },
       tool: "search_app_by_name",
       riskLevel: "low",
       verification: { kind: "none", because: "a read has nothing to verify" },
@@ -146,7 +160,8 @@ export function createTvCapabilities(provider: string): Capability[] {
       ...base,
       id: "tv.app.launch",
       name: "Launch an app",
-      description: "Launch an installed application by id.",
+      description:
+        "Launch an installed application by its id. Resolve the id with search_app_by_name first if unsure.",
       domain: "app",
       parameters: { appId: { type: "string", description: "Application id", required: true } },
       tool: "launch_app",
@@ -164,7 +179,9 @@ export function createTvCapabilities(provider: string): Capability[] {
       name: "Press a remote key",
       description: "Inject a remote-control key to navigate the on-screen UI.",
       domain: "input",
-      parameters: { key: { type: "string", description: "Remote key", required: true } },
+      parameters: {
+        key: { type: "string", description: "Remote key", required: true, enum: REMOTE_KEYS },
+      },
       tool: "press_key",
       riskLevel: "low",
       verification: { kind: "none", because: "the effect of a key press is context-dependent" },
@@ -226,14 +243,27 @@ export function createDevicePowerCapabilities(deviceId: string, provider: string
 }
 
 /**
- * Media transport, registered only where the platform advertises `media` —
- * separate from the list above for the same reason `createTvTools` treats it
- * separately: an optional HAL member must not become a promise on a device
- * without it.
+ * Media transport, offered only where the platform advertises `media` — an
+ * optional HAL member must not become a promise on a device without it.
  */
 export function createMediaCapabilities(provider: string): Capability[] {
   const base = { device: "tv", provider, confidence: 1, status: "available", domain: "content" } as const;
   return [
+    {
+      ...base,
+      id: "content.play",
+      name: "Play a media URI",
+      description: "Start playback of a media URI on the active player.",
+      parameters: { uri: { type: "string", description: "Media URI", required: true } },
+      tool: "media_play",
+      sideEffects: [{ path: W.contentState, set: "playing" }],
+      // Low, unlike `tv.app.launch`, because a URI only ever gets here because
+      // someone asked for that thing by name — confirming "shall I play what you
+      // just asked me to play?" is the kind of prompt that teaches people to
+      // press OK without reading.
+      riskLevel: "low",
+      verification: { kind: "none", because: "no playback-state read in the HAL yet" },
+    },
     {
       ...base,
       id: "content.pause",
@@ -258,14 +288,13 @@ export function createMediaCapabilities(provider: string): Capability[] {
     },
     {
       ...base,
-      id: "content.play",
-      name: "Play a media URI",
-      description: "Start playback of a media URI on the active player.",
-      parameters: { uri: { type: "string", description: "Media URI", required: true } },
-      tool: "media_play",
-      sideEffects: [{ path: W.contentState, set: "playing" }],
-      riskLevel: "medium",
-      verification: { kind: "none", because: "no playback-state read in the HAL yet" },
+      id: "content.seek",
+      name: "Seek playback",
+      description: "Seek the current playback to an absolute position in milliseconds.",
+      parameters: { positionMs: { type: "number", description: "Position in ms", required: true } },
+      tool: "media_seek",
+      riskLevel: "low",
+      verification: { kind: "none", because: "no playback-position read in the HAL yet" },
     },
   ];
 }

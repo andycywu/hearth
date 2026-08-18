@@ -74,3 +74,5 @@ export type {
   CompletionResult,
   StreamHandlers,
 } from "./llm/client.js";
+export { toolsFromCapabilities, toolSpecFor, type CapabilityHandler } from "./capabilities/to-tools.js";
+export { capabilitiesForPlatform, tvHandlers } from "./tools/tv-tools.js";
