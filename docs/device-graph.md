@@ -25,8 +25,7 @@ interface DeviceNode {
   vendor?: string;
   model?: string;
   connection: Connection;      // how we reach it
-  power?: "on" | "standby" | "off" | "unknown";
-  parentId?: string;           // an Apple TV behind an AVR has parentId "avr"
+  parentId?: string;           // power state is NOT here — see below           // an Apple TV behind an AVR has parentId "avr"
   capabilities: string[];      // Capability ids this device offers
   discoveredBy: DiscoverySourceId[];
   confidence: number;          // 0..1
@@ -89,8 +88,10 @@ interface DiscoverySource {
 
 Merge rules: identity is decided by the strongest available key — MAC, then CEC
 physical address, then HDMI port, then a normalised name. Two observations that
-merge combine `discoveredBy` and take the **max** confidence per field, not the
-newest, because CEC knowing the name does not make mDNS wrong about the IP.
+merge combine `discoveredBy`, take the **max** confidence, and resolve each field
+in favour of the **better evidence** rather than the newer observation: CEC
+knowing the name does not make mDNS wrong about the IP, and a low-confidence
+"Device on HDMI2" must not rename a console someone registered by hand.
 
 ## Interaction with the World Model
 
