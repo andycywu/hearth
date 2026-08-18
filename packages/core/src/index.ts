@@ -46,6 +46,11 @@ export {
   createTvCapabilities, createMediaCapabilities, createDevicePowerCapabilities,
 } from "./capabilities/tv-capabilities.js";
 export { DeviceGraph, runDiscovery, createManualSource } from "./devices/graph.js";
+export { createPlatformSource } from "./devices/platform-source.js";
+export {
+  saveDevices, loadDevices, registerDevice, forgetDevice, createStoredSource, MAX_DEVICES,
+} from "./devices/store.js";
+export { deviceTreeText } from "./devices/report.js";
 export type {
   DeviceNode, DeviceObservation, DeviceType, Connection, DiscoverySource, DiscoverySourceId,
 } from "./devices/types.js";

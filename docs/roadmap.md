@@ -232,7 +232,7 @@ Ordered. Each is independently shippable.
   behaviour, and it had to be added to three test harnesses that were relying on
   it silently.
 
-### 6. Device Graph in the host, plus a `?devices` diagnostic
+### 6. Device Graph in the host, plus a `?devices` diagnostic — **done**
 
 - **Goal** — hosts build a Device Graph at boot (platform + manual sources) and
   persist it; `?devices` renders the tree.
@@ -243,6 +243,15 @@ Ordered. Each is independently shippable.
   on the Android TV emulator against the persisted graph.
 - **Risk** — low.
 - **Complexity** — M.
+- **Outcome** — `saveDevices` / `loadDevices` / `registerDevice` / `forgetDevice`
+  over `platform.storage`, a `platform` discovery source, `deviceTreeText`, and
+  `?devices` in the dev harness. A corrupt record is skipped rather than fatal.
+  One real defect surfaced: the graph's merge preferred the *incoming*
+  observation per field, so the platform's low-confidence "Device on HDMI2" would
+  rename a hand-registered PlayStation 5. Merging now prefers the better
+  evidence, and `unknown` never overwrites a known type.
+  **Not yet verified on the emulator** — the persistence and merge are covered by
+  tests; the emulator run is still owed.
 
 ### 7. HDMI-CEC discovery and control adapter
 

@@ -1,6 +1,4 @@
-import type {
-  Connection, DeviceNode, DeviceObservation, DeviceType, DiscoverySource,
-} from "./types.js";
+import type { DeviceNode, DeviceObservation, DeviceType, DiscoverySource } from "./types.js";
 
 /**
  * The living room's topology.
@@ -30,11 +28,21 @@ export class DeviceGraph {
   observe(obs: DeviceObservation): DeviceNode {
     const existing = this.match(obs);
     const id = existing?.id ?? obs.id ?? synthesizeId(obs);
+    // Weaker evidence may add fields; it may not overwrite better ones. The
+    // platform can see that *something* is on HDMI2 and calls it "Device on
+    // HDMI2" — merging that over the PlayStation 5 someone registered by hand
+    // would be a downgrade dressed up as an update. Ties go to the newcomer,
+    // since equal confidence plus later usually means fresher.
+    const wins = (obs.confidence ?? 0.5) >= (existing?.confidence ?? 0);
+    const better = <T>(incoming: T | undefined, held: T | undefined): T | undefined =>
+      (wins && incoming !== undefined) || held === undefined ? incoming ?? held : held;
+
     const merged: DeviceNode = {
       id,
-      type: pick(obs.type, existing?.type, "unknown") as DeviceType,
-      name: pick(obs.name, existing?.name, id) as string,
-      connection: pick(obs.connection, existing?.connection, { kind: "unknown" } as Connection) as Connection,
+      // `unknown` is the absence of a type, never a correction of one.
+      type: (better(obs.type === "unknown" ? undefined : obs.type, existing?.type) ?? "unknown") as DeviceType,
+      name: better(obs.name, existing?.name) ?? id,
+      connection: better(obs.connection, existing?.connection) ?? { kind: "unknown" },
       capabilities: [...new Set([...(existing?.capabilities ?? []), ...(obs.capabilities ?? [])])],
       discoveredBy: [...new Set([...(existing?.discoveredBy ?? []), obs.source])],
       // Max, not newest: CEC knowing the name does not make mDNS wrong about the
@@ -42,10 +50,14 @@ export class DeviceGraph {
       // source's good field for another's blank.
       confidence: Math.max(existing?.confidence ?? 0, obs.confidence ?? 0.5),
       lastSeen: this.now(),
-      ...(obs.vendor ?? existing?.vendor ? { vendor: (obs.vendor ?? existing?.vendor)! } : {}),
-      ...(obs.model ?? existing?.model ? { model: (obs.model ?? existing?.model)! } : {}),
-      ...(obs.parentId ?? existing?.parentId ? { parentId: (obs.parentId ?? existing?.parentId)! } : {}),
     };
+    const vendor = better(obs.vendor, existing?.vendor);
+    if (vendor !== undefined) merged.vendor = vendor;
+    const model = better(obs.model, existing?.model);
+    if (model !== undefined) merged.model = model;
+    const parentId = better(obs.parentId, existing?.parentId);
+    if (parentId !== undefined) merged.parentId = parentId;
+
     this.nodes.set(id, merged);
     return merged;
   }
@@ -177,8 +189,4 @@ function synthesizeId(obs: DeviceObservation): string {
 
 function normalize(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function pick<T>(...candidates: (T | undefined)[]): T | undefined {
-  return candidates.find((c) => c !== undefined);
 }

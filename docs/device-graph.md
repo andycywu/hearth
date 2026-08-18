@@ -99,12 +99,30 @@ lives in the World Model under `devices.<id>.*`. The split keeps a slow-changing
 topology from being rewritten by every power poll, and lets a device be "known to
 exist, current state unknown" — the normal case.
 
-## P0 scope
+## P0 scope — done
 
-`manual` and `platform` sources only. The mock adapter registers a living room
-with a TV, a PS5 on HDMI2 and an STB on HDMI3, which is enough for Scenario B to
-be a real plan (`ps5` → `connection.port` → `tv.input.switch`) rather than a
-hard-coded `hdmi2`.
+`manual` and `platform` sources, persisted. The host builds the graph at boot
+from three places, in this order:
 
-That substitution is the entire point: **nowhere in the core does the string
-`hdmi2` appear for the PS5 case.** It is looked up.
+1. **stored** — what was registered into `platform.storage` last time
+   (`registerDevice` / `saveDevices`). Structure only; power state deliberately
+   is not persisted, because a power state from last Tuesday is worse than not
+   knowing.
+2. **platform** — the TV itself, plus the *currently selected* input as an
+   occupied port at low confidence and type `unknown`. The HAL cannot enumerate
+   ports or see what is on them, so this says "something is on HDMI2" and stops
+   there. Naming it would be inventing a device.
+3. **demo** — a fallback living room in the dev harness, seeded only when
+   nothing is stored. `?room=empty` skips the lot.
+
+`?devices` prints the tree with its uncertainty visible (confidence and which
+sources agreed), the same way `?diag` prints capabilities.
+
+Merging is the part worth knowing: weaker evidence may *add* fields, never
+overwrite better ones. The platform's "Device on HDMI2" merges into the
+PlayStation 5 someone registered by hand rather than renaming it or appearing
+beside it — and `unknown` is treated as the absence of a type, never as a
+correction of one.
+
+The whole point of the layer: **nowhere in the core does the string `hdmi2`
+appear for the PS5 case.** It is looked up, following AVR parents on the way.
