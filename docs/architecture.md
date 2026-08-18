@@ -92,9 +92,9 @@ is missing is a *state and reasoning tier* above the tool layer.
 1. **`tv-tools.ts` hard-codes the tool catalogue against the HAL shape.** Fifteen
    tools written by hand; adding a capability means editing core. It should be
    *generated from the Capability Graph*.
-2. **`capability-probe.ts` maps groups to tool names by string matching** —
-   `agent.ts:reasonFor` guesses the group from `name.includes("volume")`. That is
-   a Capability Graph struggling to be born inside a naming convention.
+2. ~~**`capability-probe.ts` maps groups to tool names by string matching.**~~
+   *Fixed (M3).* The inference is a `vouchesFor` field on the read capability,
+   and `reasonFor`'s `name.includes("volume")` is gone.
 3. **`ConversationContext` is doing double duty as memory.** Anything the agent
    should *know* (volume, current input) is only recoverable by re-reading chat
    history, which is trimmed at 12 messages.

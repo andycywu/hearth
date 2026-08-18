@@ -118,7 +118,11 @@ Rules carried over from `capability-probe.ts`, unchanged because they are right:
 - **Probe with reads only.** Never mutate the TV to find out what it can do.
 - **Withdraw on `unsupported` only.** `failed` and `offline` are bad moments,
   not missing capabilities.
-- **A read vouches for its group** when read and write share one platform object.
+- **A read vouches only for what it declares.** `vouchesFor` on the read
+  capability names the ids it speaks for — usually its own group, because read
+  and write share one platform object, and sometimes only itself:
+  `tv.input.get_source` reads fine on Tizen while `tv.input.switch` is
+  signing-gated forever.
 
 ## Relationship to tools
 

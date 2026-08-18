@@ -27,6 +27,6 @@ export interface AgentEvents {
    * probe said so, or the tool itself answered `unsupported`. Hosts surface it
    * in `?diag`; nothing has to listen.
    */
-  "tool:withdrawn": { name: string; reason: string; at: "probe" | "call" };
+  "tool:withdrawn": { name: string; reason: string; at: "probe" | "call"; capability?: string };
   "error": { error: Error };
 }

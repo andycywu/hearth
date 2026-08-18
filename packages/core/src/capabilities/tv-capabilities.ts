@@ -40,6 +40,7 @@ export function createTvCapabilities(provider: string): Capability[] {
       parameters: {},
       tool: "get_volume",
       reads: { volume: W.tvVolume, muted: W.tvMuted },
+      vouchesFor: ["tv.audio.get_volume", "tv.audio.set_volume"],
       riskLevel: "low",
       verification: { kind: "none", because: "a read has nothing to verify" },
     },
@@ -52,6 +53,10 @@ export function createTvCapabilities(provider: string): Capability[] {
       parameters: {},
       tool: "get_mute",
       reads: { muted: W.tvMuted },
+      // `get_volume` reports mute too, so it is already covered by the volume
+      // probe; listing it there as well would be harmless but would say the
+      // wrong thing about which read vouches for what.
+      vouchesFor: ["tv.audio.get_mute", "tv.audio.set_mute"],
       riskLevel: "low",
       verification: { kind: "none", because: "a read has nothing to verify" },
     },
@@ -103,6 +108,10 @@ export function createTvCapabilities(provider: string): Capability[] {
       parameters: {},
       tool: "get_input_source",
       reads: { source: W.tvInput },
+      // Only itself. `tv.input.switch` is a separate, usually signing-gated API —
+      // on Tizen this read works and that write never will — so inferring one
+      // from the other would withdraw a working capability or keep a dead one.
+      vouchesFor: ["tv.input.get_source"],
       riskLevel: "low",
       verification: { kind: "none", because: "a read has nothing to verify" },
     },
@@ -139,6 +148,10 @@ export function createTvCapabilities(provider: string): Capability[] {
       domain: "app",
       parameters: {},
       tool: "list_apps",
+      // All three depend on this listing: search filters it, and launch is
+      // reached through search. A device that cannot enumerate apps cannot
+      // offer any of them.
+      vouchesFor: ["tv.app.list", "tv.app.search", "tv.app.launch"],
       riskLevel: "low",
       verification: { kind: "none", because: "a read has nothing to verify" },
     },

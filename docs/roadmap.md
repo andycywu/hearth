@@ -170,7 +170,7 @@ Ordered. Each is independently shippable.
   brain always re-reads. What is asserted instead is what this layer actually
   controls — the agent knows, and the prompt says so.
 
-### 3. Replace the probe's name-matching with capability withdrawal
+### 3. Replace the probe's name-matching with capability withdrawal — **done**
 
 - **Goal** — delete `reasonFor()`'s `name.includes("volume")` guesswork; the
   probe withdraws *capabilities*, and tools follow.
@@ -182,6 +182,13 @@ Ordered. Each is independently shippable.
   reason per capability.
 - **Risk** — low. Existing withdrawal tests cover the behaviour.
 - **Complexity** — S.
+- **Outcome** — which capabilities a read speaks for is now a `vouchesFor` field
+  on the read capability, next to the read, instead of a table in the probe and a
+  `name.includes("volume")` guess in the agent. `Agent.capabilities` is a live
+  `CapabilityGraph`: the probe withdraws capability ids and the tools follow, and
+  a call-time `unsupported` withdraws the capability too. `CapabilityProbe` now
+  returns `withdrawn` (ids), `tools`, `notes` and `reasons` — the one breaking
+  change, and hosts only ever read `notes`.
 
 ### 4. Plan-mode entry point on the agent
 

@@ -226,7 +226,12 @@ describe("only offering what the device can do", () => {
     const agent = new Agent({ platform: noAudio(), llm: finalLlm });
     expect(names(agent)).toContain("set_volume");   // before probing
     const probe = await agent.probeCapabilities();
-    expect(probe.withdrawn.sort()).toEqual(["get_mute", "get_volume", "set_mute", "set_volume"]);
+    // The probe withdraws *capabilities*; the tools follow from them.
+    expect(probe.withdrawn.sort()).toEqual([
+      "tv.audio.get_mute", "tv.audio.get_volume", "tv.audio.set_mute", "tv.audio.set_volume",
+    ]);
+    expect(probe.tools.sort()).toEqual(["get_mute", "get_volume", "set_mute", "set_volume"]);
+    expect(agent.capabilities.get("tv.audio.set_volume")?.status).toBe("withdrawn");
     expect(names(agent)).not.toContain("set_volume");
     expect(names(agent)).not.toContain("get_mute");
   });
@@ -276,6 +281,9 @@ describe("only offering what the device can do", () => {
     expect(probe.notes.join(" ")).toMatch(/no audio control API/);
     expect(events.every((e) => e.at === "probe")).toBe(true);
     expect(events.find((e) => e.name === "set_volume")?.reason).toMatch(/no audio control API/);
+    // And the reason is attached to the capability, not reconstructed from the
+    // tool's name — which is what `reasonFor(name.includes("volume"))` was doing.
+    expect(probe.reasons["tv.audio.set_volume"]).toMatch(/no audio control API/);
   });
 
   it("withdraws a write-only tool the first time it refuses", async () => {
@@ -306,11 +314,18 @@ describe("only offering what the device can do", () => {
     const agent = new Agent({ platform, llm });
     const withdrawn: string[] = [];
     agent.events.on("tool:withdrawn", (e) => withdrawn.push(`${e.name}@${e.at}`));
+    const byCall: string[] = [];
+    agent.events.on("tool:withdrawn", (e) => { if (e.capability) byCall.push(e.capability); });
 
     expect(agent.toolRegistry.list().map((s) => s.name)).toContain("set_input_source");
     await agent.run("switch to hdmi2");
     expect(withdrawn).toEqual(["set_input_source@call"]);
+    expect(byCall).toEqual(["tv.input.switch"]);
+    // The write is gone; the read it was never able to vouch for is untouched.
+    expect(agent.capabilities.get("tv.input.switch")?.status).toBe("withdrawn");
+    expect(agent.capabilities.get("tv.input.get_source")?.status).toBe("available");
     expect(agent.toolRegistry.list().map((s) => s.name)).not.toContain("set_input_source");
+    expect(agent.toolRegistry.list().map((s) => s.name)).toContain("get_input_source");
   });
 
   it("still tells the model about the refusal on the turn it happened", async () => {

@@ -84,6 +84,17 @@ export interface Capability {
    * statement somewhere that has to be kept in step with the tool list.
    */
   reads?: Record<string, string>;
+  /**
+   * Capability ids this one's read speaks for at boot.
+   *
+   * Set on a *read* capability, and it is what the boot probe uses: if this read
+   * reports the API absent, everything listed here is withdrawn. It lives here
+   * rather than in the probe because the inference is a property of the platform
+   * object the capability wraps — Tizen's `audio()`, webOS's `luna()` — and the
+   * exceptions are what matter: `tv.input.get_source` vouches only for itself,
+   * because on Tizen the read works and the write is signing-gated forever.
+   */
+  vouchesFor?: string[];
   constraints?: Constraint[];
   preconditions?: StatePredicate[];
   sideEffects?: StateEffect[];

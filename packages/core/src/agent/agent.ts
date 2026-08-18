@@ -3,6 +3,7 @@ import type { ChatMessage, LlmClient } from "../llm/client.js";
 import { ToolRegistry, type Tool } from "../tools/registry.js";
 import { createTvTools, capabilitiesForPlatform } from "../tools/tv-tools.js";
 import type { Capability } from "../capabilities/types.js";
+import { CapabilityGraph } from "../capabilities/graph.js";
 import { WorldModel } from "../world/model.js";
 import { observeResult } from "../world/from-tools.js";
 import { probeCapabilities, type CapabilityProbe } from "../tools/capability-probe.js";
@@ -84,6 +85,8 @@ export class Agent {
   /** What the agent believes about the room. See docs/world-model.md. */
   readonly world: WorldModel;
   private readonly tools = new ToolRegistry();
+  /** What this device can do, and what it turned out it could not. */
+  readonly capabilities = new CapabilityGraph();
   /** Tool name -> the capability it performs, for reading results into state. */
   private readonly byTool = new Map<string, Capability>();
   private readonly ctx: ConversationContext;
@@ -96,6 +99,7 @@ export class Agent {
     this.turnTimeoutMs = opts.turnTimeoutMs ?? 30_000;
     this.world = opts.world ?? new WorldModel();
     for (const capability of capabilitiesForPlatform(opts.platform)) {
+      this.capabilities.register(capability);
       if (capability.tool) this.byTool.set(capability.tool, capability);
     }
     for (const tool of createTvTools(opts.platform)) this.tools.register(tool);
@@ -117,22 +121,43 @@ export class Agent {
   async probeCapabilities(): Promise<CapabilityProbe> {
     const probe = await probeCapabilities(this.opts.platform);
     const withdrawn: string[] = [];
-    for (const name of probe.withdrawn) {
-      if (this.withdraw(name, reasonFor(name, probe), "probe")) withdrawn.push(name);
+    const tools: string[] = [];
+    for (const id of probe.withdrawn) {
+      const reason = probe.reasons[id] ?? "unsupported on this device";
+      const tool = this.capabilities.get(id)?.tool;
+      if (!this.capabilities.withdraw(id, reason)) continue;
+      withdrawn.push(id);
+      if (tool && this.withdrawTool(tool, reason, "probe", id)) tools.push(tool);
     }
-    return { withdrawn, notes: probe.notes };
+    return { withdrawn, tools, notes: probe.notes, reasons: probe.reasons };
   }
 
   /**
-   * Remove a tool the device cannot back, once.
+   * Stop offering something the device cannot back — capability first, then the
+   * tool it provided.
+   *
+   * The capability is the record; the tool is what the model sees. Withdrawing
+   * only the tool used to mean the reason had to be reconstructed by matching on
+   * the tool's *name* (`name.includes("volume")`), which is a naming convention
+   * standing in for a data structure. Now the reason travels with the capability
+   * and `?diag` can say which read withdrew what.
+   */
+  private withdraw(toolName: string, reason: string, at: "probe" | "call"): boolean {
+    const capability = this.byTool.get(toolName);
+    if (capability) this.capabilities.withdraw(capability.id, reason);
+    return this.withdrawTool(toolName, reason, at, capability?.id);
+  }
+
+  /**
+   * Remove a tool, once.
    *
    * `help` is never withdrawn: it lists what is left, and a device with no
    * capabilities at all should still be able to say so.
    */
-  private withdraw(name: string, reason: string, at: "probe" | "call"): boolean {
+  private withdrawTool(name: string, reason: string, at: "probe" | "call", capability?: string): boolean {
     if (name === "help") return false;
     if (!this.tools.unregister(name)) return false;
-    this.events.emit("tool:withdrawn", { name, reason, at });
+    this.events.emit("tool:withdrawn", { name, reason, at, ...(capability ? { capability } : {}) });
     return true;
   }
 
@@ -336,19 +361,4 @@ function isUnsupportedResult(result: unknown): boolean {
 function unsupportedMessage(result: unknown): string {
   const message = (result as { message?: unknown })?.message;
   return typeof message === "string" && message ? message : "reported unsupported";
-}
-
-/**
- * Which probe note explains this tool's withdrawal.
- *
- * The probe reports per capability group and withdraws per tool, so the note has
- * to be matched back by name rather than carried alongside — worth it because a
- * bare "withdrawn" in `?diag` sends someone reading it to the wrong place.
- */
-function reasonFor(name: string, probe: CapabilityProbe): string {
-  const group = name.includes("volume") ? "volume"
-    : name.includes("mute") ? "mute"
-    : name.includes("app") ? "apps"
-    : "input source";
-  return probe.notes.find((n) => n.startsWith(`${group}:`)) ?? "unsupported on this device";
 }
