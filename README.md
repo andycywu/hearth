@@ -206,9 +206,10 @@ hardware.
 ## Documentation
 
 - [Writing a cross-vendor skill](docs/skills.md) · [Extending (tools, persistence, new OS)](docs/extending.md) · [API reference](docs/api.md)
-- [On-device inference](docs/on-device-inference.md) · [Architecture](docs/ARCHITECTURE.md) · [Project status](docs/STATUS.md) · [What still needs a real TV](docs/HARDWARE_VERIFICATION.md)
+- [On-device inference](docs/on-device-inference.md) · [Architecture](docs/architecture.md) · [Project status](docs/STATUS.md) · [What still needs a real TV](docs/HARDWARE_VERIFICATION.md)
 - Bring-up: [POC plan (no vendor signing)](docs/POC.md) · [emulator setup](docs/EMULATOR_SETUP.md) · [checklist](docs/BRINGUP_CHECKLIST.md) · [capability matrix](docs/platform/capability-matrix.md)
-- [Security review](docs/SECURITY_REVIEW.md) · [Releasing](docs/RELEASING.md) · [Roadmap](docs/DEVELOPMENT_PLAN.md)
+- Living-room agent design: [world model](docs/world-model.md) · [capability graph](docs/capability-graph.md) · [device graph](docs/device-graph.md) · [planner & verification](docs/agent-planner.md) · [tools & adapters](docs/tool-adapter-design.md) · [policy & safety](docs/policy-and-safety.md)
+- [Security review](docs/SECURITY_REVIEW.md) · [Releasing](docs/RELEASING.md) · [Roadmap](docs/roadmap.md) · [platform bring-up plan](docs/DEVELOPMENT_PLAN.md)
 
 ## Contributing
 

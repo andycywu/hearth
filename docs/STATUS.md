@@ -1,7 +1,15 @@
 # Project Status
 
-A snapshot of what's built, what's verified, and what remains. For the full plan
-see [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md).
+A snapshot of what's built, what's verified, and what remains. For the plan see
+[`roadmap.md`](roadmap.md) (product) and [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md)
+(platform bring-up).
+
+**2026-08-18 — repositioning.** The product is an AI agent runtime and cross-OS
+control plane for living-room devices, not a TV OS and not a voice assistant. The
+state and reasoning tier this needs — World Model, Capability Graph, Device
+Graph, planner, verification, policy — landed as additive modules under
+`packages/core/src/`, with the four P0 scenarios passing headless. Nothing in the
+existing agent loop changed. See [`architecture.md`](architecture.md).
 
 _Last updated: 2026-08-11 · target release: v0.1.0_
 

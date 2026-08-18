@@ -26,7 +26,7 @@ The scripted brain and system prompt handle en/zh. If needed, add more locales:
 ## A6.4 — Contributor niceties
 - `.github/PULL_REQUEST_TEMPLATE.md` and issue templates already exist — verify
   they render.
-- Consider a `CODEOWNERS` file and a short `docs/ARCHITECTURE.md` diagram update
+- Consider a `CODEOWNERS` file and a short `docs/architecture.md` diagram update
   if the package set changed.
 
 ## A6.5 — CI: build the Blits demo (optional)

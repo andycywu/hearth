@@ -1,6 +1,12 @@
-# TV AI Agent (Harness) — Development Plan
+# TV AI Agent (Harness) — Platform Bring-up Plan
 
-This is the working roadmap for building an on-device AI agent runtime that runs
+> **Superseded as the top-level roadmap by [`roadmap.md`](roadmap.md).** The
+> product is an AI agent runtime and cross-OS control plane for living-room
+> devices; the OS/SoC matrix below is one layer of it, not the whole story. What
+> this document says about bring-up, signing and privilege levels is still
+> accurate and still needed — read it after [`architecture.md`](architecture.md).
+
+This is the platform plan for an on-device AI agent runtime that runs
 on **AOSP / Android TV** and **Tizen**, across **MediaTek (MTK)** and
 **Novatek (NVT)** SoCs, and is released as open source.
 
