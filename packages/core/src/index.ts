@@ -54,7 +54,7 @@ export {
   type PerceptionEvent, type PerceptionEventType, type PerceptionSource,
 } from "./perception/events.js";
 export {
-  PolicyEngine, defaultRules, parentalRules,
+  PolicyEngine, defaultRules, parentalRules, capabilityForTool,
   type Actor, type PolicyDecision, type PolicyRequest, type PolicyRule, type PolicyAuditEntry,
 } from "./policy/policy.js";
 export { GoalPlanner, argsFor, remainingGap, type GoalPlannerOptions } from "./planner/planner.js";

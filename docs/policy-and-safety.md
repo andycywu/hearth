@@ -94,17 +94,26 @@ decision, rule id, actor, timestamp, plan id. Hosts can persist it. This is what
 makes "why did the TV do that?" answerable, and it is the same event stream the
 `?diag` view already knows how to render.
 
-## Relationship to today's confirm gate
+## Relationship to the old confirm gate
 
-`ToolSpec.confirm` + `AgentOptions.confirm` become one outcome of the engine:
+**Done (M5).** Both paths — chat tool calls and plan steps — go through
+`PolicyEngine`. `ToolSpec.confirm` survives as the model-facing flag, and the
+*decision* comes from the capability's `riskLevel`:
 
 ```
-policy.check(...) -> { effect: "ask" } -> the existing host confirm handler
+policy.check(...) -> { effect: "ask" } -> the host's existing confirm handler
 ```
 
-so the 10-foot confirmation dialog, the CLI prompt and the "declined" tool result
-all keep working unchanged. Migration M5 replaces the boolean with a risk level;
-nothing above the engine changes.
+The 10-foot dialog, the CLI prompt and the "declined" tool result all keep
+working. A tool outside the catalogue — a custom tool, a manifest skill — gets a
+stand-in capability (`capabilityForTool`) rather than a free pass, because a
+policy layer with a hole in it is not one.
+
+One behaviour changed. With no confirm handler, a tool marked `confirm: true`
+used to run anyway; now it is **declined**, because an agent with nobody to ask
+should not take the screen away from whoever is watching. A host that genuinely
+has no user — a bring-up script, a kiosk — says so with `unattended: true`.
+Every host in this repo already supplies a handler, so nothing shipped changes.
 
 ## Non-goals
 

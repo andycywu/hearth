@@ -6,7 +6,10 @@ import { createScriptedClient } from "./scripted.js";
 function makeAgent(tools: Tool[] = []) {
   const platform = createWebAdapter();
   const llm = createScriptedClient();
-  return { platform, agent: new Agent({ platform, llm, tools }) };
+  // `unattended`: there is no user in a test run to answer a confirmation, and
+  // policy's default when nobody can be asked is to decline. Saying so here is
+  // the point of the flag — it is not a default anyone gets by accident.
+  return { platform, agent: new Agent({ platform, llm, tools, unattended: true }) };
 }
 
 /** Stand-in for the example skill in packages/skills-example (no network). */

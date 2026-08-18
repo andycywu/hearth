@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Agent } from "./agent.js";
 import { defineTool } from "../tools/registry.js";
+import { PolicyEngine, defaultRules, parentalRules } from "../policy/policy.js";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 import type { LlmClient, CompletionResult } from "../llm/client.js";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
@@ -311,7 +312,7 @@ describe("only offering what the device can do", () => {
         }
         : { wantsToolCalls: false, message: { role: "assistant", content: "can't" } }),
     };
-    const agent = new Agent({ platform, llm });
+    const agent = new Agent({ platform, llm, unattended: true });
     const withdrawn: string[] = [];
     agent.events.on("tool:withdrawn", (e) => withdrawn.push(`${e.name}@${e.at}`));
     const byCall: string[] = [];
@@ -355,7 +356,7 @@ describe("only offering what the device can do", () => {
           : { wantsToolCalls: false, message: { role: "assistant", content: "no" } };
       },
     };
-    await new Agent({ platform, llm }).run("switch to hdmi2");
+    await new Agent({ platform, llm, unattended: true }).run("switch to hdmi2");
     expect(JSON.stringify(seen)).toMatch(/unsupported/);
   });
 });
@@ -434,5 +435,85 @@ describe("Agent — what it knows about the room", () => {
     const agent = new Agent({ platform: fakePlatform(), llm, tools: [greet] });
     await agent.run("hello");
     expect(agent.world.paths()).toEqual([]);
+  });
+});
+
+/**
+ * One gate for both paths. It used to be a boolean on the tool spec, checked
+ * inside the chat loop, which meant a plan step and a chat tool call could
+ * disagree about the same action — and only one of them could ever be given a
+ * parental rule or an enterprise policy.
+ */
+describe("Agent — one policy gate", () => {
+  const callOnce = (name: string, args: Record<string, unknown> = {}): LlmClient => {
+    let step = 0;
+    return {
+      id: "one-call",
+      complete: async (): Promise<CompletionResult> => (step++ === 0
+        ? { wantsToolCalls: true, message: { role: "assistant", content: "", toolCalls: [{ id: "c1", name, args }] } }
+        : { wantsToolCalls: false, message: { role: "assistant", content: "done" } }),
+    };
+  };
+
+  it("declines a disruptive tool when there is nobody to ask", async () => {
+    const agent = new Agent({ platform: fakePlatform(), llm: callOnce("launch_app", { appId: "netflix" }) });
+    const results: unknown[] = [];
+    agent.events.on("tool:result", (e) => results.push(e.result));
+    await agent.run("open netflix");
+    expect(JSON.stringify(results)).toMatch(/needs confirmation, and nothing can ask/);
+  });
+
+  it("runs it when the host says nobody is watching", async () => {
+    const platform = fakePlatform();
+    const agent = new Agent({ platform, llm: callOnce("launch_app", { appId: "netflix" }), unattended: true });
+    const results: unknown[] = [];
+    agent.events.on("tool:result", (e) => results.push(e.result));
+    await agent.run("open netflix");
+    expect(JSON.stringify(results)).not.toMatch(/needs confirmation/);
+  });
+
+  it("holds a custom tool to the same rule, rather than leaving a hole", async () => {
+    let ran = false;
+    const buy = defineTool(
+      { name: "buy", description: "Buy the thing", parameters: {}, confirm: true },
+      async () => { ran = true; return { ok: true }; },
+    );
+    const asked: string[] = [];
+    const agent = new Agent({
+      platform: fakePlatform(),
+      llm: callOnce("buy"),
+      tools: [buy],
+      confirm: (req) => { asked.push(req.name); return false; },
+    });
+    await agent.run("buy it");
+    expect(asked).toEqual(["buy"]);
+    expect(ran).toBe(false);
+  });
+
+  it("lets a profile rule deny outright, and tells the model why", async () => {
+    const policy = new PolicyEngine([...defaultRules(), ...parentalRules({ maxVolume: 30 })]);
+    const agent = new Agent({
+      platform: fakePlatform(),
+      llm: callOnce("set_volume", { level: 80 }),
+      policy,
+      confirm: () => true,
+    });
+    const results: unknown[] = [];
+    agent.events.on("tool:result", (e) => results.push(e.result));
+    await agent.run("crank it");
+    expect(JSON.stringify(results)).toMatch(/capped at 30/);
+  });
+
+  it("records every decision, from either path", async () => {
+    const platform = fakePlatform();
+    const agent = new Agent({ platform, llm: callOnce("set_volume", { level: 40 }), confirm: () => true });
+    const audit: string[] = [];
+    agent.events.on("policy:decision", ({ entry }) => audit.push(`${entry.capabilityId}:${entry.decision.effect}`));
+
+    await agent.run("volume 40");
+    expect(audit).toContain("tv.audio.set_volume:allow");
+
+    await agent.pursue({ id: "g", desiredState: [{ path: "tv.volume", equals: 12 }] });
+    expect(audit.filter((a) => a === "tv.audio.set_volume:allow")).toHaveLength(2);
   });
 });

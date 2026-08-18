@@ -42,6 +42,7 @@ interface AgentOptions {
   tools?: Tool[];           // extra/custom tools
   persistKey?: string;      // auto-save history to platform.storage
   confirm?: (req: ConfirmRequest) => boolean | Promise<boolean>;
+  unattended?: boolean;     // no human present: policy's `ask` becomes `allow`
   world?: WorldModel;       // share one with a planner; otherwise the agent owns it
   devices?: DeviceGraph;    // what discovery found; otherwise empty
   policy?: PolicyEngine;    // defaults to the built-in risk rules
@@ -63,6 +64,7 @@ interface ConfirmRequest { name: string; args: Record<string, unknown>; descript
 "plan:start"  { plan: Plan }              // the goal path
 "plan:step"   { outcome: StepOutcome }    // after each step, with its status
 "plan:end"    { outcome: PlanOutcome }
+"policy:decision" { entry: PolicyAuditEntry }   // from either path
 "error"       { error: Error }
 ```
 

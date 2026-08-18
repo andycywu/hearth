@@ -1,6 +1,6 @@
 import type { Capability, StateEffect } from "../capabilities/types.js";
 import type { CapabilityGraph } from "../capabilities/graph.js";
-import type { PolicyEngine, Actor } from "../policy/policy.js";
+import type { PolicyEngine, Actor, PolicyAuditEntry } from "../policy/policy.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import { classifyToolError } from "../tools/result.js";
 import type { WorldModel } from "../world/model.js";
@@ -38,6 +38,8 @@ export interface PlanExecutorOptions {
   confirm?: (req: ConfirmRequest) => boolean | Promise<boolean>;
   actor?: Actor;
   onStep?: (outcome: StepOutcome) => void;
+  /** Every policy decision, for the audit trail. */
+  onPolicy?: (entry: PolicyAuditEntry) => void;
   now?: () => number;
 }
 
@@ -158,6 +160,13 @@ export class PlanExecutor {
       args,
       actor: this.opts.actor ?? "user",
       world: this.opts.world,
+      planId,
+    });
+    this.opts.onPolicy?.({
+      at: this.opts.now?.() ?? Date.now(),
+      capabilityId: capability.id,
+      actor: this.opts.actor ?? "user",
+      decision,
       planId,
     });
     if (decision.effect === "allow") return undefined;

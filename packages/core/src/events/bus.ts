@@ -1,4 +1,5 @@
 import type { Plan, PlanOutcome, StepOutcome } from "../planner/types.js";
+import type { PolicyAuditEntry } from "../policy/policy.js";
 
 export type Listener<T> = (payload: T) => void;
 
@@ -39,5 +40,10 @@ export interface AgentEvents {
   "plan:start": { plan: Plan };
   "plan:step": { outcome: StepOutcome };
   "plan:end": { outcome: PlanOutcome };
+  /**
+   * Every policy decision, from either path. This is what makes "why did the TV
+   * do that?" — and "why did it refuse?" — answerable after the fact.
+   */
+  "policy:decision": { entry: PolicyAuditEntry };
   "error": { error: Error };
 }

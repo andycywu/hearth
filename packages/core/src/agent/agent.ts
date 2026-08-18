@@ -5,7 +5,7 @@ import { createTvTools, capabilitiesForPlatform } from "../tools/tv-tools.js";
 import type { Capability } from "../capabilities/types.js";
 import { CapabilityGraph } from "../capabilities/graph.js";
 import { DeviceGraph } from "../devices/graph.js";
-import { PolicyEngine } from "../policy/policy.js";
+import { PolicyEngine, capabilityForTool } from "../policy/policy.js";
 import { GoalPlanner } from "../planner/planner.js";
 import { PlanExecutor } from "../planner/executor.js";
 import { summarizeOutcome } from "../planner/report.js";
@@ -36,9 +36,13 @@ export interface AgentOptions {
    */
   persistKey?: string;
   /**
-   * Called before executing a tool whose spec has `confirm: true`. Return false
-   * to decline; the model receives a structured "declined" result and can adapt.
-   * When unset, confirm-required tools run without prompting (opt-in guard).
+   * Asked when policy wants a human in the loop. Return false to decline; the
+   * model receives a structured "declined" result and can adapt.
+   *
+   * When unset, a step needing confirmation is **declined** rather than run —
+   * an agent with nobody to ask should not take the screen away from whoever is
+   * watching. Set `unattended` for a bring-up script or a kiosk that genuinely
+   * has no user.
    */
   confirm?: (req: ConfirmRequest) => boolean | Promise<boolean>;
   /**
@@ -59,6 +63,14 @@ export interface AgentOptions {
   devices?: DeviceGraph;
   /** May this happen? Defaults to the built-in risk rules. */
   policy?: PolicyEngine;
+  /**
+   * Run without a human present: policy's `ask` becomes `allow`.
+   *
+   * For a bring-up script or a kiosk, and it has to be asked for. The default
+   * when there is no `confirm` handler is to *decline* — an agent that cannot
+   * ask should not take the screen away from whoever is watching.
+   */
+  unattended?: boolean;
 }
 
 export interface ConfirmRequest {
@@ -264,6 +276,38 @@ export class Agent {
   }
 
   /**
+   * May this run? Returns a reason to decline, or undefined to proceed.
+   *
+   * A tool outside the capability catalogue — a custom tool, a manifest skill —
+   * gets a stand-in capability rather than a free pass, because a policy layer
+   * with a hole in it is not one.
+   */
+  private async gate(toolName: string, args: Record<string, unknown>): Promise<string | undefined> {
+    const spec = this.tools.getSpec(toolName);
+    const capability = this.byTool.get(toolName)
+      ?? (spec ? capabilityForTool(spec) : undefined);
+    if (!capability) return undefined; // unknown tool: the registry will say so
+
+    const decision = this.policy.check({ capability, args, actor: "user", world: this.world });
+    this.events.emit("policy:decision", {
+      entry: { at: Date.now(), capabilityId: capability.id, actor: "user", decision },
+    });
+    if (decision.effect === "allow") return undefined;
+    if (decision.effect === "deny") return decision.reason;
+    if (this.opts.confirm) {
+      const approved = await this.opts.confirm({
+        name: toolName,
+        args,
+        description: spec?.description ?? capability.description,
+      });
+      return approved ? undefined : "Action declined by the user.";
+    }
+    return this.opts.unattended
+      ? undefined
+      : `${capability.name} needs confirmation, and nothing can ask.`;
+  }
+
+  /**
    * Pursue a goal: plan against the world, check policy, execute, verify.
    *
    * The second path through the agent, and deliberately not a replacement for
@@ -294,7 +338,9 @@ export class Agent {
           }),
         }
         : {}),
+      ...(this.opts.unattended && !this.opts.confirm ? { confirm: () => true } : {}),
       onStep: (outcome) => this.events.emit("plan:step", { outcome }),
+      onPolicy: (entry) => this.events.emit("policy:decision", { entry }),
     });
 
     const outcome = await executor.run(plan, runOpts.signal);
@@ -414,20 +460,16 @@ ${summary}` },
       for (const call of result.message.toolCalls ?? []) {
         this.events.emit("tool:call", { name: call.name, args: call.args });
 
-        // Confirmation gate for higher-impact tools (input switch, launch, …).
-        const spec = this.tools.getSpec(call.name);
-        if (spec?.confirm && this.opts.confirm) {
-          const approved = await this.opts.confirm({
-            name: call.name,
-            args: call.args,
-            description: spec.description,
-          });
-          if (!approved) {
-            const declined = { declined: true, error: "Action declined by the user." };
-            this.events.emit("tool:result", { name: call.name, result: declined });
-            this.ctx.add({ role: "tool", toolCallId: call.id, content: JSON.stringify(declined) });
-            continue;
-          }
+        // One policy gate, shared with the plan path. It used to be a boolean on
+        // the tool spec checked right here, which meant the two paths could
+        // disagree about the same action — and only one of them could be given a
+        // parental rule or an enterprise policy.
+        const denial = await this.gate(call.name, call.args);
+        if (denial) {
+          const declined = { declined: true, error: denial };
+          this.events.emit("tool:result", { name: call.name, result: declined });
+          this.ctx.add({ role: "tool", toolCallId: call.id, content: JSON.stringify(declined) });
+          continue;
         }
 
         let toolResult: unknown;

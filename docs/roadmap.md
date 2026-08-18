@@ -212,7 +212,7 @@ Ordered. Each is independently shippable.
   of pretending; and `switch_input` with no port named falls through to chat so
   the model can ask which input rather than the agent picking one.
 
-### 5. Policy engine replaces the boolean confirm gate
+### 5. Policy engine replaces the boolean confirm gate — **done**
 
 - **Goal** — `ToolSpec.confirm` becomes `Capability.riskLevel`; the host confirm
   handler becomes the `ask` outcome; every decision is audited.
@@ -224,6 +224,13 @@ Ordered. Each is independently shippable.
   device bring-up.
 - **Risk** — low, and it removes a duplicated gate.
 - **Complexity** — M.
+- **Outcome** — one `gate()` for both paths, decisions driven by `riskLevel`,
+  every decision emitted as `policy:decision` for the audit trail. Tools outside
+  the catalogue get a stand-in capability instead of a free pass. Behaviour
+  change, deliberate and documented: no confirm handler now means *decline*, not
+  *run anyway* — `unattended: true` is how a bring-up script asks for the old
+  behaviour, and it had to be added to three test harnesses that were relying on
+  it silently.
 
 ### 6. Device Graph in the host, plus a `?devices` diagnostic
 

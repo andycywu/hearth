@@ -160,3 +160,30 @@ export interface PolicyAuditEntry {
   decision: PolicyDecision;
   planId?: string;
 }
+
+/**
+ * A stand-in capability for a tool that has none — a custom tool, a manifest
+ * skill, anything registered by a host.
+ *
+ * Policy has to answer for *every* execution, so a tool outside the catalogue
+ * cannot be a hole in it. The old boolean is the only signal such a tool
+ * carries, so it maps to the level it always meant: `confirm: true` was "ask
+ * first", which is `medium`.
+ */
+export function capabilityForTool(
+  spec: { name: string; description: string; parameters: Record<string, unknown>; confirm?: boolean },
+): Capability {
+  return {
+    id: `tool.${spec.name}`,
+    name: spec.name,
+    description: spec.description,
+    device: "tv",
+    domain: "meta",
+    parameters: spec.parameters as Capability["parameters"],
+    tool: spec.name,
+    riskLevel: spec.confirm ? "medium" : "low",
+    provider: "tool",
+    confidence: 1,
+    status: "available",
+  };
+}

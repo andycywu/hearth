@@ -98,8 +98,9 @@ is missing is a *state and reasoning tier* above the tool layer.
 3. **`ConversationContext` is doing double duty as memory.** Anything the agent
    should *know* (volume, current input) is only recoverable by re-reading chat
    history, which is trimmed at 12 messages.
-4. **The confirm gate lives in the agent loop**, keyed off a boolean on the tool
-   spec. Policy can see one call at a time, never the plan.
+4. ~~**The confirm gate lives in the agent loop**, keyed off a boolean.~~
+   *Fixed (M5).* One `PolicyEngine` decides for chat calls and plan steps alike,
+   from the capability's `riskLevel`.
 5. **`InputSource` is a closed union in `platform-api`.** Fine for a TV, wrong
    for a living room: `hdmi2` names a port, not the PS5 behind it.
 6. **Hosts duplicate wiring.** `apps/dev-harness`, `apps/cli` and each device
@@ -190,7 +191,7 @@ architecture is holding.
 | **M2** — *done* | Every `tool:result` is folded into `Agent.world` via its capability's `reads` map; a budgeted summary of known facts goes into the system prompt. | low |
 | **M3** | Add the verification loop: each capability declares how it is verified; the executor runs it and reports `verified` / `unverified` / `failed`. | medium — needs a read-back per capability |
 | **M4** — *done* | `agent.pursue` / `agent.pursueSkill` run the goal path beside LLM tool-calling; both share one world, tool registry, policy and confirm handler. Plan lifecycle events reach every renderer. | medium — two paths coexist by design |
-| **M5** | Route every execution through `PolicyEngine`; the existing `confirm` handler becomes one policy outcome (`ask_user`). | low |
+| **M5** — *done* | Both paths go through `PolicyEngine`; the host `confirm` handler is the `ask` outcome, and `policy:decision` carries the audit trail. | low |
 | **M6** | Device discovery (CEC first) populates the Device Graph; `set_input_source(hdmi2)` becomes `activate(device: ps5)`. | medium — hardware-gated |
 | **M7** | Adapter stubs for Titan OS / Xumo / Roku: interface plus contract test only. | low, and deliberately last |
 

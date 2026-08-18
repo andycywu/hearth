@@ -6,6 +6,44 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **A Living Room agent runtime under the chat loop.** The agent kept no state
+  between tool calls, could not describe the room it was in, and reported every
+  action as a success whether or not the TV did it. Six additive modules in
+  `packages/core/src` change that: a **World Model** (facts with source,
+  confidence and decay), a **Capability Graph** (what can be done here, with what
+  risk, verified how), a **Device Graph** (what is in the room, and on which
+  port), a **Planner** with a verification loop, a **Policy engine**, and
+  declarative **skills**. Docs: `docs/architecture.md` and the seven design
+  documents beside it.
+- **Goal mode.** `agent.pursue(goal)` and `agent.pursueSkill(id, params)` run
+  plan → policy → execute → verify, beside the existing chat path and sharing its
+  world, tools, policy and confirm handler. `plan:start` / `plan:step` /
+  `plan:end` reach every renderer through the shared view-model. In the dev
+  harness, `?plan=off` forces the chat path so the difference is visible.
+- **`policy:decision` events**, so "why did the TV do that?" — and "why did it
+  refuse?" — are answerable after the fact.
+
+### Changed
+
+- **Tools are generated from the capability catalogue.** The tool list was
+  written by hand and described by the catalogue afterwards; now the capability
+  owns the name, description, schema and risk, and `tv-tools.ts` keeps only the
+  platform calls. `ToolSpec.confirm` is derived from `riskLevel`, so the two can
+  no longer drift. The model-facing vocabulary is unchanged — `packages/acceptance`
+  passes untouched.
+- **Switching input is `medium` risk**, which is what its `confirm: true` always
+  meant: it takes the screen away from whoever is watching.
+- **The capability probe no longer identifies tools by their names.** Which
+  capabilities a read speaks for is a `vouchesFor` field on the read capability.
+  `CapabilityProbe.withdrawn` is capability ids now, with tool names under
+  `tools` and per-id `reasons`.
+- **With no confirm handler, a step needing confirmation is declined** rather
+  than run. An agent with nobody to ask should not take the screen away. Hosts
+  that genuinely have no user pass `unattended: true`. Every host in this repo
+  already supplies a handler, so nothing shipped changes.
+
 ### Security
 
 - **The API key could end up on the television.** The `?debug` status line
