@@ -148,7 +148,7 @@ Ordered. Each is independently shippable.
   supply — it was picking `content.play` over `content.resume` for a goal that
   said nothing about what to play.
 
-### 2. Wire the World Model into the agent loop
+### 2. Wire the World Model into the agent loop — **done**
 
 - **Goal** — every `tool:result` becomes an observation; a world summary is
   injected into the system prompt.
@@ -161,6 +161,14 @@ Ordered. Each is independently shippable.
 - **Risk** — medium: prompt changes affect every turn; stale facts must be
   marked, not asserted.
 - **Complexity** — M.
+- **Outcome** — `Agent.world` is a `WorldModel`; every tool result is read into
+  it through its capability's `reads` map, so it arrives on every adapter with no
+  adapter change. Known facts go into the system prompt under a character budget,
+  and only known ones — an empty world adds nothing. The stated acceptance
+  ("answers with no second `get_volume`") turned out not to be testable from
+  here: whether the model re-reads is the model's decision, and the scripted
+  brain always re-reads. What is asserted instead is what this layer actually
+  controls — the agent knows, and the prompt says so.
 
 ### 3. Replace the probe's name-matching with capability withdrawal
 

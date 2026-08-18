@@ -23,6 +23,7 @@ new Agent(options: AgentOptions)
 | `historyLength` | `get: number` | Retained message count (excludes system prompt). |
 | `toolRegistry` | `get: ToolRegistry` | The live registry (inspect / add tools). |
 | `events` | `EventBus<AgentEvents>` | Observe the turn lifecycle. |
+| `world` | `WorldModel` | What the agent knows about the room. Tool results land here automatically; see [world-model.md](world-model.md). |
 
 ```ts
 interface AgentOptions {
@@ -34,6 +35,9 @@ interface AgentOptions {
   tools?: Tool[];           // extra/custom tools
   persistKey?: string;      // auto-save history to platform.storage
   confirm?: (req: ConfirmRequest) => boolean | Promise<boolean>;
+  world?: WorldModel;       // share one with a planner; otherwise the agent owns it
+  worldInPrompt?: boolean;  // put known facts in the system prompt (default true)
+  worldPromptChars?: number;// budget for that block (default 400)
 }
 
 interface ConfirmRequest { name: string; args: Record<string, unknown>; description: string }

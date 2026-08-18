@@ -83,7 +83,7 @@ Precedence: `user > tool > probe > perception > inferred > assumed`.
 
 | Source | Path |
 |---|---|
-| Tool results | `EventBus.on("tool:result")` → `observeFromTool()`. A `get_volume` result of `{volume:35,muted:false}` writes two facts. |
+| Tool results | The agent loop reads each result through its capability's `reads` map (`observeResult`). A `get_volume` result of `{volume:35,muted:false}` writes two facts. **Live.** |
 | Boot probe | `runDiagnostics` / `probeCapabilities` → capability facts and initial reads. |
 | Perception | `applyPerception(world, event)` — see [perception](#perception). |
 | User statements | "the PS5 is on HDMI2" → highest precedence, no TTL. |

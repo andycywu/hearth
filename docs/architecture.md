@@ -187,7 +187,7 @@ architecture is holding.
 |---|---|---|
 | **M0** — *done in this change* | Add `world/`, `capabilities/`, `devices/`, `perception/`, `planner/`, `policy/`, `skills/` as **additive** modules with their own tests. Nothing in the existing loop changes; the 484 existing tests stay green. | none |
 | **M1** — *done* | Tools are generated from the capability catalogue; `tv-tools.ts` now holds only the platform calls, and `confirm` is derived from `riskLevel`. Behaviour-equivalent, proved by `packages/acceptance`. (The string matching in `reasonFor` moves in M3.) | low |
-| **M2** | Feed every `tool:result` into the World Model. Inject a compact world snapshot into the system prompt. | low — additive prompt context |
+| **M2** — *done* | Every `tool:result` is folded into `Agent.world` via its capability's `reads` map; a budgeted summary of known facts goes into the system prompt. | low |
 | **M3** | Add the verification loop: each capability declares how it is verified; the executor runs it and reports `verified` / `unverified` / `failed`. | medium — needs a read-back per capability |
 | **M4** | Introduce `Planner` alongside LLM tool-calling. Goal-based path for the four P0 scenarios; free-form chat keeps the existing path. | medium — two paths coexist by design |
 | **M5** | Route every execution through `PolicyEngine`; the existing `confirm` handler becomes one policy outcome (`ask_user`). | low |

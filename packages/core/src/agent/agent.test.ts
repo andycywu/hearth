@@ -344,3 +344,80 @@ describe("only offering what the device can do", () => {
     expect(JSON.stringify(seen)).toMatch(/unsupported/);
   });
 });
+
+/**
+ * The agent used to know only what it had *said*. A `set_volume` turn left no
+ * trace anywhere except chat history, which is trimmed at twelve messages, so
+ * "a bit quieter" meant asking the TV again what quieter was.
+ */
+describe("Agent — what it knows about the room", () => {
+  /** An LLM that calls one tool, and records the prompt it was given. */
+  function recordingLlm(call: { name: string; args: Record<string, unknown> }) {
+    const prompts: string[] = [];
+    let step = 0;
+    const llm: LlmClient = {
+      id: "recorder",
+      complete: async (req): Promise<CompletionResult> => {
+        prompts.push(String(req.messages[0]?.content ?? ""));
+        step++;
+        return step === 1
+          ? { wantsToolCalls: true, message: { role: "assistant", content: "", toolCalls: [{ id: "1", ...call }] } }
+          : { wantsToolCalls: false, message: { role: "assistant", content: "done" } };
+      },
+    };
+    return { llm, prompts };
+  }
+
+  it("learns the volume from the tool it just called", async () => {
+    const { llm } = recordingLlm({ name: "set_volume", args: { level: 25 } });
+    const agent = new Agent({ platform: fakePlatform(), llm });
+    await agent.run("set volume to 25");
+    expect(agent.world.value("tv.volume")).toBe(25);
+    expect(agent.world.get("tv.volume")?.source).toBe("tool");
+  });
+
+  it("learns both facts a single read reports", async () => {
+    const { llm } = recordingLlm({ name: "get_volume", args: {} });
+    const agent = new Agent({ platform: fakePlatform(), llm });
+    await agent.run("what's the volume?");
+    expect(agent.world.value("tv.volume")).toBe(10);
+    expect(agent.world.value("tv.muted")).toBe(false);
+  });
+
+  it("tells the model what it already knows, and only that", async () => {
+    const { llm, prompts } = recordingLlm({ name: "set_volume", args: { level: 25 } });
+    const agent = new Agent({ platform: fakePlatform(), llm });
+
+    await agent.run("set volume to 25");
+    // Nothing was known when the turn opened, so nothing was claimed.
+    expect(prompts[0]).not.toContain("What you already know");
+    // By the second round of the same turn, the tool result is in the world.
+    expect(prompts[1]).toContain("tv.volume: 25");
+    expect(prompts[1]).not.toContain("unknown");
+  });
+
+  it("can be told not to put it in the prompt, and still keeps the facts", async () => {
+    const { llm, prompts } = recordingLlm({ name: "set_volume", args: { level: 25 } });
+    const agent = new Agent({ platform: fakePlatform(), llm, worldInPrompt: false });
+    await agent.run("set volume to 25");
+    expect(prompts[1]).not.toContain("What you already know");
+    expect(agent.world.value("tv.volume")).toBe(25);
+  });
+
+  it("keeps the block within its budget", async () => {
+    const { llm, prompts } = recordingLlm({ name: "list_apps", args: {} });
+    const agent = new Agent({ platform: fakePlatform(), llm, worldPromptChars: 40 });
+    await agent.run("what can I watch?");
+    const base = prompts[0]!.length;
+    // The whole point of a budget is that the prompt cannot grow with the room.
+    expect(prompts[1]!.length - base).toBeLessThan(160);
+  });
+
+  it("says nothing about a tool it has no capability for", async () => {
+    const greet = defineTool({ name: "greet", description: "greet", parameters: {} }, async () => ({ hi: true }));
+    const { llm } = recordingLlm({ name: "greet", args: {} });
+    const agent = new Agent({ platform: fakePlatform(), llm, tools: [greet] });
+    await agent.run("hello");
+    expect(agent.world.paths()).toEqual([]);
+  });
+});

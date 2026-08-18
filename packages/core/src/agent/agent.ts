@@ -1,7 +1,10 @@
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
-import type { LlmClient } from "../llm/client.js";
+import type { ChatMessage, LlmClient } from "../llm/client.js";
 import { ToolRegistry, type Tool } from "../tools/registry.js";
-import { createTvTools } from "../tools/tv-tools.js";
+import { createTvTools, capabilitiesForPlatform } from "../tools/tv-tools.js";
+import type { Capability } from "../capabilities/types.js";
+import { WorldModel } from "../world/model.js";
+import { observeResult } from "../world/from-tools.js";
 import { probeCapabilities, type CapabilityProbe } from "../tools/capability-probe.js";
 import { ConversationContext } from "../memory/context.js";
 import { EventBus, type AgentEvents } from "../events/bus.js";
@@ -30,6 +33,20 @@ export interface AgentOptions {
    * When unset, confirm-required tools run without prompting (opt-in guard).
    */
   confirm?: (req: ConfirmRequest) => boolean | Promise<boolean>;
+  /**
+   * Where the agent keeps what it knows about the room. Pass one to share it
+   * with a planner or a perception source; otherwise the agent owns its own.
+   */
+  world?: WorldModel;
+  /**
+   * Put what the agent already knows into the system prompt. Default true.
+   *
+   * Off is for measuring the difference, and for a host that wants to build the
+   * block itself. The facts still accumulate either way.
+   */
+  worldInPrompt?: boolean;
+  /** Budget for that block, in characters. Default 400. */
+  worldPromptChars?: number;
 }
 
 export interface ConfirmRequest {
@@ -64,7 +81,11 @@ Traditional Chinese if they wrote Chinese).`;
  */
 export class Agent {
   readonly events = new EventBus<AgentEvents>();
+  /** What the agent believes about the room. See docs/world-model.md. */
+  readonly world: WorldModel;
   private readonly tools = new ToolRegistry();
+  /** Tool name -> the capability it performs, for reading results into state. */
+  private readonly byTool = new Map<string, Capability>();
   private readonly ctx: ConversationContext;
   private readonly maxIterations: number;
   private readonly turnTimeoutMs: number;
@@ -73,6 +94,10 @@ export class Agent {
     this.ctx = new ConversationContext(opts.systemPrompt ?? DEFAULT_SYSTEM_PROMPT);
     this.maxIterations = opts.maxIterations ?? 6;
     this.turnTimeoutMs = opts.turnTimeoutMs ?? 30_000;
+    this.world = opts.world ?? new WorldModel();
+    for (const capability of capabilitiesForPlatform(opts.platform)) {
+      if (capability.tool) this.byTool.set(capability.tool, capability);
+    }
     for (const tool of createTvTools(opts.platform)) this.tools.register(tool);
     for (const tool of opts.tools ?? []) this.tools.register(tool);
     this.registerHelpTool();
@@ -196,12 +221,37 @@ export class Agent {
     }
   }
 
+  /**
+   * The conversation, with what the agent already knows folded into the system
+   * prompt.
+   *
+   * Only known, fresh facts go in — padding the block with "volume: unknown"
+   * teaches the model to distrust all of it — and it is rebuilt every round
+   * rather than appended to the history, so a fact that changes mid-turn does
+   * not appear twice with two different values.
+   */
+  private messages(): ChatMessage[] {
+    const messages = this.ctx.toMessages();
+    if (this.opts.worldInPrompt === false) return messages;
+    const summary = this.world.summarize({ maxChars: this.opts.worldPromptChars ?? 400 });
+    if (!summary) return messages;
+    const system = messages[0];
+    if (!system) return messages;
+    return [
+      { ...system, content: `${system.content}
+
+What you already know about this room (do not re-read it unless the user doubts it):
+${summary}` },
+      ...messages.slice(1),
+    ];
+  }
+
   private async runLoop(userInput: string, deadline: Promise<never>): Promise<string> {
     this.events.emit("turn:start", { input: userInput });
     this.ctx.add({ role: "user", content: userInput });
 
     for (let i = 0; i < this.maxIterations; i++) {
-      const req = { messages: this.ctx.toMessages(), tools: this.tools.list() };
+      const req = { messages: this.messages(), tools: this.tools.list() };
       const llm = this.opts.llm;
       // Race the LLM call against the deadline so a hung call is interrupted.
       const result = await Promise.race([
@@ -246,6 +296,13 @@ export class Agent {
           toolResult = { error: (err as Error).message, tool: call.name };
         }
         this.events.emit("tool:result", { name: call.name, result: toolResult });
+        // Everything the TV just told us is also something the agent now knows.
+        // Reading it here rather than in each tool is what makes the world model
+        // arrive for free on every adapter, including ones written elsewhere:
+        // the mapping is on the capability, and this is the one place a result
+        // and its capability are both in hand.
+        const capability = this.byTool.get(call.name);
+        if (capability) observeResult(this.world, capability, toolResult);
         // A tool that reports `unsupported` has told us something permanent
         // about this device, so stop offering it. The result still goes back to
         // the model for this turn — it has to be able to explain the refusal —
