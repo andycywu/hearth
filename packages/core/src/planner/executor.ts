@@ -135,7 +135,14 @@ export class PlanExecutor {
 
         const verdict = await this.verify(step, capability);
         if (verdict === "verified") {
-          this.commit(step.expectedResult, "tool", 1);
+          // Only for verification that did not *read*. A read-back has already put
+          // the device's own answer in the world at full confidence, and
+          // overwriting it with what we asked for would replace an observation
+          // with a wish — on a quantised control those differ, and the difference
+          // is the whole reason the read exists.
+          if ((step.verification ?? capability.verification)?.kind !== "read_back") {
+            this.commit(step.expectedResult, "tool", 1);
+          }
           this.opts.graph.confirm(capability.id, capability.provider);
           return { step, status: "verified", attempts, provider: capability.provider };
         }

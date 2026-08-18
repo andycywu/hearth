@@ -90,6 +90,38 @@ Chinese, and no agent errors were raised.
   `navigation.available` still reports ready.
 - **`getInputSource` returns `app`** — the emulator has no HDMI inputs.
 
+### Goal mode on the device (verified 2026-08-18)
+
+Launched with `?plan&room=demo&confirm=auto` and driven by `?ask=`, on the same
+Android TV 34 emulator. Plan lifecycle is logged to logcat under `[plan]`, the
+room under `[devices]`.
+
+| Utterance | Plan | Outcome |
+|---|---|---|
+| turn it up | `tv.audio.set_volume(level=10)` | **verified** — read-back agreed |
+| turn it down / night mode | *(nothing runnable)* | `achieved=true` — already at or below the level asked for |
+| play ps5 | `tv.input.switch(source=hdmi2)` | **unsupported** — "setInputSource (needs a platform signature on most builds)"; capability withdrawn |
+| movie night | *(nothing runnable)* | this build advertises no `media`, so the goal is honestly out of reach |
+
+The device graph came up as expected — `PlayStation 5 [ps5] — HDMI2 · 100% ·
+manual` beside `AOSP TV on x86 [tv] — built in · 100% · manual+platform` — and
+`hdmi2` reached the plan by lookup, not by being written anywhere.
+
+Two defects only a real device could produce, both fixed:
+
+- **Verification failed on quantised volume.** "turn it down" from 33 asked for
+  23, Android set step 3 of 15 and read back 20, and exact equality reported *the
+  device did not end up in the expected state* about a TV that had done precisely
+  what it was asked. The quantisation is documented three bullets above this and
+  the verification layer ignored it. Read-back verification now carries a
+  tolerance (`StatePredicate.within`), and a relative goal is expressed as a bound
+  (`lte` / `gte`) rather than an exact value — a tolerance on the *goal* was the
+  first attempt and was worse, because it made a small change a no-op.
+- **The world believed the request rather than the reading.** After a verified
+  read-back the executor was overwriting the observed value with the requested
+  one, so the world said 23 while the TV was at 20. A read-back is now
+  authoritative: the observation stands.
+
 ## Tizen — Samsung TV 10.0 emulator (verified 2026-08-03)
 
 Everything under `tizen.*` works: 84 apps listed, `getForegroundApp`, `sendKey`,

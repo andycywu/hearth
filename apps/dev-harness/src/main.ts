@@ -1,7 +1,6 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, summarizeOutcome,
-  DeviceGraph, createManualSource, createPlatformSource, createStoredSource,
-  runDiscovery, saveDevices, deviceTreeText,
+  discoverRoom, deviceTreeText,
   type LlmClient,
 } from "@tv-ai-agent/core";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
@@ -25,12 +24,6 @@ declare global {
     __AGENT_LLM_API_KEY__?: string;
   }
 }
-
-/** A living room to demonstrate the goal-based scenarios with. */
-const DEMO_ROOM = [
-  { id: "ps5", type: "game_console", name: "PlayStation 5", connection: { kind: "hdmi", port: "hdmi2" }, source: "manual" },
-  { id: "stb", type: "stb", name: "Set-top box", connection: { kind: "hdmi", port: "hdmi3" }, source: "manual" },
-] as const;
 
 async function boot(): Promise<void> {
   const state = document.getElementById("state");
@@ -89,25 +82,13 @@ async function boot(): Promise<void> {
     console.warn(`[skills] skipping ${name}: ${reason}`);
   }
 
-  // The room: what was registered into storage last time, what the TV itself can
-  // see, and — only when nothing is stored — a demo living room so the
-  // goal-based scenarios have something to reason about. Real hosts get the
-  // first two and skip the third; the planner cannot tell the difference, which
-  // is the point. `?room=empty` to watch the agent say it does not know where
-  // anything is.
-  const devices = new DeviceGraph();
-  const emptyRoom = params.get("room") === "empty";
-  const stored = createStoredSource(platform.storage);
-  // The demo room is a fallback, not a default: once anything is stored, that is
-  // the room, and a demo device reappearing beside it would be a bug someone
-  // would spend an afternoon on.
-  const seedDemo = !emptyRoom && !(await stored.available());
-  const sources = emptyRoom
-    ? [createPlatformSource(platform)]
-    : [stored, createPlatformSource(platform), createManualSource(seedDemo ? [...DEMO_ROOM] : [])];
-  const discovery = await runDiscovery(devices, sources);
-  if (discovery.failed.length) console.warn("[devices] sources failed:", discovery.failed.join(", "));
-  if (!emptyRoom) await saveDevices(platform.storage, devices);
+  // The room: stored registrations, what the TV itself can see, and — only when
+  // nothing is stored — a demo living room so the goal-based scenarios have
+  // something to reason about. `?room=empty` to watch the agent say it does not
+  // know where anything is. Shared with the device hosts, because four slightly
+  // different copies of this is how an emulator ends up with a room a TV does not
+  // have.
+  const devices = await discoverRoom(platform, { room: params.get("room") === "empty" ? "empty" : "demo" });
 
   // `?devices` prints the room the same way `?diag` prints the capabilities.
   if (params.has("devices")) {

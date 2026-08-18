@@ -52,6 +52,7 @@ hardware.
 | Tests / CI / lint / bundle-size / license / SBOM | ✅ 574 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
+| **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18 — device graph, plan, policy, execute, verify, all through logcat. Two device-only defects found and fixed (quantised-volume verification; the world believing a request over a reading). See [`capability-matrix.md`](platform/capability-matrix.md) |
 | **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
 | **Tizen / webOS packaging** | ✅ signed `.wgt` + `.ipk` verified |
 | **Tizen TV emulator bring-up** | ✅ installs, runs, offline demo runs — but no audio API on that build, so volume/mute are untested |

@@ -16,7 +16,16 @@ export function evaluate(world: WorldModel, predicate: StatePredicate): Truth {
   if (!world.known(predicate.path)) return predicate.unknownOk ? "true" : "unknown";
   const value = world.value(predicate.path);
 
-  if (predicate.equals !== undefined) return bool(looseEquals(value, predicate.equals));
+  if (predicate.equals !== undefined) {
+    // Tolerance first: a quantised control that landed on the nearest step it has
+    // did what was asked, and failing it would send someone to debug a TV that is
+    // working exactly as designed.
+    if (predicate.within !== undefined && typeof value === "number") {
+      const target = Number(predicate.equals);
+      return bool(Number.isFinite(target) && Math.abs(value - target) <= predicate.within);
+    }
+    return bool(looseEquals(value, predicate.equals));
+  }
   if (predicate.notEquals !== undefined) return bool(!looseEquals(value, predicate.notEquals));
   if (predicate.oneOf !== undefined) return bool(predicate.oneOf.some((v) => looseEquals(value, v)));
   if (predicate.gte !== undefined) return bool(typeof value === "number" && value >= predicate.gte);
@@ -43,6 +52,12 @@ export function unsatisfied(world: WorldModel, predicates: StatePredicate[]): St
 export function targetValue(predicate: StatePredicate): unknown {
   if (predicate.equals !== undefined) return predicate.equals;
   if (predicate.oneOf?.length) return predicate.oneOf[0];
+  // A bound is a target: "at most 20" is achieved by setting 20, and without
+  // this a bounded goal produced no argument, so `night_mode` — which has always
+  // been written as `lte` — was silently unplannable. Nothing noticed until a
+  // relative volume goal was expressed the same way.
+  if (predicate.lte !== undefined) return predicate.lte;
+  if (predicate.gte !== undefined) return predicate.gte;
   return undefined;
 }
 

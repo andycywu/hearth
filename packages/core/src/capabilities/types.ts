@@ -29,6 +29,16 @@ export interface StatePredicate {
   oneOf?: unknown[];
   gte?: number;
   lte?: number;
+  /**
+   * Tolerance for a numeric `equals`, because some controls are quantised.
+   *
+   * Android maps 0-100 onto `getStreamMaxVolume` steps — commonly 15, sometimes
+   * 7 — so asking for 23 sets the nearest step and reads back 20. On a real
+   * emulator that turned a working TV into "the device did not end up in the
+   * expected state": the volume *had* gone down, by as much as the hardware can
+   * express, and exact equality called it a failure.
+   */
+  within?: number;
   /** Treat an unknown value as satisfying this predicate (optimistic gates). */
   unknownOk?: boolean;
 }

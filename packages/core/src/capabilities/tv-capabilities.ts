@@ -79,7 +79,13 @@ export function createTvCapabilities(provider: string): Capability[] {
       verification: {
         kind: "read_back",
         capability: "tv.audio.get_volume",
-        predicate: { path: W.tvVolume, equals: "{level}" },
+        // Not exact: Android maps 0-100 onto `getStreamMaxVolume` steps, which is
+        // 15 on the TV emulator and can be as few as 7 on real hardware, so
+        // asking for 23 sets step 3 and reads back 20. The tolerance covers the
+        // coarsest plausible stream; the read-back's *observed* value is what
+        // lands in the world, so the agent knows the TV is at 20 rather than
+        // believing its own request.
+        predicate: { path: W.tvVolume, equals: "{level}", within: 8 },
       },
     },
     {

@@ -51,6 +51,9 @@ export {
   saveDevices, loadDevices, registerDevice, forgetDevice, createStoredSource, MAX_DEVICES,
 } from "./devices/store.js";
 export { deviceTreeText } from "./devices/report.js";
+export {
+  discoverRoom, roomOptionFromUrl, DEMO_ROOM, type RoomOptions,
+} from "./devices/host.js";
 export type {
   DeviceNode, DeviceObservation, DeviceType, Connection, DiscoverySource, DiscoverySourceId,
 } from "./devices/types.js";

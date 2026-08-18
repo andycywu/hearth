@@ -212,6 +212,11 @@ export interface DeviceShellOptions {
    * mostly speak Chinese, where typing characters isn't an option.
    */
   keyboard?: boolean | string;
+  /**
+   * Let the agent plan, not just chat. Defaults to whether `?plan` was passed.
+   * See `planRequested`.
+   */
+  plan?: boolean;
 }
 
 /**
@@ -239,6 +244,22 @@ function askAndForget(ui: Pick<OverlayController, "ask">, text: string): void {
   void ui.ask(text).catch(() => {
     /* already rendered via the agent's `error` event */
   });
+}
+
+/**
+ * Should this build let the agent *plan* what it is asked, rather than only chat?
+ *
+ * Opt-in per launch, and off by default on a device, for one specific reason: the
+ * automated bring-up run (`tools/device-acceptance.mjs`) asserts a tool sequence
+ * read out of logcat, and plan mode legitimately produces a different one — it
+ * resolves "make it louder" from world state instead of re-reading the TV. Turning
+ * it on silently would have broken the one check that proves the device still
+ * works. `?plan` turns it on; `?plan=off` is also accepted, so the flag reads the
+ * same way it does in the dev harness.
+ */
+export function planRequested(search = launchSearch()): boolean {
+  const value = new URLSearchParams(search).get("plan");
+  return value !== null && value !== "off" && value !== "0" && value !== "false";
 }
 
 export interface DeviceShellController extends OverlayController {
@@ -279,6 +300,22 @@ export function mountDeviceShell(
         showActivity: debugRequested(),
       })
     : mountAgentOverlay(agent);
+
+  // With plan mode on, every way in — the keyboard, the microphone, `?ask=`, the
+  // demo script — goes through the agent's own routing: a goal it can plan is
+  // planned and verified, and anything else is a conversation exactly as before.
+  // Wrapping the controller rather than each call site is what makes that true of
+  // the ways in that this file does not own.
+  const plan = opts.plan ?? planRequested();
+  if (plan) {
+    const chat = ui.ask.bind(ui);
+    ui.ask = async (text: string) => {
+      // `undefined` means "not plan work" — the routing rule lives in the agent,
+      // and this is the one place a host has to honour it.
+      if (await agent.pursueIntent(text)) return;
+      await chat(text);
+    };
+  }
 
   const status = document.getElementById(opts.statusId ?? "status");
   if (status) {

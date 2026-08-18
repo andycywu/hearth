@@ -38,12 +38,13 @@ import { targets, type Target } from "./mocks.js";
  *  - `verified` — the write took and the read-back agrees.
  *  - `unsupported` — the adapter refuses up front, because the API is
  *    partner-signed. Tizen and webOS both say so rather than pretending.
- *  - `failed` — the write was *accepted* and nothing happened. This is Android's
- *    real behaviour for a third-party app: switching the system TV input needs
- *    the TV Input Framework, the passthrough Intent is best-effort, and the read
- *    afterwards still reports the old source. It is precisely the case
- *    `execute -> assume success` would have reported as done, and the reason the
- *    verification loop exists.
+ *  - `failed` — the write was *accepted* and nothing happened. That is what this
+ *    mock does, and it is the shape that matters: `execute -> assume success`
+ *    would have reported it as done. (The real AOSP adapter is blunter — it
+ *    refuses `setInputSource` up front, so on the emulator the same utterance
+ *    comes back `unsupported`. Keeping the mock as it is keeps a target in the
+ *    suite for the accepted-and-ignored case, which is the one no adapter can be
+ *    relied on to self-report.)
  *
  * A target moving to `verified` here without its adapter gaining a real capability
  * means verification has been weakened, so these are pinned by name.

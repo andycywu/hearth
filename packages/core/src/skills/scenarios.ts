@@ -144,7 +144,15 @@ export const SKILLS: Skill[] = [
     goal: (params) => ({
       id: "volume_reduced",
       params,
-      desiredState: [{ path: W.tvVolume, equals: params.level }],
+      // `lte`, not `equals`: "quieter" is satisfied by landing at or below the
+      // level we computed, and on a real TV that distinction is the difference
+      // between success and a lie. Android maps 0-100 onto 15 volume steps, so
+      // asking for 23 sets step 3 and reads back 20 — with `equals` the step
+      // verified and the *goal* still reported "still not where you asked" about a
+      // volume it had just successfully changed. A tolerance on the goal was the
+      // wrong fix: it made a small change a no-op, because the goal was already
+      // within tolerance before anything happened.
+      desiredState: [{ path: W.tvVolume, lte: Number(params.level) }],
     }),
   },
   {
@@ -162,7 +170,8 @@ export const SKILLS: Skill[] = [
     goal: (params) => ({
       id: "volume_raised",
       params,
-      desiredState: [{ path: W.tvVolume, equals: params.level }],
+      // Mirror of `quieter`: at or above the level asked for.
+      desiredState: [{ path: W.tvVolume, gte: Number(params.level) }],
     }),
   },
 ];

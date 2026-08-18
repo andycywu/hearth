@@ -72,7 +72,9 @@ Verification → World Model.
 
 **Exit criteria**
 
-- The four scenarios run on the Android TV emulator, not only in CI.
+- ✅ The four scenarios run on the Android TV emulator, not only in CI —
+  verified 2026-08-18, results and the two defects it found in
+  [`capability-matrix.md`](platform/capability-matrix.md).
 - Every executed step reports `verified`, `unverified` or `failed` — never an
   assumption dressed up as success.
 - Moving the PS5 to another HDMI port changes the plan and changes no code.
@@ -253,8 +255,9 @@ Ordered. Each is independently shippable.
   observation per field, so the platform's low-confidence "Device on HDMI2" would
   rename a hand-registered PlayStation 5. Merging now prefers the better
   evidence, and `unknown` never overwrites a known type.
-  **Not yet verified on the emulator** — the persistence and merge are covered by
-  tests; the emulator run is still owed.
+  **Verified on the emulator** (2026-08-18): the seeded room persisted and the
+  platform source merged into it — `PlayStation 5 [ps5] — HDMI2 · 100% · manual`
+  beside `AOSP TV on x86 [tv] — built in · 100% · manual+platform`.
 
 ### 7. HDMI-CEC discovery and control adapter
 

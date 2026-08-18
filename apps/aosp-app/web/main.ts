@@ -1,4 +1,7 @@
-import { Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl} from "@tv-ai-agent/core";
+import {
+  Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl,
+  discoverRoom, deviceTreeText,
+} from "@tv-ai-agent/core";
 import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
 import {
@@ -73,13 +76,23 @@ async function boot(): Promise<void> {
   // `?timeout=90` when the model is slow — a local model on modest hardware
   // can take a minute a turn, and the 30s default makes that look broken.
   const turnTimeoutMs = turnTimeoutFromUrl();
-  const agent = new Agent({ platform, llm, confirm, ...(turnTimeoutMs ? { turnTimeoutMs } : {}) });
+  // What is in the room, from storage plus what the TV can see. `?room=demo`
+  // seeds a console on HDMI2 so Scenario B has something to plan for on a
+  // device with nothing plugged in — a bring-up aid, like `?confirm=auto`.
+  const devices = await discoverRoom(platform);
+  const agent = new Agent({
+    platform, llm, confirm, devices,
+    ...(turnTimeoutMs ? { turnTimeoutMs } : {}),
+  });
   // Ask the device which tools actually work here before anything can ask
   // what we can do. On a build missing a capability inside a required
   // member — Tizen with no audio API — the alternative is promising it and
   // then declining.
   const capabilities = await agent.probeCapabilities();
   for (const note of capabilities.notes) console.info(`[capability] ${note}`);
+  // Logged rather than only rendered: on a TV you cannot attach a debugger to,
+  // logcat is how anyone finds out the agent thinks the console is on HDMI3.
+  for (const line of deviceTreeText(devices).split("\n")) console.info(`[devices] ${line}`);
   window.__tvAgent = agent;
   window.__tvPlatform = platform;
   console.info(
@@ -96,6 +109,17 @@ async function boot(): Promise<void> {
     ...renderOption(),
     ...keyboardOption(),
   });
+  // Plan lifecycle into logcat, for the same reason the device tree is there: on
+  // a TV you cannot attach a debugger to, this is the only way to see that a step
+  // ran, what it verified, and whether the answer was `unsupported` rather than a
+  // failure. It is also what an automated bring-up run reads.
+  agent.events.on("plan:start", ({ plan }) =>
+    console.info(`[plan] ${plan.goal.id}: ${plan.steps.map((s) => s.action.capabilityId).join(" -> ") || "(nothing runnable)"}`));
+  agent.events.on("plan:step", ({ outcome }) =>
+    console.info(`[plan] ${outcome.step.action.capabilityId} ${JSON.stringify(outcome.step.action.args)} — ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ""}`));
+  agent.events.on("plan:end", ({ outcome }) =>
+    console.info(`[plan] done: achieved=${outcome.achieved} — ${agent.describe(outcome)}`));
+
   // After the shell exists, so the avatar can be told when it's speaking.
   speakReplies(agent, platform, { onSpeaking: (s) => ui.setSpeaking?.(s) });
   // `?demo` runs the built-in script, `?ask=…` runs your own — either way the TV
