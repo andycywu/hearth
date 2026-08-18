@@ -4,6 +4,13 @@ import { ToolRegistry, type Tool } from "../tools/registry.js";
 import { createTvTools, capabilitiesForPlatform } from "../tools/tv-tools.js";
 import type { Capability } from "../capabilities/types.js";
 import { CapabilityGraph } from "../capabilities/graph.js";
+import { DeviceGraph } from "../devices/graph.js";
+import { PolicyEngine } from "../policy/policy.js";
+import { GoalPlanner } from "../planner/planner.js";
+import { PlanExecutor } from "../planner/executor.js";
+import { summarizeOutcome } from "../planner/report.js";
+import type { Goal, PlanOutcome } from "../planner/types.js";
+import { findSkill, type Skill } from "../skills/scenarios.js";
 import { WorldModel } from "../world/model.js";
 import { observeResult } from "../world/from-tools.js";
 import { probeCapabilities, type CapabilityProbe } from "../tools/capability-probe.js";
@@ -48,6 +55,10 @@ export interface AgentOptions {
   worldInPrompt?: boolean;
   /** Budget for that block, in characters. Default 400. */
   worldPromptChars?: number;
+  /** What is in the room. Pass one built by the host's discovery; else empty. */
+  devices?: DeviceGraph;
+  /** May this happen? Defaults to the built-in risk rules. */
+  policy?: PolicyEngine;
 }
 
 export interface ConfirmRequest {
@@ -87,6 +98,10 @@ export class Agent {
   private readonly tools = new ToolRegistry();
   /** What this device can do, and what it turned out it could not. */
   readonly capabilities = new CapabilityGraph();
+  /** What is in the room. Empty until a host runs discovery. */
+  readonly devices: DeviceGraph;
+  /** May this happen? Consulted before every plan step. */
+  readonly policy: PolicyEngine;
   /** Tool name -> the capability it performs, for reading results into state. */
   private readonly byTool = new Map<string, Capability>();
   private readonly ctx: ConversationContext;
@@ -98,6 +113,8 @@ export class Agent {
     this.maxIterations = opts.maxIterations ?? 6;
     this.turnTimeoutMs = opts.turnTimeoutMs ?? 30_000;
     this.world = opts.world ?? new WorldModel();
+    this.devices = opts.devices ?? new DeviceGraph();
+    this.policy = opts.policy ?? new PolicyEngine();
     for (const capability of capabilitiesForPlatform(opts.platform)) {
       this.capabilities.register(capability);
       if (capability.tool) this.byTool.set(capability.tool, capability);
@@ -244,6 +261,107 @@ export class Agent {
       clearTimeout(timer);
       runOpts.signal?.removeEventListener("abort", onAbort);
     }
+  }
+
+  /**
+   * Pursue a goal: plan against the world, check policy, execute, verify.
+   *
+   * The second path through the agent, and deliberately not a replacement for
+   * the first. Conversation improvises tool calls, which is right for open
+   * questions and wrong for "get the room ready to play a console" — that is a
+   * *state* the user wants to be in, and a chat loop reaching it by improvisation
+   * has no preconditions, no fallbacks, no verification and no record of how far
+   * it got. Both paths share the same tools, the same policy and the same world.
+   */
+  async pursue(goal: Goal, runOpts: RunOptions = {}): Promise<PlanOutcome> {
+    const planner = new GoalPlanner({ graph: this.capabilities, world: this.world });
+    const plan = await planner.plan(goal);
+    this.events.emit("plan:start", { plan });
+
+    const executor = new PlanExecutor({
+      graph: this.capabilities,
+      world: this.world,
+      tools: this.tools,
+      policy: this.policy,
+      // The host already has a confirmation UI wired to tool calls; a plan step
+      // asks through the same door rather than growing a second one.
+      ...(this.opts.confirm
+        ? {
+          confirm: (req) => this.opts.confirm!({
+            name: req.capability.tool ?? req.capability.id,
+            args: req.args,
+            description: req.prompt,
+          }),
+        }
+        : {}),
+      onStep: (outcome) => this.events.emit("plan:step", { outcome }),
+    });
+
+    const outcome = await executor.run(plan, runOpts.signal);
+    this.events.emit("plan:end", { outcome });
+    return outcome;
+  }
+
+  /**
+   * Pursue a named scenario, resolving its parameters first.
+   *
+   * `resolve` is where a skill looks at the room — which HDMI port the console
+   * is on, how loud it is now — and where it can decline. A decline is reported
+   * as `blocked` rather than as a failed plan, because "I don't know where your
+   * PS5 is" and "I tried to switch and it didn't take" need different answers
+   * from the user.
+   */
+  async pursueSkill(
+    skill: Skill | string,
+    params: Record<string, unknown> = {},
+    runOpts: RunOptions = {},
+  ): Promise<PlanOutcome> {
+    const resolved = typeof skill === "string" ? findSkill(skill) : skill;
+    if (!resolved) throw new Error(`Unknown skill: ${String(skill)}`);
+
+    let goalParams: Record<string, unknown> | undefined = params;
+    if (resolved.resolve) {
+      goalParams = await resolved.resolve(params, {
+        world: this.world,
+        devices: this.devices,
+        observe: (capabilityId) => this.observe(capabilityId),
+      });
+    }
+    if (!goalParams) {
+      const goal = resolved.goal(params);
+      const blocked = resolved.blocked ?? `I can't work out what "${resolved.id}" means here.`;
+      const outcome: PlanOutcome = {
+        plan: { id: `plan-blocked-${resolved.id}`, goal, steps: [], createdAt: Date.now() },
+        outcomes: [], achieved: false, unmet: goal.desiredState, blocked,
+      };
+      this.events.emit("plan:end", { outcome });
+      return outcome;
+    }
+    return this.pursue(resolved.goal(goalParams), runOpts);
+  }
+
+  /**
+   * Run one read capability and fold the answer into the world.
+   *
+   * The perception step, for the cases where planning needs a fact first — "a
+   * bit quieter" is not a goal until you know how loud it is. Failures are
+   * swallowed on purpose: the caller's next move is to check whether the world
+   * knows, and an exception here would only be a longer way of saying no.
+   */
+  async observe(capabilityId: string): Promise<void> {
+    const capability = this.capabilities.get(capabilityId);
+    if (!capability?.tool || !this.tools.has(capability.tool)) return;
+    try {
+      const result = await this.tools.call(capability.tool, {});
+      observeResult(this.world, capability, result);
+    } catch {
+      /* a read that failed leaves the world as it was, which is the truth */
+    }
+  }
+
+  /** What a plan outcome amounts to, in a sentence. */
+  describe(outcome: PlanOutcome): string {
+    return summarizeOutcome(outcome);
   }
 
   /**

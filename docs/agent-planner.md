@@ -80,6 +80,40 @@ type Verification =
 `{ kind: "none" }` requires a reason string. An unverifiable action should be a
 deliberate, documented decision, not an omission.
 
+## Driving it
+
+```ts
+const outcome = await agent.pursue({
+  id: "input_switched",
+  desiredState: [{ path: "tv.input", equals: "hdmi2" }],
+});
+agent.describe(outcome);   // "Done: tv.input.switch(source=hdmi2)."
+```
+
+or by scenario, which resolves its parameters against the room first:
+
+```ts
+const match = matchSkill("我要打 PS5");            // stopgap matcher, see below
+if (match && isPlannable(match)) await agent.pursueSkill(match.skill, match.params);
+```
+
+Both paths live on the same agent and share one world, one tool registry, one
+policy engine and one confirmation handler. Conversation is unchanged: anything
+`matchSkill` does not recognise goes to `agent.run()` exactly as before. In the
+dev harness, `?plan=off` forces the chat path — asking for HDMI2 both ways is the
+clearest demonstration of the difference, because only one of them checks whether
+it worked.
+
+`matchSkill` is a **stopgap** and is labelled as one in the source: real intent
+understanding is the LLM planner's job (roadmap task 9). It exists so the P0
+scenarios can be driven with no model at all, which is what makes them
+demonstrable offline and testable in CI.
+
+`describe()` is mechanical English, which is a known limit — the agent otherwise
+replies in the user's language. Phrasing an outcome through the model costs a
+round trip the offline path cannot make; a host that wants a spoken reply in
+another language should hand the outcome to the LLM itself.
+
 ## Planning strategies
 
 Two, and they coexist:

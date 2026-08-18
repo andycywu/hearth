@@ -80,6 +80,12 @@ export interface PlanOutcome {
   achieved: boolean;
   /** Goal predicates still false after execution. */
   unmet: StatePredicate[];
+  /**
+   * Why there was nothing to run: the skill could not express this as a goal
+   * here (no such device, no idea how loud it is). Distinct from a plan that ran
+   * and failed, and the user hears the difference.
+   */
+  blocked?: string;
 }
 
 export interface Planner {

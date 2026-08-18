@@ -185,4 +185,48 @@ describe("createAgentViewModel", () => {
     expect(calls).toBe(0);
     expect(vm.snapshot().reply).toBe("");
   });
+
+  describe("a plan, which is the other kind of turn", () => {
+    const plan = {
+      id: "p1",
+      goal: { id: "gaming_session_active", desiredState: [] },
+      steps: [{ id: "s1", action: { capabilityId: "tv.input.switch", args: {} }, preconditions: [], expectedResult: [] }],
+      createdAt: 0,
+    };
+    const step = (status: string) => ({
+      step: plan.steps[0]!,
+      status,
+      attempts: 1,
+    }) as never;
+
+    it("shows the same busy/activity a renderer already draws", () => {
+      const { agent, events } = fakeAgent();
+      const vm = createAgentViewModel(agent);
+      const seen: AgentViewState[] = [];
+      vm.subscribe((s) => seen.push(s));
+
+      events.emit("plan:start", { plan } as never);
+      expect(vm.snapshot()).toMatchObject({ busy: true, phase: "thinking", activity: "planning gaming_session_active" });
+
+      events.emit("plan:step", { outcome: step("verified") });
+      expect(vm.snapshot().activity).toBe("tv.input.switch — verified");
+
+      events.emit("plan:end", {
+        outcome: { plan, outcomes: [step("verified")], achieved: true, unmet: [] },
+      } as never);
+      expect(vm.snapshot()).toMatchObject({ busy: false, activity: "", phase: "idle" });
+      expect(vm.snapshot().reply).toMatch(/^Done: tv\.input\.switch/);
+    });
+
+    it("reports a step that could not be checked as exactly that", () => {
+      const { agent, events } = fakeAgent();
+      const vm = createAgentViewModel(agent);
+      events.emit("plan:end", {
+        outcome: { plan, outcomes: [step("unverified")], achieved: true, unmet: [] },
+      } as never);
+      // Never "done" for something nothing on this device can confirm.
+      expect(vm.snapshot().reply).toMatch(/can't confirm it/);
+      expect(vm.snapshot().reply).not.toMatch(/^Done/);
+    });
+  });
 });

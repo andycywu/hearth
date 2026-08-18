@@ -1,3 +1,5 @@
+import type { Plan, PlanOutcome, StepOutcome } from "../planner/types.js";
+
 export type Listener<T> = (payload: T) => void;
 
 /** Minimal typed event bus used to decouple runtime components. */
@@ -28,5 +30,14 @@ export interface AgentEvents {
    * in `?diag`; nothing has to listen.
    */
   "tool:withdrawn": { name: string; reason: string; at: "probe" | "call"; capability?: string };
+  /**
+   * A goal-driven run, as opposed to a conversational turn. Both paths exist:
+   * chat improvises tool calls, a plan is derived from a goal and verified step
+   * by step. Renderers show them the same way; the events are separate because
+   * "what the agent is doing" is genuinely different information.
+   */
+  "plan:start": { plan: Plan };
+  "plan:step": { outcome: StepOutcome };
+  "plan:end": { outcome: PlanOutcome };
   "error": { error: Error };
 }

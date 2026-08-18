@@ -24,6 +24,13 @@ new Agent(options: AgentOptions)
 | `toolRegistry` | `get: ToolRegistry` | The live registry (inspect / add tools). |
 | `events` | `EventBus<AgentEvents>` | Observe the turn lifecycle. |
 | `world` | `WorldModel` | What the agent knows about the room. Tool results land here automatically; see [world-model.md](world-model.md). |
+| `pursue` | `pursue(goal: Goal, opts?): Promise<PlanOutcome>` | The goal path: plan → policy → execute → verify. See [agent-planner.md](agent-planner.md). |
+| `pursueSkill` | `pursueSkill(skill: Skill \| string, params?, opts?): Promise<PlanOutcome>` | Same, for a named scenario; resolves its parameters against the room first. |
+| `observe` | `observe(capabilityId: string): Promise<void>` | Run one read capability and fold the answer into `world`. |
+| `describe` | `describe(outcome: PlanOutcome): string` | What a plan amounted to, in a sentence. Never reports `unverified` as done. |
+| `capabilities` | `CapabilityGraph` | What this device can do, and what was withdrawn. |
+| `devices` | `DeviceGraph` | What is in the room. Empty until a host runs discovery. |
+| `policy` | `PolicyEngine` | Consulted before every plan step. |
 
 ```ts
 interface AgentOptions {
@@ -36,6 +43,8 @@ interface AgentOptions {
   persistKey?: string;      // auto-save history to platform.storage
   confirm?: (req: ConfirmRequest) => boolean | Promise<boolean>;
   world?: WorldModel;       // share one with a planner; otherwise the agent owns it
+  devices?: DeviceGraph;    // what discovery found; otherwise empty
+  policy?: PolicyEngine;    // defaults to the built-in risk rules
   worldInPrompt?: boolean;  // put known facts in the system prompt (default true)
   worldPromptChars?: number;// budget for that block (default 400)
 }
@@ -51,6 +60,9 @@ interface ConfirmRequest { name: string; args: Record<string, unknown>; descript
 "tool:call"   { name: string; args: unknown }
 "tool:result" { name: string; result: unknown }
 "turn:end"    { output: string }
+"plan:start"  { plan: Plan }              // the goal path
+"plan:step"   { outcome: StepOutcome }    // after each step, with its status
+"plan:end"    { outcome: PlanOutcome }
 "error"       { error: Error }
 ```
 

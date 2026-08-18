@@ -1,5 +1,6 @@
 import { W } from "../world/state.js";
 import type { DeviceGraph } from "../devices/graph.js";
+import type { WorldModel } from "../world/model.js";
 import type { Goal } from "../planner/types.js";
 
 /**
@@ -19,20 +20,64 @@ import type { Goal } from "../planner/types.js";
  * See docs/agent-planner.md.
  */
 
+export interface SkillContext {
+  world: WorldModel;
+  devices: DeviceGraph;
+  /**
+   * Look something up before planning — the *perception* step of the loop.
+   *
+   * "A bit quieter" cannot be turned into a goal without knowing the current
+   * volume, and the honest way to get it is to look, once, rather than to guess
+   * a number or to make the planner carry relative arithmetic it has no business
+   * knowing about.
+   */
+  observe(capabilityId: string): Promise<void>;
+}
+
 export interface Skill {
   id: string;
   description: string;
-  /** Utterance keys the host can map to this skill; not a parser. */
+  /** Utterance fragments a host matcher can key on; not a parser. */
   triggers?: string[];
-  /** Built from parameters resolved by the host (device id, title, volume). */
+  /**
+   * Turn raw parameters into the ones the goal needs, looking at the world and
+   * the device graph. Returning `undefined` means "I cannot express this as a
+   * goal here" — the agent then says why instead of planning something wrong.
+   */
+  resolve?: (params: Record<string, unknown>, ctx: SkillContext) => Promise<Record<string, unknown> | undefined>;
   goal: (params: Record<string, unknown>) => Goal;
+  /** Shown when `resolve` declines. */
+  blocked?: string;
 }
 
 export const SKILLS: Skill[] = [
   {
+    id: "switch_input",
+    description: "Show what is on another input",
+    triggers: ["hdmi", "switch input", "切到", "切換輸入"],
+    goal: (params) => ({
+      id: "input_switched",
+      params,
+      desiredState: [{ path: W.tvInput, equals: "{source}" }],
+    }),
+  },
+  {
     id: "gaming_session",
     description: "Get the room ready to play a console",
-    triggers: ["play ps5", "gaming", "打電動", "我要打 ps5"],
+    triggers: ["ps5", "playstation", "xbox", "打電動", "打 ps5", "gaming"],
+    blocked: "I don't know where that console is plugged in.",
+    // The port is a property of where the console happens to be plugged in
+    // today, so it is looked up now rather than written into the goal — which is
+    // why moving the console to another HDMI port changes the plan and changes
+    // no code.
+    resolve: async (params, ctx) => {
+      const query = String(params.device ?? "ps5");
+      const found = ctx.devices.find(query)[0];
+      if (!found) return undefined;
+      const port = ctx.devices.inputPortFor(found.id);
+      if (!port) return undefined;
+      return { ...params, device: found.id, port };
+    },
     goal: (params) => ({
       id: "gaming_session_active",
       params,
@@ -56,7 +101,7 @@ export const SKILLS: Skill[] = [
   {
     id: "movie_night",
     description: "Set the room up for a film",
-    triggers: ["movie night", "我要看電影"],
+    triggers: ["movie night", "看電影", "我要看電影", "watch a film"],
     goal: (params) => ({
       id: "movie_night_active",
       params,
@@ -71,7 +116,7 @@ export const SKILLS: Skill[] = [
   {
     id: "night_mode",
     description: "Quieter and dimmer, for late viewing",
-    triggers: ["night mode", "晚上模式"],
+    triggers: ["night mode", "晚上模式", "夜間模式"],
     goal: (params) => ({
       id: "night_mode_active",
       params,
@@ -85,13 +130,37 @@ export const SKILLS: Skill[] = [
   {
     id: "quieter",
     description: "Turn the volume down relative to where it is now",
-    triggers: ["quieter", "小聲一點", "turn it down"],
-    // The relative intent is resolved by the host against the *world*, which is
-    // the whole point of Scenario D: "a bit quieter" is only meaningful if you
-    // know the current volume, and re-reading the TV to find out is the thing
-    // the World Model exists to stop.
+    triggers: ["quieter", "小聲", "小聲一點", "turn it down", "轉小聲"],
+    blocked: "I can't tell how loud it is right now.",
+    resolve: async (params, ctx) => {
+      // Look only if we do not already know — the whole point of the World Model
+      // is that the second "a bit quieter" in a row costs nothing.
+      if (!ctx.world.known(W.tvVolume)) await ctx.observe("tv.audio.get_volume");
+      const current = ctx.world.value<number>(W.tvVolume);
+      if (typeof current !== "number") return undefined;
+      const step = Number(params.step ?? 10);
+      return { ...params, level: Math.max(0, Math.min(100, Math.round(current - step))) };
+    },
     goal: (params) => ({
       id: "volume_reduced",
+      params,
+      desiredState: [{ path: W.tvVolume, equals: params.level }],
+    }),
+  },
+  {
+    id: "louder",
+    description: "Turn the volume up relative to where it is now",
+    triggers: ["louder", "大聲", "大聲一點", "turn it up", "轉大聲"],
+    blocked: "I can't tell how loud it is right now.",
+    resolve: async (params, ctx) => {
+      if (!ctx.world.known(W.tvVolume)) await ctx.observe("tv.audio.get_volume");
+      const current = ctx.world.value<number>(W.tvVolume);
+      if (typeof current !== "number") return undefined;
+      const step = Number(params.step ?? 10);
+      return { ...params, level: Math.max(0, Math.min(100, Math.round(current + step))) };
+    },
+    goal: (params) => ({
+      id: "volume_raised",
       params,
       desiredState: [{ path: W.tvVolume, equals: params.level }],
     }),
@@ -103,11 +172,11 @@ export function findSkill(id: string): Skill | undefined {
 }
 
 /**
- * Fill in a gaming goal's `{port}` from the Device Graph.
+ * Fill in a device's current HDMI port from the Device Graph.
  *
- * This function is the reason the string `hdmi2` appears nowhere in the planner:
- * the port is a property of where the console happens to be plugged in today,
- * looked up at plan time, following AVR parents when there are any.
+ * Kept exported because it is the clearest demonstration of the rule: the string
+ * `hdmi2` appears nowhere in the planner or in any goal, it is looked up, and
+ * AVR parents are followed on the way.
  */
 export function resolveDeviceParams(
   devices: DeviceGraph,

@@ -1,4 +1,5 @@
 import type { Agent } from "@tv-ai-agent/core";
+import { summarizeOutcome } from "@tv-ai-agent/core";
 import { formatToolCall } from "./format.js";
 
 /**
@@ -100,6 +101,29 @@ export function createAgentViewModel(agent: Agent): AgentViewModel {
       // Non-streaming clients only produce the final output; keep whatever the
       // stream already showed so a streamed reply isn't overwritten.
       if (!state.reply) state.reply = output;
+      state.activity = "";
+      state.busy = false;
+      emit();
+    }),
+    // A plan is the other kind of turn. It reuses `busy` and `activity` so every
+    // renderer shows it without changes: the avatar thinks, and the activity line
+    // names the step being run rather than the tool being called. `plan:step`
+    // arrives *after* each step, so it reports what happened rather than what is
+    // about to — a status is worth more to a watching user than an intention.
+    agent.events.on("plan:start", ({ plan }) => {
+      state.reply = "";
+      state.error = "";
+      state.busy = true;
+      state.streamed = false;
+      state.activity = plan.steps.length ? `planning ${plan.goal.id}` : "";
+      emit();
+    }),
+    agent.events.on("plan:step", ({ outcome }) => {
+      state.activity = `${outcome.step.action.capabilityId} — ${outcome.status}`;
+      emit();
+    }),
+    agent.events.on("plan:end", ({ outcome }) => {
+      state.reply = summarizeOutcome(outcome);
       state.activity = "";
       state.busy = false;
       emit();

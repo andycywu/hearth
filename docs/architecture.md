@@ -189,7 +189,7 @@ architecture is holding.
 | **M1** — *done* | Tools are generated from the capability catalogue; `tv-tools.ts` now holds only the platform calls, and `confirm` is derived from `riskLevel`. Behaviour-equivalent, proved by `packages/acceptance`. (The string matching in `reasonFor` moves in M3.) | low |
 | **M2** — *done* | Every `tool:result` is folded into `Agent.world` via its capability's `reads` map; a budgeted summary of known facts goes into the system prompt. | low |
 | **M3** | Add the verification loop: each capability declares how it is verified; the executor runs it and reports `verified` / `unverified` / `failed`. | medium — needs a read-back per capability |
-| **M4** | Introduce `Planner` alongside LLM tool-calling. Goal-based path for the four P0 scenarios; free-form chat keeps the existing path. | medium — two paths coexist by design |
+| **M4** — *done* | `agent.pursue` / `agent.pursueSkill` run the goal path beside LLM tool-calling; both share one world, tool registry, policy and confirm handler. Plan lifecycle events reach every renderer. | medium — two paths coexist by design |
 | **M5** | Route every execution through `PolicyEngine`; the existing `confirm` handler becomes one policy outcome (`ask_user`). | low |
 | **M6** | Device discovery (CEC first) populates the Device Graph; `set_input_source(hdmi2)` becomes `activate(device: ps5)`. | medium — hardware-gated |
 | **M7** | Adapter stubs for Titan OS / Xumo / Roku: interface plus contract test only. | low, and deliberately last |

@@ -63,7 +63,11 @@ export { evaluate, allTrue, unsatisfied, interpolate, targetValue, type Truth } 
 export type {
   Goal, Plan, PlanStep, PlanOutcome, StepOutcome, StepStatus, Action, Planner,
 } from "./planner/types.js";
-export { SKILLS, findSkill, resolveDeviceParams, type Skill } from "./skills/scenarios.js";
+export {
+  SKILLS, findSkill, resolveDeviceParams, type Skill, type SkillContext,
+} from "./skills/scenarios.js";
+export { matchSkill, isPlannable, type SkillMatch } from "./skills/match.js";
+export { summarizeOutcome, outcomeLines } from "./planner/report.js";
 export { EventBus, type AgentEvents } from "./events/bus.js";
 export { launchSearch, launchSearchSource, redactSecrets, turnTimeoutFromUrl } from "./launch-flags.js";
 export type {

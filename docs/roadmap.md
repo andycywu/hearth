@@ -190,7 +190,7 @@ Ordered. Each is independently shippable.
   returns `withdrawn` (ids), `tools`, `notes` and `reasons` — the one breaking
   change, and hosts only ever read `notes`.
 
-### 4. Plan-mode entry point on the agent
+### 4. Plan-mode entry point on the agent — **done**
 
 - **Goal** — `agent.pursue(goal)` runs planner → policy → executor → world, next
   to the existing chat path. A skill trigger routes to it.
@@ -200,6 +200,17 @@ Ordered. Each is independently shippable.
   steps stream to the overlay as they execute; free-form chat is unaffected.
 - **Risk** — medium: two execution paths must not diverge in policy or events.
 - **Complexity** — L (3–5 days).
+- **Outcome** — `agent.pursue(goal)` / `agent.pursueSkill(id, params)`, sharing
+  the world, tools, policy and confirm handler with the chat path. `plan:start`
+  / `plan:step` / `plan:end` reach every renderer through the existing
+  view-model, so the avatar and both canvases show plan steps with no renderer
+  change. A skill can now `resolve` its parameters against the room — and
+  decline, which is reported as `blocked` rather than as a failed plan, because
+  "I don't know where your PS5 is" needs a different answer from "I tried and it
+  didn't take". Two scenarios came out honest rather than tidy: on a platform
+  with no CEC, waking the console is `unreachable` and the plan says so instead
+  of pretending; and `switch_input` with no port named falls through to chat so
+  the model can ask which input rather than the agent picking one.
 
 ### 5. Policy engine replaces the boolean confirm gate
 

@@ -1,4 +1,8 @@
-import { Agent, runDiagnostics, reportToMarkdown, launchSearch, type LlmClient } from "@tv-ai-agent/core";
+import {
+  Agent, runDiagnostics, reportToMarkdown, launchSearch, summarizeOutcome,
+  DeviceGraph, createManualSource, runDiscovery, matchSkill, isPlannable,
+  type LlmClient,
+} from "@tv-ai-agent/core";
 import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 import {
   mountAgentOverlay, mountAgentCanvas, mountAgentAvatar, createConfirmHandler, speakReplies,
@@ -77,10 +81,25 @@ async function boot(): Promise<void> {
     console.warn(`[skills] skipping ${name}: ${reason}`);
   }
 
+  // A demo living room, so the goal-based scenarios have something to reason
+  // about. Real hosts get this from discovery (CEC, mDNS) or from what the user
+  // registered; here it is declared, which is the point — the planner never
+  // learns an HDMI port, it looks one up. `?room=empty` to see what the agent
+  // says when it does not know where anything is.
+  const devices = new DeviceGraph();
+  if (params.get("room") !== "empty") {
+    await runDiscovery(devices, [createManualSource([
+      { id: "tv", type: "tv", name: "Living Room TV", connection: { kind: "internal" }, source: "manual" },
+      { id: "ps5", type: "game_console", name: "PlayStation 5", connection: { kind: "hdmi", port: "hdmi2" }, source: "manual" },
+      { id: "stb", type: "stb", name: "Set-top box", connection: { kind: "hdmi", port: "hdmi3" }, source: "manual" },
+    ])]);
+  }
+
   const agent = new Agent({
     platform,
     llm,
     tools: skills,
+    devices,
     // Demonstrate the confirmation gate: confirm-required tools (launch app,
     // switch input) prompt before running. Same handler the device hosts use.
     confirm: createConfirmHandler(),
@@ -103,6 +122,30 @@ async function boot(): Promise<void> {
     appendLog("Agent", output, 1);
     pending = "";
   });
+  agent.events.on("plan:step", ({ outcome }) =>
+    appendLog("·", `${outcome.step.action.capabilityId} — ${outcome.status}`, 0.5));
+  agent.events.on("plan:end", ({ outcome }) => {
+    if (pending) appendLog("You", pending, 0.85);
+    appendLog("Agent", summarizeOutcome(outcome), 1);
+    pending = "";
+  });
+
+  /**
+   * The two paths. A recognised scenario becomes a goal and gets planned,
+   * verified and reported; everything else is a conversation, exactly as before.
+   * `?plan=off` forces the chat path, which is how you see the difference: ask
+   * for HDMI2 both ways and watch one of them check whether it worked.
+   */
+  const planMode = params.get("plan") !== "off";
+  async function ask(text: string): Promise<void> {
+    const match = planMode ? matchSkill(text) : undefined;
+    if (match && isPlannable(match)) {
+      pending = text;
+      await agent.pursueSkill(match.skill, match.params);
+      return;
+    }
+    await ui.ask(text);
+  }
   function appendLog(who: string, text: string, opacity: number) {
     if (!log) return;
     const line = document.createElement("div");
@@ -134,7 +177,7 @@ async function boot(): Promise<void> {
       mic.hidden = false;
       voice.onTranscript((text, isFinal) => {
         if (input) input.value = text;
-        if (isFinal) { void capture.stop(); void ui.ask(text); }
+        if (isFinal) { void capture.stop(); void ask(text); }
       });
       mic.addEventListener("click", () => void capture.toggle());
     }
@@ -169,7 +212,7 @@ async function boot(): Promise<void> {
     input.value = "";
     input.disabled = true;
     try {
-      await ui.ask(value);
+      await ask(value);
       if (state) {
         state.textContent =
           `volume=${await platform.system.getVolume()} · muted=${await platform.system.getMute()} · input=${await platform.system.getInputSource()}`;
