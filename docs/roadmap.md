@@ -267,7 +267,7 @@ Ordered. Each is independently shippable.
   CEC APIs are privileged on most builds.
 - **Complexity** — L, hardware-gated.
 
-### 8. Perception source interface with a mock camera
+### 8. Perception source interface with a mock camera — **done**
 
 - **Goal** — prove the perception path end to end without a CV model: a mock
   source emits occupancy events behind a policy grant, and the world updates.
@@ -279,6 +279,14 @@ Ordered. Each is independently shippable.
   within one event.
 - **Risk** — medium, mostly privacy design rather than code.
 - **Complexity** — M.
+- **Outcome** — `PerceptionManager` enforces the three properties at the
+  boundary: no grant no sensor, raw capture and identity stripped from every
+  event, revocation effective before `stop()` is even called.
+  `packages/perception-mock` ships a scripted source *and* a deliberately leaky
+  one — attaches a frame to every event, ignores `stop()` — because a
+  well-behaved source proves nothing. Writing the leaky test tightened the code
+  twice: a short `transcript` string sailed through the first sanitiser, and
+  `revokeAll` emitted two grant-dropped events for one source.
 
 ### 9. LLM planner alongside the deterministic one — **done**
 

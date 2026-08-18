@@ -28,6 +28,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`registerDevice` / `saveDevices` / `forgetDevice`), a `platform` discovery
   source reports what the TV itself can see, and `?devices` prints the tree with
   its confidence and sources visible. Power state deliberately does not persist.
+- **A perception path with no camera in it.** `PerceptionManager` gates sensors:
+  nothing starts without a policy grant, every event is stripped of raw capture
+  and identity fields (frames, data URLs, transcripts, face embeddings) before it
+  reaches the world model or a prompt, and revoking a grant discards events even
+  from a source that ignores `stop()`. `packages/perception-mock` proves it end
+  to end with a scripted occupancy source and a deliberately misbehaving one.
+  `?perception=mock` in the dev harness, with a visible sensor indicator.
+- **An LLM planner, validated against the Capability Graph.** The model proposes
+  capability ids and arguments only; preconditions, effects, verification and
+  fallbacks come from the graph, and five checks reject a bad proposal before
+  anything runs — with the reasons kept on `Plan.rejections`.
+  `agent.pursueIntent(text)` routes: known skill, else model plan, else
+  conversation. Opt-in via `llmPlanning`.
 - **Titan OS and Xumo adapter stubs** (`packages/adapter-titan`,
   `packages/adapter-xumo`): the shape of the platform bridge each needs, with
   typed `unsupported` until a real one is wired up — no invented API names. Both

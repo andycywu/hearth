@@ -38,6 +38,9 @@ importers:
       '@tv-ai-agent/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
+      '@tv-ai-agent/platform-api':
+        specifier: workspace:*
+        version: link:../../packages/platform-api
       '@tv-ai-agent/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -75,6 +78,9 @@ importers:
       '@tv-ai-agent/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
+      '@tv-ai-agent/perception-mock':
+        specifier: workspace:*
+        version: link:../../packages/perception-mock
       '@tv-ai-agent/skill-manifest':
         specifier: workspace:*
         version: link:../../packages/skill-manifest
@@ -96,6 +102,9 @@ importers:
       '@tv-ai-agent/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
+      '@tv-ai-agent/platform-api':
+        specifier: workspace:*
+        version: link:../../packages/platform-api
       '@tv-ai-agent/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -111,6 +120,9 @@ importers:
       '@tv-ai-agent/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
+      '@tv-ai-agent/platform-api':
+        specifier: workspace:*
+        version: link:../../packages/platform-api
       '@tv-ai-agent/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -204,6 +216,16 @@ importers:
   packages/create-skill: {}
 
   packages/llm-connectors:
+    dependencies:
+      '@tv-ai-agent/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@tv-ai-agent/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
+
+  packages/perception-mock:
     dependencies:
       '@tv-ai-agent/core':
         specifier: workspace:*

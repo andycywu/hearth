@@ -6,6 +6,7 @@ import type { Capability } from "../capabilities/types.js";
 import { CapabilityGraph } from "../capabilities/graph.js";
 import { DeviceGraph } from "../devices/graph.js";
 import { PolicyEngine, capabilityForTool } from "../policy/policy.js";
+import { PerceptionManager } from "../perception/manager.js";
 import { GoalPlanner } from "../planner/planner.js";
 import { createLlmPlanner } from "../planner/llm-planner.js";
 import { PlanExecutor } from "../planner/executor.js";
@@ -127,6 +128,11 @@ export class Agent {
   readonly devices: DeviceGraph;
   /** May this happen? Consulted before every plan step. */
   readonly policy: PolicyEngine;
+  /**
+   * Sensors, and the gate in front of them. Empty until a host registers one;
+   * nothing starts without a grant. See docs/policy-and-safety.md.
+   */
+  readonly perception: PerceptionManager;
   /** Tool name -> the capability it performs, for reading results into state. */
   private readonly byTool = new Map<string, Capability>();
   private readonly ctx: ConversationContext;
@@ -140,6 +146,23 @@ export class Agent {
     this.world = opts.world ?? new WorldModel();
     this.devices = opts.devices ?? new DeviceGraph();
     this.policy = opts.policy ?? new PolicyEngine();
+    this.perception = new PerceptionManager({
+      world: this.world,
+      policy: this.policy,
+      // Consent goes through the host's existing confirmation UI — the same door
+      // a gated tool call uses, so there is one place a person says yes.
+      ...(opts.confirm
+        ? {
+          confirm: ({ source, prompt }) => opts.confirm!({
+            name: `perception:${source.id}`,
+            args: { sensors: source.sensors },
+            description: prompt,
+          }),
+        }
+        : {}),
+      onEvent: (event, sourceId) => this.events.emit("perception:event", { event, sourceId }),
+      onGrantChange: (grant, sourceId) => this.events.emit("perception:grant", { grant, sourceId }),
+    });
     for (const capability of capabilitiesForPlatform(opts.platform)) {
       this.capabilities.register(capability);
       if (capability.tool) this.byTool.set(capability.tool, capability);

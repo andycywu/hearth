@@ -38,8 +38,18 @@ export interface PerceptionEvent<V = Record<string, unknown>> {
   source?: string;
 }
 
+/** What a source physically reads. Consent is asked per sensor, not per source. */
+export type SensorKind = "camera" | "microphone" | "presence" | "ambient";
+
 export interface PerceptionSource {
   id: string;
+  /** Shown to the user when consent is asked. Say what it senses, plainly. */
+  label: string;
+  /**
+   * The sensors this source opens. A person deciding whether to allow something
+   * needs to know a camera is involved; "occupancy" does not tell them that.
+   */
+  sensors: SensorKind[];
   /** Requires a policy grant before it may be started. Never auto-starts. */
   start(emit: (event: PerceptionEvent) => void): Promise<void>;
   stop(): Promise<void>;

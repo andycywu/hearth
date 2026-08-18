@@ -13,6 +13,7 @@ import {
   createScriptedClient, createOpenAiCompatibleClient, resolveLlmEndpoint,
 } from "@tv-ai-agent/llm-connectors";
 import { createWeatherTool } from "@tv-ai-agent/skills-example";
+import { createScriptedSource, occupancyScript } from "@tv-ai-agent/perception-mock";
 import { loadBundledSkills, loadInstalledSkills } from "@tv-ai-agent/skill-manifest";
 import weatherManifest from "@tv-ai-agent/skill-manifest/examples/open-meteo-weather.json";
 import type { Tool } from "@tv-ai-agent/core";
@@ -182,6 +183,31 @@ async function boot(): Promise<void> {
       pending = "";
     }
     await ui.ask(text);
+  }
+
+  // `?perception=mock` registers a scripted occupancy source — no camera, no CV
+  // model, no `mediaDevices`. It has to be *granted* before it starts, through the
+  // same confirmation dialog a gated tool uses, and the indicator below is not
+  // optional decoration: a sensor that is live must be visibly live.
+  if (params.get("perception") === "mock") {
+    const camera = createScriptedSource({
+      script: occupancyScript(),
+      intervalMs: 4000,
+      repeat: true,
+    });
+    agent.perception.register(camera);
+
+    const indicator = document.createElement("div");
+    indicator.style.cssText = "position:fixed;top:8px;right:12px;font-size:14px;opacity:.85";
+    document.body.appendChild(indicator);
+    agent.events.on("perception:grant", ({ grant }) => {
+      indicator.textContent = grant ? "● sensing the room" : "";
+    });
+    agent.events.on("perception:event", ({ event }) =>
+      appendLog("○", `${event.type} ${JSON.stringify(event.value)}`, 0.45));
+
+    const started = await agent.perception.start(camera.id);
+    if (!started.started) console.info(`[perception] not started: ${started.reason}`);
   }
 
   // Optional voice: speak replies and accept spoken commands when supported.

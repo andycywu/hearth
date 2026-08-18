@@ -76,14 +76,41 @@ explained to the user in their own language rather than reported as a fault.
 
 ## Perception, specifically
 
-Camera and microphone are `medium` at minimum, and:
+**Enforced (task 8)** by `PerceptionManager`
+([`core/src/perception/manager.ts`](../packages/core/src/perception/manager.ts)),
+at the boundary rather than by asking each source nicely — a source is precisely
+the thing you cannot assume is well behaved, and "the vendor's CV library
+promised" is not a privacy model:
 
-- Nothing starts a perception source without an explicit, revocable grant.
-- Raw frames and raw audio **never** leave the perception layer and never enter
-  the World Model, logs or the LLM prompt. Only derived `PerceptionEvent`s do.
+1. **Nothing starts without a grant.** `start()` asks policy; `ask` needs a
+   human, and with no confirmation handler the sensor does not start. The
+   source's own `start()` is never called, so it is never handed the callback it
+   would emit through.
+2. **Raw data does not cross.** Every event is stripped to numbers, booleans and
+   strings of 32 characters or fewer, and any key that reads like raw capture
+   (`frame`, `buffer`, `dataUrl`, `samples`) or like personal identity
+   (`transcript`, `face`, `embedding`, `name`) is dropped whatever its value. The
+   second family matters more and is easier to miss: it arrives as
+   innocent-looking short strings, and a transcript of what a family said in
+   their living room is the worst thing this pipeline could carry into a prompt.
+3. **Revocation is immediate.** `revoke()` drops the grant *before* calling
+   `stop()`, so a source that ignores `stop()`, or stops slowly, has its events
+   discarded from that moment. A time-boxed grant expires on the next event
+   rather than on a timer, so a source that goes quiet costs nothing.
+4. **Consent says what it senses.** The prompt names the sensors (`camera`,
+   `microphone`), because "occupancy" does not tell a person a camera is
+   involved.
+5. **A live sensor is visibly live.** `perception:grant` is what a host wires its
+   indicator to; the dev harness (`?perception=mock`) shows one.
+
+`packages/perception-mock` proves the path with no camera and no CV model, and it
+ships a *deliberately misbehaving* source — one that attaches a frame to every
+event and ignores `stop()` — because a well-behaved source proves nothing about a
+boundary.
+
+Also standing:
+
 - Recording is off by default and is not something a plan can turn on.
-- A visible indicator whenever a sensor is live is a host requirement, not a
-  suggestion.
 - `child_detected` may tighten policy (content rating, volume ceiling) but must
   never be used for advertising or profiling in this runtime.
 

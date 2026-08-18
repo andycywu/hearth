@@ -125,13 +125,15 @@ consequence of our own action. See
 }
 ```
 
-P0 defines the interface and the reducer only — no CV model, no camera. Event
-types reserved: `occupancy_changed`, `person_entered`, `person_left`,
-`child_detected`, `low_light`, `speech_detected`, `high_noise`, `device_signal`.
+No CV model and no camera: `packages/perception-mock` emits scripted events, and
+`PerceptionManager` gates them. Event types: `occupancy_changed`,
+`person_entered`, `person_left`, `child_detected`, `low_light`,
+`ambient_light_changed`, `speech_detected`, `high_noise`, `device_signal`.
 
-Privacy is a *policy* concern, enforced before a perception source is ever
-started: see [policy-and-safety](policy-and-safety.md). Raw frames and audio
-never enter the World Model — only derived events do.
+Privacy is enforced, not documented: nothing starts without a grant, raw capture
+and identity fields are stripped from every event at the boundary, and revocation
+takes effect before the source is even asked to stop. See
+[policy-and-safety](policy-and-safety.md).
 
 ## Non-goals
 

@@ -13,6 +13,7 @@
     "@tv-ai-agent/ui": "workspace:*",
     "@tv-ai-agent/llm-connectors": "workspace:*",
     "@tv-ai-agent/skills-example": "workspace:*",
+    "@tv-ai-agent/perception-mock": "workspace:*",
     "@tv-ai-agent/skill-manifest": "workspace:*"
   },
   "license": "Apache-2.0"

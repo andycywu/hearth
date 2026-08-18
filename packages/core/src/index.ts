@@ -56,8 +56,12 @@ export type {
 } from "./devices/types.js";
 export {
   applyPerception, observationsFrom,
-  type PerceptionEvent, type PerceptionEventType, type PerceptionSource,
+  type PerceptionEvent, type PerceptionEventType, type PerceptionSource, type SensorKind,
 } from "./perception/events.js";
+export {
+  PerceptionManager, capabilityForPerception, sanitize,
+  type PerceptionGrant, type PerceptionManagerOptions, type StartResult,
+} from "./perception/manager.js";
 export {
   PolicyEngine, defaultRules, parentalRules, capabilityForTool,
   type Actor, type PolicyDecision, type PolicyRequest, type PolicyRule, type PolicyAuditEntry,

@@ -1,5 +1,7 @@
 import type { Plan, PlanOutcome, StepOutcome } from "../planner/types.js";
 import type { PolicyAuditEntry } from "../policy/policy.js";
+import type { PerceptionEvent } from "../perception/events.js";
+import type { PerceptionGrant } from "../perception/manager.js";
 
 export type Listener<T> = (payload: T) => void;
 
@@ -45,5 +47,15 @@ export interface AgentEvents {
    * do that?" — and "why did it refuse?" — answerable after the fact.
    */
   "policy:decision": { entry: PolicyAuditEntry };
+  /**
+   * A sensor reading that got through the gate. Already stripped of raw capture,
+   * so a host can log or display it without thinking about it.
+   */
+  "perception:event": { event: PerceptionEvent; sourceId: string };
+  /**
+   * A sensor grant taken or dropped — what a host wires its "camera is live"
+   * indicator to. `grant: undefined` means the sensor is off.
+   */
+  "perception:grant": { grant: PerceptionGrant | undefined; sourceId: string };
   "error": { error: Error };
 }
