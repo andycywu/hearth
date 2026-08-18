@@ -11,7 +11,7 @@ Graph, planner, verification, policy — landed as additive modules under
 `packages/core/src/`, with the four P0 scenarios passing headless. Nothing in the
 existing agent loop changed. See [`architecture.md`](architecture.md).
 
-_Last updated: 2026-08-11 · target release: v0.1.0_
+_Last updated: 2026-08-18 · target release: v0.1.0_
 
 **The agent runs end-to-end on two TV emulators, and you can talk to it.** On
 Android TV the capability probe is clean (11 ok / 0 errors), the CI acceptance
@@ -34,7 +34,8 @@ hardware.
 | Area | State |
 |------|-------|
 | Agent core (loop, tools, memory, events, streaming) | ✅ done |
-| Platform HAL + adapters (web, Tizen, AOSP, webOS) | ✅ done (4 targets) |
+| Platform HAL + adapters (web, Tizen, AOSP, webOS, Linux) | ✅ done (5 implemented) |
+| Titan OS / Xumo adapters | 🟡 stubs: bridge shape + contract test, no integration. Both in the 6-target acceptance run |
 | App hosts (Tizen `.wgt`, AOSP APK, webOS `.ipk`, dev harness) | ✅ bundled; **APK compiles** |
 | LLM connectors (OpenAI-compatible + offline scripted) | ✅ done, with retry |
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
@@ -48,7 +49,7 @@ hardware.
 | Skills — code (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
 | Skills — data (JSON manifests, bundled + installable) | ✅ `packages/skill-manifest`, [ADR-0002](adr/0002-declarative-skill-manifests.md) |
 | Offline demo on device (`?demo`, no network) | ✅ verified on the Android **and** Tizen emulators |
-| Tests / CI / lint / bundle-size / license / SBOM | ✅ 484 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM | ✅ 574 tests, CI green |
 | Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
@@ -67,9 +68,12 @@ hardware.
   registry with schema validation, rolling memory (+ persistence via storage),
   typed event bus, token streaming, multilingual replies, custom-tool extension
   point (`defineTool`), confirmation gate for high-impact tools.
-- **HAL + 4 adapters** all passing one shared behavioural contract test.
+- **HAL + 7 adapters** (5 implemented, 2 stubs) all passing one shared behavioural
+  contract test — which now checks coherence rather than privilege: an adapter
+  either round-trips a capability group or refuses all of it as `unsupported`.
 - **Cross-target acceptance test:** identical command script → identical tool
-  sequence + end state on web/Tizen/AOSP/webOS (mocked). Hardware-free parity proof.
+  sequence + end state on web/Tizen/AOSP/webOS/Titan/Xumo (mocked). Hardware-free
+  parity proof, six targets.
 - **Bundling:** esbuild → per-target `main.js`; bundle-size budget enforced in CI.
 - **Offline everything:** `pnpm dev` runs the full stack in a browser with a
   scripted brain — no TV, no API key. `?llm=` points at a local model.

@@ -120,6 +120,9 @@ importers:
       '@tv-ai-agent/adapter-aosp':
         specifier: workspace:*
         version: link:../adapter-aosp
+      '@tv-ai-agent/adapter-titan':
+        specifier: workspace:*
+        version: link:../adapter-titan
       '@tv-ai-agent/adapter-tizen':
         specifier: workspace:*
         version: link:../adapter-tizen
@@ -129,6 +132,9 @@ importers:
       '@tv-ai-agent/adapter-webos':
         specifier: workspace:*
         version: link:../adapter-webos
+      '@tv-ai-agent/adapter-xumo':
+        specifier: workspace:*
+        version: link:../adapter-xumo
       '@tv-ai-agent/core':
         specifier: workspace:*
         version: link:../core
@@ -155,6 +161,12 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
+  packages/adapter-titan:
+    dependencies:
+      '@tv-ai-agent/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
+
   packages/adapter-tizen:
     dependencies:
       '@tv-ai-agent/platform-api':
@@ -168,6 +180,12 @@ importers:
         version: link:../platform-api
 
   packages/adapter-webos:
+    dependencies:
+      '@tv-ai-agent/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
+
+  packages/adapter-xumo:
     dependencies:
       '@tv-ai-agent/platform-api':
         specifier: workspace:*

@@ -2,6 +2,8 @@ import { createWebAdapter } from "@tv-ai-agent/adapter-web";
 import { createTizenAdapter } from "@tv-ai-agent/adapter-tizen";
 import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
 import { createWebosAdapter } from "@tv-ai-agent/adapter-webos";
+import { createTitanAdapter } from "@tv-ai-agent/adapter-titan";
+import { createXumoAdapter } from "@tv-ai-agent/adapter-xumo";
 import type { PlatformProvider } from "@tv-ai-agent/platform-api";
 
 /**
@@ -34,6 +36,22 @@ export function targets(): Target[] {
       name: "webos",
       make: () => { installWebos(); return createWebosAdapter(); },
       teardown: () => { delete g.webOS; delete g.webOSSystem; },
+    },
+    // The two stubs. They are here for one reason: to prove the vocabulary is the
+    // adapter's to *implement* and never the adapter's to *name*. Both are given
+    // a bridge that grants the whole script, because this suite asks whether a
+    // conforming device behaves identically — what happens on a build that grants
+    // less is each adapter's own test, where the interesting answer is which
+    // capabilities get withdrawn.
+    {
+      name: "titan",
+      make: () => createTitanAdapter({ bridge: grantingBridge() }),
+      teardown: () => {},
+    },
+    {
+      name: "xumo",
+      make: () => createXumoAdapter({ bridge: grantingBridge() }),
+      teardown: () => {},
     },
   ];
 }
@@ -104,5 +122,32 @@ function installWebos(): void {
         return o.onFailure?.({ errorText: "unhandled" });
       },
     },
+  };
+}
+
+/**
+ * A host bridge that grants everything the acceptance script needs.
+ *
+ * Shared by both stubs because their bridge shapes are deliberately the same
+ * small surface — and if they diverge as the real integrations land, this splits
+ * into two, which is a change worth seeing in a diff.
+ */
+function grantingBridge() {
+  const state = { volume: 20, muted: false, input: "hdmi1" };
+  return {
+    getDeviceInfo: () => ({ osVersion: "1.0", soc: "unknown", model: "stub-tv" }),
+    getVolume: () => state.volume,
+    setVolume: (n: number) => { state.volume = Math.max(0, Math.min(100, Math.round(n))); },
+    getMute: () => state.muted,
+    setMute: (m: boolean) => { state.muted = m; },
+    getInputSource: () => state.input,
+    setInputSource: (s: string) => { state.input = s; },
+    powerStandby: () => {},
+    listInstalledApps: () => APPS,
+    launchApp: () => {},
+    getForegroundApp: () => null,
+    sendKey: () => {},
+    isOnline: () => true,
+    connectionType: () => "ethernet",
   };
 }

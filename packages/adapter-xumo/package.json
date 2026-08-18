@@ -1,0 +1,15 @@
+{
+  "name": "@tv-ai-agent/adapter-xumo",
+  "version": "0.1.0",
+  "description": "Xumo OS adapter stub: the shape of the platform bridge, with typed \"unsupported\" until a real one is wired up. Proves adding an OS touches only its adapter.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": { "@tv-ai-agent/platform-api": "workspace:*" },
+  "license": "Apache-2.0"
+}

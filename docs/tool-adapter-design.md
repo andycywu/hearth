@@ -96,9 +96,9 @@ adapters/os/
 |- tizen/        implemented   (packages/adapter-tizen)
 |- linux/        implemented   (packages/adapter-linux)
 |- mock/         implemented   (packages/adapter-web)
-|- titan_os/     stub + contract test only            (P3)
-|- xumo/         stub + contract test only            (P3)
-`- roku/         stub + contract test only            (P3)
+|- titan_os/     stub + contract test   (packages/adapter-titan)
+|- xumo/         stub + contract test   (packages/adapter-xumo)
+`- roku/         not started                          (P3)
 ```
 
 The interface every adapter satisfies, stated in the vocabulary of the new
@@ -127,25 +127,50 @@ Titan device, a Roku ECP endpoint) implements `TvOsAdapter` directly and skips
 the HAL. That is the escape hatch that keeps us from bending the HAL out of shape
 for every new platform.
 
-### The test of the boundary
+### The test of the boundary — run, and it held
 
-Adding Titan OS or Xumo must change **only** files under `packages/adapter-*`
-plus one registration line in a host. It must not change:
+Adding Titan OS and Xumo changed **only**:
 
 ```
-planner  world model  capability graph  device graph  policy  memory  agent core
+packages/adapter-titan/     new
+packages/adapter-xumo/      new
+packages/platform-api/      two lines of `DeviceInfo["os"]`, and the contract
+packages/acceptance/        two mock targets
 ```
 
-Enforced three ways:
+Nothing under `core/src/{world,planner,capabilities,devices,policy}`, nothing in
+the agent loop, nothing in the tool layer. That was the point of doing it early:
+if it had needed a core change, the abstraction would have been wrong and we
+would want to know before P3 rather than during it.
 
-1. An ESLint `no-restricted-imports` rule: core modules may not import
-   `@tv-ai-agent/adapter-*`.
-2. `assertProviderContract` — every adapter passes the same behavioural spec.
-3. `packages/acceptance` — the same command script must produce the same tool
-   sequence and end state on every target.
+Two things came out of actually writing them.
 
-All three exist today. They are the reason this repositioning is a refactor and
-not a rewrite.
+**The stubs refuse rather than pretend.** Neither platform's control surface is
+public to us: Titan's is a partner SDK, and on Xumo (RDK/Firebolt) volume, input
+switching and launching another app are the platform's business, not an app's.
+Inventing API names would have produced code that looks finished, passes its own
+mocks and fails on the first real device in a way nobody can debug. So each
+adapter declares the *shape* of the bridge it needs and returns typed
+`unsupported` until something implements it — which the capability probe already
+knows how to handle by withdrawing the capability, so an agent on a bare Titan
+build offers exactly what it can do and no more.
+
+**The contract was wrong, and the stubs found it.** `assertProviderContract`
+required volume, mute and an app list to *work*, which quietly defined a
+conforming adapter as one running on a TV with all of them — while the Tizen
+emulator (no audio API at all) and any app-level Xumo build are not broken
+adapters, just smaller ones. The contract now checks *coherence* instead: either
+the group round-trips, or every call in it refuses with a typed `unsupported`.
+What it still forbids is the shape that actually hurts — a read that answers and
+a write that silently does nothing.
+
+Enforced three ways, all live:
+
+1. `assertProviderContract` — every adapter, including a bridgeless stub, passes
+   the same behavioural spec.
+2. `packages/acceptance` — the same command script produces the same tool
+   sequence and end state on all six targets.
+3. Review of the diff scope, which is the list above.
 
 ## Naming
 

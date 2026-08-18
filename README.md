@@ -170,6 +170,7 @@ acceptance script reproduces the CI tool sequence exactly. Navigation works with
                        memory, events              │ implemented by
                                                    ▼
                          adapter-aosp · adapter-tizen · adapter-webos · adapter-web
+                         adapter-linux · adapter-titan (stub) · adapter-xumo (stub)
                                                    │
                                                    ▼
                           apps/aosp-app (.apk) · tizen-app (.wgt) · webos-app (.ipk)

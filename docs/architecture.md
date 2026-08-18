@@ -36,6 +36,7 @@ packages/platform-api   the HAL: SystemControl, AppControl, Navigation,
   |                     + assertProviderContract (one behavioural spec)
   |
 packages/adapter-{web,aosp,tizen,webos,linux}   concrete HAL implementations
+packages/adapter-{titan,xumo}                    stubs: bridge shape + contract test
 packages/llm-connectors                          OpenAI-compatible + scripted
 packages/skill-manifest                          declarative HTTP skills (ADR-0002)
 ```
@@ -193,7 +194,7 @@ architecture is holding.
 | **M4** — *done* | `agent.pursue` / `agent.pursueSkill` run the goal path beside LLM tool-calling; both share one world, tool registry, policy and confirm handler. Plan lifecycle events reach every renderer. | medium — two paths coexist by design |
 | **M5** — *done* | Both paths go through `PolicyEngine`; the host `confirm` handler is the `ask` outcome, and `policy:decision` carries the audit trail. | low |
 | **M6** | Device discovery (CEC first) populates the Device Graph; `set_input_source(hdmi2)` becomes `activate(device: ps5)`. | medium — hardware-gated |
-| **M7** | Adapter stubs for Titan OS / Xumo / Roku: interface plus contract test only. | low, and deliberately last |
+| **M7** — *Titan + Xumo done, Roku pending* | Adapter stubs: interface plus contract test, no integration. Done early on purpose as a boundary check — and it held, touching no file under `core/src/{world,planner,capabilities,devices,policy}`. | low |
 
 Each stage is independently shippable and independently revertible.
 

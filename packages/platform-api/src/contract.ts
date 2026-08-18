@@ -8,10 +8,38 @@
  * AOSP/Tizen. Dependency-free (no test framework import) so it can live in the
  * runtime package without pulling vitest into device bundles.
  */
+import { isTvUnsupported } from "./errors.js";
 import type { PlatformProvider } from "./index.js";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(`[provider-contract] ${msg}`);
+}
+
+/**
+ * Does this capability exist on this device?
+ *
+ * Only a typed `unsupported` counts as "no". A failure — a timeout, a bus that
+ * did not answer — is a bad moment, and treating it as an absent capability
+ * would let a flaky device pass a contract it does not satisfy.
+ */
+async function supported(call: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await call();
+    return true;
+  } catch (err) {
+    if (isTvUnsupported(err)) return false;
+    throw err;
+  }
+}
+
+/** Did this call refuse in the typed way, rather than quietly doing nothing? */
+async function refuses(call: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await call();
+    return false;
+  } catch (err) {
+    return isTvUnsupported(err);
+  }
 }
 
 export interface ContractOptions {
@@ -31,7 +59,10 @@ export async function assertProviderContract(
 
   // --- structure ---
   assert(p.device && typeof p.device.os === "string", "device.os must be a string");
-  assert(["aosp", "tizen", "webos", "web", "linux"].includes(p.device.os), `unexpected os: ${p.device.os}`);
+  assert(
+    ["aosp", "tizen", "webos", "web", "linux", "titan", "xumo"].includes(p.device.os),
+    `unexpected os: ${p.device.os}`,
+  );
   assert(typeof p.device.soc === "string", "device.soc must be a string");
   assert(typeof p.init === "function", "init() must exist");
   assert(typeof p.has === "function", "has() must exist");
@@ -44,32 +75,68 @@ export async function assertProviderContract(
   assert(p.has("navigation") === true, "navigation is mandatory");
   assert(p.has("storage") === true, "storage is mandatory");
 
-  // --- volume round-trips within 0..100 and clamps ---
-  await p.system.setVolume(30);
-  const v = await p.system.getVolume();
-  assert(v >= 0 && v <= 100, `volume out of range: ${v}`);
-  await p.system.setVolume(999);
-  const vHigh = await p.system.getVolume();
-  assert(vHigh <= 100, `volume not clamped at 100: ${vHigh}`);
-  await p.system.setVolume(-50);
-  const vLow = await p.system.getVolume();
-  assert(vLow >= 0, `volume not clamped at 0: ${vLow}`);
-
-  // --- mute round-trips ---
-  await p.system.setMute(true);
-  assert((await p.system.getMute()) === true, "mute did not report true");
-  await p.system.setMute(false);
-  assert((await p.system.getMute()) === false, "unmute did not report false");
-
-  // --- apps: list + name lookup ---
-  const apps = await p.apps.listInstalledApps();
-  assert(Array.isArray(apps), "listInstalledApps must return an array");
-  for (const a of apps) {
-    assert(typeof a.id === "string" && a.id.length > 0, "app.id must be a non-empty string");
-    assert(typeof a.name === "string", "app.name must be a string");
+  // --- volume: round-trips and clamps, or refuses consistently ---
+  //
+  // "Refuses consistently" is the part that took a real device to learn. This
+  // used to require volume, mute and an app list to *work*, which quietly said
+  // that a conforming adapter is one running on a TV with all of them. The Tizen
+  // TV emulator has no audio API at all, and a Xumo or Titan build reaches
+  // volume through a platform-privileged path an app may not have — those are
+  // not broken adapters, they are smaller ones, and the agent already has a
+  // first-class answer for them (`unsupported`, which withdraws the capability).
+  //
+  // So the contract now checks *coherence* rather than presence: either the
+  // group round-trips, or every call in it refuses with a typed `unsupported`.
+  // What it still refuses to allow is the shape that actually hurts — a read
+  // that answers and a write that silently does nothing.
+  if (await supported(() => p.system.getVolume())) {
+    await p.system.setVolume(30);
+    const v = await p.system.getVolume();
+    assert(v >= 0 && v <= 100, `volume out of range: ${v}`);
+    await p.system.setVolume(999);
+    const vHigh = await p.system.getVolume();
+    assert(vHigh <= 100, `volume not clamped at 100: ${vHigh}`);
+    await p.system.setVolume(-50);
+    const vLow = await p.system.getVolume();
+    assert(vLow >= 0, `volume not clamped at 0: ${vLow}`);
+  } else {
+    assert(
+      await refuses(() => p.system.setVolume(30)),
+      "getVolume reports unsupported but setVolume accepted the call anyway",
+    );
   }
-  const found = await p.apps.findAppsByName("");
-  assert(Array.isArray(found) && found.length === 0, "empty query must return no matches");
+
+  // --- mute round-trips, or refuses consistently ---
+  if (await supported(() => p.system.getMute())) {
+    await p.system.setMute(true);
+    assert((await p.system.getMute()) === true, "mute did not report true");
+    await p.system.setMute(false);
+    assert((await p.system.getMute()) === false, "unmute did not report false");
+  } else {
+    assert(
+      await refuses(() => p.system.setMute(true)),
+      "getMute reports unsupported but setMute accepted the call anyway",
+    );
+  }
+
+  // --- apps: list + name lookup, or refuse consistently ---
+  if (await supported(() => p.apps.listInstalledApps())) {
+    const apps = await p.apps.listInstalledApps();
+    assert(Array.isArray(apps), "listInstalledApps must return an array");
+    for (const a of apps) {
+      assert(typeof a.id === "string" && a.id.length > 0, "app.id must be a non-empty string");
+      assert(typeof a.name === "string", "app.name must be a string");
+    }
+    const found = await p.apps.findAppsByName("");
+    assert(Array.isArray(found) && found.length === 0, "empty query must return no matches");
+  } else {
+    // A device that cannot enumerate apps cannot resolve a spoken name to an id,
+    // so offering to launch one would be a promise nothing can keep.
+    assert(
+      await refuses(() => p.apps.launchApp("com.example.app")),
+      "listInstalledApps reports unsupported but launchApp accepted an id anyway",
+    );
+  }
 
   // --- storage round-trip ---
   await p.storage.set("contract.key", "value-1");

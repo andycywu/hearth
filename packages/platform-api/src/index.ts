@@ -14,7 +14,7 @@ export interface DeviceInfo {
    * set-top box, a Pi — as opposed to `web`, which is the in-memory adapter used
    * for development and CI.
    */
-  os: "aosp" | "tizen" | "webos" | "web" | "linux";
+  os: "aosp" | "tizen" | "webos" | "web" | "linux" | "titan" | "xumo";
   osVersion: string;
   /** SoC vendor, e.g. "mediatek" | "novatek" | "unknown". */
   soc: string;

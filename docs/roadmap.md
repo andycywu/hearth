@@ -294,7 +294,7 @@ Ordered. Each is independently shippable.
   validation must be total.
 - **Complexity** — L.
 
-### 10. Titan OS and Xumo adapter stubs with contract tests
+### 10. Titan OS and Xumo adapter stubs with contract tests — **done**
 
 - **Goal** — prove the boundary holds. Interface, capability declaration and a
   contract test; **no integration**.
@@ -308,6 +308,16 @@ Ordered. Each is independently shippable.
 - **Risk** — low, and its value is diagnostic: if this task turns out to need a
   core change, the architecture is wrong and we want to know before P3.
 - **Complexity** — S.
+- **Outcome** — `packages/adapter-titan` and `packages/adapter-xumo`, both
+  contract-tested and both in the six-target acceptance run. **The boundary
+  held**: no file under `core/src/{world,planner,capabilities,devices,policy}` was
+  touched. The stubs declare the bridge they need and refuse with typed
+  `unsupported` until one exists, rather than guessing at API names nobody here
+  can verify. They also found a real defect one layer down —
+  `assertProviderContract` required volume, mute and an app list to *work*, which
+  defined a conforming adapter as one on a fully-privileged TV. It now checks
+  coherence: round-trip, or refuse consistently. Still forbidden is a read that
+  answers beside a write that silently does nothing.
 
 ---
 

@@ -24,9 +24,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   harness, `?plan=off` forces the chat path so the difference is visible.
 - **`policy:decision` events**, so "why did the TV do that?" — and "why did it
   refuse?" — are answerable after the fact.
+- **The room persists.** Device topology is stored in `platform.storage`
+  (`registerDevice` / `saveDevices` / `forgetDevice`), a `platform` discovery
+  source reports what the TV itself can see, and `?devices` prints the tree with
+  its confidence and sources visible. Power state deliberately does not persist.
+- **Titan OS and Xumo adapter stubs** (`packages/adapter-titan`,
+  `packages/adapter-xumo`): the shape of the platform bridge each needs, with
+  typed `unsupported` until a real one is wired up — no invented API names. Both
+  pass the provider contract and join the acceptance run, which now covers six
+  targets. Adding them touched no file under
+  `core/src/{world,planner,capabilities,devices,policy}`, which was the point.
 
 ### Changed
 
+- **The provider contract checks coherence, not privilege.** It required volume,
+  mute and an app list to *work*, which quietly defined a conforming adapter as
+  one running on a fully-privileged TV — while the Tizen emulator (no audio API at
+  all) and an app-level Xumo build are smaller adapters, not broken ones. Now
+  either the group round-trips or every call in it refuses with a typed
+  `unsupported`. Still forbidden: a read that answers beside a write that
+  silently does nothing.
 - **Tools are generated from the capability catalogue.** The tool list was
   written by hand and described by the catalogue afterwards; now the capability
   owns the name, description, schema and risk, and `tv-tools.ts` keeps only the
