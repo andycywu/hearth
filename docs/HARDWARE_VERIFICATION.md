@@ -1,6 +1,6 @@
 # What still needs a real TV
 
-_Last updated: 2026-08-11_
+_Last updated: 2026-08-18_
 
 An emulator proves the code runs. It does not prove the code is right, because
 the thing an emulator is least faithful about is **the hardware you are trying
@@ -18,6 +18,7 @@ not have, the emulator cannot test, and its silence reads exactly like success.*
 | **webOS** | Simulator, first run | Audio and app management — the simulator stubs those Luna services. Plus partner APIs and a real TV's method names. |
 | **Android TV / AOSP** | Emulator, thoroughly | Input switching, standby, real remotes, real apps, and MTK/NVT performance. |
 | **Linux** | Real machine ✅ | Nothing outstanding — verified on Ubuntu with a real sound card. |
+| **The living room itself** | Nothing but the TV | Everything with a second device in it: CEC, IR, an AVR, a console, a camera, a microphone at 3m. See below. |
 
 ---
 
@@ -111,6 +112,49 @@ backends (`wpctl`, `pactl`, `amixer`), every write confirmed by reading the
 value back. `pactl` and `wpctl` also run in CI on every push. Input switching
 and standby correctly report "this device has no TV inputs".
 
+## The living-room layer — what needs a room, not just a TV
+
+The World Model, Capability Graph, Device Graph, planner, verification and policy
+are exercised headless on six adapters and on the Android TV emulator
+(2026-08-18, results in [`platform/capability-matrix.md`](platform/capability-matrix.md)).
+What no emulator can answer is anything involving a **second device**, a
+**sensor**, or **hardware that quantises**.
+
+### Needs a console, an AVR and a set-top box
+
+| Claim | Why only a room can settle it |
+|---|---|
+| HDMI-CEC discovery | Every device claims CEC; the useful question is which vendor names, physical addresses and power states actually come back, and how many devices answer at all. The emulator has no HDMI ports. |
+| `ps5.power.on` over CEC | Wake-on-CEC is the single most vendor-dependent thing in this design. It is currently `unverified` in the graph and correctly reports `unverified` at execution — a real console is what turns that into `verified` or withdraws it. |
+| Multi-provider fallback (CEC → wake-on-LAN → IR) | The demotion path only runs when a provider genuinely fails. Contrived failures prove the code, not the ordering. |
+| The AVR parent hop | `inputPortFor` follows `parentId` so an Apple TV behind an AVR resolves to the AVR's port. Untested against an AVR that also has to switch its own input. |
+| Input switching, end to end | Needs a platform-signed build **and** something plugged in. On the emulator the honest answer is `unsupported`; on a retail TV it will be `unsupported` too, for a different reason. |
+| IR blaster profiles | A device with no back channel can only be verified by watching it turn on. |
+
+### Needs a sensor
+
+| Claim | Why only hardware can settle it |
+|---|---|
+| Camera occupancy | `packages/perception-mock` proves the *path* — consent, gate, sanitising, decay — with no camera. It cannot tell you whether a real CV pipeline emits at a rate the World Model's TTLs suit, or what its confidence actually means. |
+| The raw-data boundary against a real library | The gate strips frames, data URLs and transcripts from events. A real vendor SDK is the thing to point it at, because the interesting leak is the field nobody predicted. |
+| Far-field microphone | Already listed under Android: a TV mic at 3m is not a desktop mic at 30cm. Wake word, barge-in and noise all change. |
+| A visible "sensor is live" indicator | `perception:grant` drives it; whether it is *actually visible* on a 10-foot screen while content is playing is a room question. |
+
+### Needs hardware that quantises
+
+| Claim | Why |
+|---|---|
+| The volume verification tolerance (`within: 8`) | Chosen to cover the coarsest plausible stream. The Android TV emulator has 15 steps; real TVs vary, and a device with 7 steps has 7-point granularity. If a retail TV needs a wider tolerance, that number is wrong — and if every TV is finer than 15 steps, it is too loose. Only a shelf of TVs settles it. |
+| Picture mode, HDR, backlight, audio profile | Declared in the capability tree, implemented nowhere, because there is no non-vendor API for them. Whether they are reachable at all is per-OEM. |
+| Model latency inside a plan | A four-step plan makes four verification reads. On MTK/NVT that is four round trips through a bridge nobody has profiled. |
+
+### Needs a fleet, not a device
+
+| Claim | Why |
+|---|---|
+| Titan OS and Xumo adapters | Both are stubs with typed `unsupported` and a declared bridge shape. Finishing either needs partner SDK access and a device — and the Firebolt reading in `adapter-xumo` is current understanding, not verified fact. |
+| Parental / enterprise policy in the field | The engine is tested; what an OEM actually wants denied is a product conversation with a fleet behind it. |
+
 ---
 
 ## Two things that were only found by leaving the emulator
@@ -135,3 +179,18 @@ Both are fixed. Both are the same shape of bug: **something that only executes
 when a real counterpart is on the other end.** Expect more of those on the first
 real TV, and prefer bring-up steps that read state back from the device rather
 than trusting a return value.
+
+**Two more, from the first goal-mode run on the emulator (2026-08-18).** Both are
+the same shape again, and both were invisible to every mock:
+
+- **Verification failed on quantised volume.** Asking for 23 set Android's step 3
+  of 15 and read back 20, and exact equality called a working TV a failure. The
+  quantisation was already documented on the capability-matrix page; the
+  verification layer simply did not honour it.
+- **The world believed the request over the reading.** A verified read-back was
+  being overwritten with the value we had asked for, so the World Model held 23
+  while the TV sat at 20 — the exact failure the read exists to prevent, inside the
+  code that performs the read.
+
+The lesson generalises: **a read-back is only worth having if what it reads is
+what you keep.**
