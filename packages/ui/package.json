@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/ui",
+  "name": "@hearthkit/ui",
   "version": "0.1.0",
   "description": "Dependency-free 10-foot UI shell for the agent (DOM). A Lightning 3 / Blits WebGL renderer can replace the view layer for low-end MTK/NVT GPUs; see README.",
   "type": "module",
@@ -11,8 +11,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tv-ai-agent/core": "workspace:*",
-    "@tv-ai-agent/platform-api": "workspace:*"
+    "@hearthkit/core": "workspace:*",
+    "@hearthkit/platform-api": "workspace:*"
   },
   "license": "Apache-2.0"
 }

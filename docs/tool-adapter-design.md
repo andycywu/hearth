@@ -177,4 +177,4 @@ Enforced three ways, all live:
 - Capability ids: `<device>.<domain>.<verb>` — `tv.audio.set_volume`,
   `ps5.power.on`.
 - Tool names stay `snake_case` (the LLM-facing surface, unchanged).
-- Adapter packages: `@tv-ai-agent/adapter-<os>`.
+- Adapter packages: `@hearthkit/adapter-<os>`.

@@ -12,7 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Native side of the JS bridge consumed by @tv-ai-agent/adapter-aosp.
+ * Native side of the JS bridge consumed by @hearthkit/adapter-aosp.
  * Every @JavascriptInterface method maps 1:1 to the NativeBridge TypeScript
  * interface. Methods returning structured data return JSON strings.
  *
@@ -171,7 +171,7 @@ class TvNativeBridge(
      * agent's `persistKey` promises a conversation survives an app reload. An
      * in-memory map made that silently false on every device.
      */
-    private val prefs by lazy { ctx.getSharedPreferences("tv-ai-agent", Context.MODE_PRIVATE) }
+    private val prefs by lazy { ctx.getSharedPreferences("hearth", Context.MODE_PRIVATE) }
     @JavascriptInterface fun kvGet(key: String): String = prefs.getString(key, "") ?: ""
     @JavascriptInterface fun kvSet(key: String, value: String) {
         prefs.edit().putString(key, value).apply()

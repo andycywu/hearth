@@ -1,10 +1,10 @@
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
-import { createTizenAdapter } from "@tv-ai-agent/adapter-tizen";
-import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
-import { createWebosAdapter } from "@tv-ai-agent/adapter-webos";
-import { createTitanAdapter } from "@tv-ai-agent/adapter-titan";
-import { createXumoAdapter } from "@tv-ai-agent/adapter-xumo";
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import { createWebAdapter } from "@hearthkit/adapter-web";
+import { createTizenAdapter } from "@hearthkit/adapter-tizen";
+import { createAospAdapter } from "@hearthkit/adapter-aosp";
+import { createWebosAdapter } from "@hearthkit/adapter-webos";
+import { createTitanAdapter } from "@hearthkit/adapter-titan";
+import { createXumoAdapter } from "@hearthkit/adapter-xumo";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 
 /**
  * Each target under test: a factory that installs whatever device globals the

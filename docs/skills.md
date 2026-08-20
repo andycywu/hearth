@@ -37,8 +37,8 @@ if (platform.has("media") && platform.media) await platform.media.pause();
 ## Start from a scaffold
 
 ```bash
-npm create tv-agent-skill sleep-timer        # pure logic, no network
-npm create tv-agent-skill sports-scores --http   # calls an HTTP API
+npm create hearth-skill sleep-timer        # pure logic, no network
+npm create hearth-skill sports-scores --http   # calls an HTTP API
 ```
 
 Both generate a package whose tests already pass, so your first run is green and
@@ -53,7 +53,7 @@ One tool = a spec the model reads plus an `execute` you write. `defineTool` give
 you inferred argument types.
 
 ```ts
-import { Agent, defineTool } from "@tv-ai-agent/core";
+import { Agent, defineTool } from "@hearthkit/core";
 
 const setSleepTimer = defineTool(
   {
@@ -83,7 +83,7 @@ What the runtime does for you:
   Write messages a model can act on: *"I couldn't find a place called
   'Atlantis'"*, not *"ENOTFOUND"*.
 - **`confirm: true`** routes through the host's confirm handler
-  (`createConfirmHandler()` in `@tv-ai-agent/ui`). Use it for anything the user
+  (`createConfirmHandler()` in `@hearthkit/ui`). Use it for anything the user
   would be annoyed to see happen silently.
 - **The built-in `help` tool** lists whatever you registered, so "what can you
   do?" stays accurate for free.
@@ -113,7 +113,7 @@ against Open-Meteo (no API key) in ~100 lines, with 13 tests and no network in
 any of them.
 
 ```ts
-import { createWeatherTool } from "@tv-ai-agent/skills-example";
+import { createWeatherTool } from "@hearthkit/skills-example";
 
 const agent = new Agent({ platform, llm, tools: [createWeatherTool()] });
 await agent.run("what's the weather in Taipei?");
@@ -169,7 +169,7 @@ response to something small enough to put back in a prompt. The shipped copy is
 Two ways in, and the host decides which origins any of them may reach:
 
 ```ts
-import { loadBundledSkills, loadInstalledSkills } from "@tv-ai-agent/skill-manifest";
+import { loadBundledSkills, loadInstalledSkills } from "@hearthkit/skill-manifest";
 import weather from "./skills/weather.json";
 
 const allowOrigins = ["https://api.open-meteo.com"];   // the host owns this list

@@ -1,4 +1,4 @@
-# tv-agent — the TV agent, in a terminal
+# hearth — the TV agent, in a terminal
 
 For a Linux device that *is* the TV: a set-top box, a Pi, an embedded panel —
 somewhere with a shell but no browser worth running an agent UI in.
@@ -15,10 +15,10 @@ node apps/cli/dist/main.js "set volume to 30"
 ## Using it
 
 ```bash
-tv-agent "set volume to 30" "make it louder"   # one-shot, in order
-tv-agent                                       # interactive, one command a line
-tv-agent --platform linux "mute"               # drive this Linux box
-echo "what's the volume?" | tv-agent --quiet   # stdout is the answer alone
+hearth "set volume to 30" "make it louder"   # one-shot, in order
+hearth                                         # interactive, one command a line
+hearth --platform linux "mute"               # drive this Linux box
+echo "what's the volume?" | hearth --quiet   # stdout is the answer alone
 ```
 
 Replies go to **stdout**, the tool trace to **stderr**, so a pipe gets the
@@ -38,7 +38,7 @@ commands, needs no network and no key, and is what the tests run against.
 For a real model, point it anywhere OpenAI-compatible:
 
 ```bash
-TV_AGENT_LLM=http://127.0.0.1:11434/v1 TV_AGENT_MODEL=llama3.2 tv-agent
+TV_AGENT_LLM=http://127.0.0.1:11434/v1 TV_AGENT_MODEL=llama3.2 hearth
 ```
 
 **The API key comes from `TV_AGENT_API_KEY` only.** `--key` is refused, on
@@ -52,7 +52,7 @@ out of the TV's launch URL. See
 | `--platform` | What it drives |
 | --- | --- |
 | `mock` *(default)* | An in-memory TV. Nothing real changes — safe to experiment with |
-| `linux` | This machine, via `@tv-ai-agent/adapter-linux` |
+| `linux` | This machine, via `@hearthkit/adapter-linux` |
 
 The default is `mock` deliberately: a stray run should not be able to mute
 someone's television.
@@ -64,7 +64,7 @@ someone's television.
 | Volume, mute | PipeWire (`wpctl`), PulseAudio (`pactl`) or ALSA (`amixer`), whichever the box has |
 | Apps | `.desktop` entries from the XDG directories — the same list a launcher shows |
 | Network | From the kernel's interface list; no ping needed |
-| Storage | One JSON file under `$XDG_CONFIG_HOME/tv-agent/` |
+| Storage | One JSON file under `$XDG_CONFIG_HOME/hearth/` |
 | Input switching | **Unsupported** — a Linux box has no tuner to switch to |
 | Key injection | **Unsupported** — needs `xdotool`/`ydotool` and permissions that vary per image |
 

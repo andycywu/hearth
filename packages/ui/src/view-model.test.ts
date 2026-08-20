@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { EventBus, type AgentEvents } from "@tv-ai-agent/core";
-import type { Agent } from "@tv-ai-agent/core";
+import { EventBus, type AgentEvents } from "@hearthkit/core";
+import type { Agent } from "@hearthkit/core";
 import { createAgentViewModel, type AgentViewState } from "./view-model.js";
 
 /**

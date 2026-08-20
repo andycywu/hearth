@@ -22,7 +22,7 @@ with a concrete, runnable example and a short guide, reusing the existing
      `apps/dev-harness/src/skills/weather.ts`. Prefer a package if you want it
      reusable:
      ```ts
-     import { defineTool } from "@tv-ai-agent/core";
+     import { defineTool } from "@hearthkit/core";
      export const weatherTool = defineTool(
        { name: "get_weather", description: "Current weather for a city.",
          parameters: { city: { type: "string", description: "City name", required: true } } },

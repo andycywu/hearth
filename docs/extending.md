@@ -14,7 +14,7 @@ built-in TV tools and become available to the model immediately. Use `defineTool
 for inferred argument types.
 
 ```ts
-import { Agent, defineTool } from "@tv-ai-agent/core";
+import { Agent, defineTool } from "@hearthkit/core";
 
 const openSettings = defineTool(
   {

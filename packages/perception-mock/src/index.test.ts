@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   PerceptionManager, PolicyEngine, WorldModel, W, defaultRules,
   type PerceptionEvent, type PerceptionSource,
-} from "@tv-ai-agent/core";
+} from "@hearthkit/core";
 import { createScriptedSource, createLeakySource, occupancyScript } from "./index.js";
 
 /**

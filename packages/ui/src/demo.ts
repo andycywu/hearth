@@ -1,4 +1,4 @@
-import { launchSearch } from "@tv-ai-agent/core";
+import { launchSearch } from "@hearthkit/core";
 
 /**
  * A self-running demo: the agent driving a TV, with nothing but a launch flag.

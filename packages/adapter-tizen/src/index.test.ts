@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertProviderContract } from "@tv-ai-agent/platform-api";
+import { assertProviderContract } from "@hearthkit/platform-api";
 import { createTizenAdapter } from "./index.js";
 
 /** Minimal stand-ins for the on-device `tizen.*` / `webapis.*` globals. */
@@ -172,7 +172,7 @@ describe("a build with no audio control API", () => {
   });
 
   it("reports volume as unsupported, not as a failure", async () => {
-    const { isTvUnsupported } = await import("@tv-ai-agent/platform-api");
+    const { isTvUnsupported } = await import("@hearthkit/platform-api");
     await expect(createTizenAdapter().system.getVolume()).rejects.toSatisfy(isTvUnsupported);
   });
 
@@ -180,7 +180,7 @@ describe("a build with no audio control API", () => {
     // getMute used to swallow the error and return false, so "is the TV muted?"
     // got a confident "no" from a TV that cannot tell — while getVolume on the
     // very same build threw. One of the two had to be wrong.
-    const { isTvUnsupported } = await import("@tv-ai-agent/platform-api");
+    const { isTvUnsupported } = await import("@hearthkit/platform-api");
     await expect(createTizenAdapter().system.getMute()).rejects.toSatisfy(isTvUnsupported);
   });
 

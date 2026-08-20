@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/blits-demo",
+  "name": "@hearthkit/blits-demo",
   "version": "0.1.0",
   "private": true,
   "description": "Standalone Lightning 3 / Blits (WebGL) UI demo, driving the agent via the same event wiring as the DOM/canvas renderers. Not part of the pnpm workspace or CI — install and build separately.",

@@ -1,4 +1,4 @@
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 import type { ChatMessage, LlmClient } from "../llm/client.js";
 import { ToolRegistry, type Tool } from "../tools/registry.js";
 import { createTvTools, capabilitiesForPlatform } from "../tools/tv-tools.js";

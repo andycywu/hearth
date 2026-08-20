@@ -1,4 +1,4 @@
-import type { ToolParameter } from "@tv-ai-agent/core";
+import type { ToolParameter } from "@hearthkit/core";
 
 /**
  * A skill expressed as data — see docs/adr/0002-declarative-skill-manifests.md.

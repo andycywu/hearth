@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertProviderContract, isTvUnsupported } from "@tv-ai-agent/platform-api";
+import { assertProviderContract, isTvUnsupported } from "@hearthkit/platform-api";
 import { createTitanAdapter, type TitanBridge } from "./index.js";
 
 /** A Titan host that grants everything — what a partner build might look like. */

@@ -1,4 +1,4 @@
-import type { Agent } from "@tv-ai-agent/core";
+import type { Agent } from "@hearthkit/core";
 import { truncate } from "./format.js";
 import { createAgentViewModel, type AgentViewState } from "./view-model.js";
 
@@ -30,7 +30,7 @@ export function mountAgentOverlay(agent: Agent, opts: OverlayOptions = {}): Over
   const showActivity = opts.showActivity ?? true;
 
   const root = document.createElement("div");
-  root.setAttribute("data-tv-agent-overlay", "");
+  root.setAttribute("data-hearth-overlay", "");
   root.style.cssText =
     "position:fixed;left:0;right:0;bottom:0;padding:32px;color:#e8eefc;" +
     "font-family:sans-serif;font-size:28px;line-height:1.4;" +

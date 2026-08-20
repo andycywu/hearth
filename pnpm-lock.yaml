@@ -29,37 +29,37 @@ importers:
 
   apps/aosp-app:
     dependencies:
-      '@tv-ai-agent/adapter-aosp':
+      '@hearthkit/adapter-aosp':
         specifier: workspace:*
         version: link:../../packages/adapter-aosp
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@tv-ai-agent/llm-connectors':
+      '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../../packages/platform-api
-      '@tv-ai-agent/ui':
+      '@hearthkit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
 
   apps/cli:
     dependencies:
-      '@tv-ai-agent/adapter-linux':
+      '@hearthkit/adapter-linux':
         specifier: workspace:*
         version: link:../../packages/adapter-linux
-      '@tv-ai-agent/adapter-web':
+      '@hearthkit/adapter-web':
         specifier: workspace:*
         version: link:../../packages/adapter-web
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@tv-ai-agent/llm-connectors':
+      '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../../packages/platform-api
     devDependencies:
@@ -69,103 +69,103 @@ importers:
 
   apps/dev-harness:
     dependencies:
-      '@tv-ai-agent/adapter-web':
+      '@hearthkit/adapter-web':
         specifier: workspace:*
         version: link:../../packages/adapter-web
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@tv-ai-agent/llm-connectors':
+      '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
-      '@tv-ai-agent/perception-mock':
+      '@hearthkit/perception-mock':
         specifier: workspace:*
         version: link:../../packages/perception-mock
-      '@tv-ai-agent/skill-manifest':
+      '@hearthkit/skill-manifest':
         specifier: workspace:*
         version: link:../../packages/skill-manifest
-      '@tv-ai-agent/skills-example':
+      '@hearthkit/skills-example':
         specifier: workspace:*
         version: link:../../packages/skills-example
-      '@tv-ai-agent/ui':
+      '@hearthkit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
 
   apps/tizen-app:
     dependencies:
-      '@tv-ai-agent/adapter-tizen':
+      '@hearthkit/adapter-tizen':
         specifier: workspace:*
         version: link:../../packages/adapter-tizen
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@tv-ai-agent/llm-connectors':
+      '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../../packages/platform-api
-      '@tv-ai-agent/ui':
+      '@hearthkit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
 
   apps/webos-app:
     dependencies:
-      '@tv-ai-agent/adapter-webos':
+      '@hearthkit/adapter-webos':
         specifier: workspace:*
         version: link:../../packages/adapter-webos
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@tv-ai-agent/llm-connectors':
+      '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../../packages/platform-api
-      '@tv-ai-agent/ui':
+      '@hearthkit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
 
   packages/acceptance:
     devDependencies:
-      '@tv-ai-agent/adapter-aosp':
+      '@hearthkit/adapter-aosp':
         specifier: workspace:*
         version: link:../adapter-aosp
-      '@tv-ai-agent/adapter-titan':
+      '@hearthkit/adapter-titan':
         specifier: workspace:*
         version: link:../adapter-titan
-      '@tv-ai-agent/adapter-tizen':
+      '@hearthkit/adapter-tizen':
         specifier: workspace:*
         version: link:../adapter-tizen
-      '@tv-ai-agent/adapter-web':
+      '@hearthkit/adapter-web':
         specifier: workspace:*
         version: link:../adapter-web
-      '@tv-ai-agent/adapter-webos':
+      '@hearthkit/adapter-webos':
         specifier: workspace:*
         version: link:../adapter-webos
-      '@tv-ai-agent/adapter-xumo':
+      '@hearthkit/adapter-xumo':
         specifier: workspace:*
         version: link:../adapter-xumo
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../core
-      '@tv-ai-agent/llm-connectors':
+      '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../llm-connectors
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
 
   packages/adapter-aosp:
     dependencies:
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
 
   packages/adapter-linux:
     dependencies:
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
     devDependencies:
@@ -175,41 +175,41 @@ importers:
 
   packages/adapter-titan:
     dependencies:
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
 
   packages/adapter-tizen:
     dependencies:
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
 
   packages/adapter-web:
     dependencies:
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
 
   packages/adapter-webos:
     dependencies:
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
 
   packages/adapter-xumo:
     dependencies:
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
 
   packages/core:
     dependencies:
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
     devDependencies:
-      '@tv-ai-agent/adapter-web':
+      '@hearthkit/adapter-web':
         specifier: workspace:*
         version: link:../adapter-web
 
@@ -217,21 +217,21 @@ importers:
 
   packages/llm-connectors:
     dependencies:
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@tv-ai-agent/adapter-web':
+      '@hearthkit/adapter-web':
         specifier: workspace:*
         version: link:../adapter-web
 
   packages/perception-mock:
     dependencies:
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@tv-ai-agent/adapter-web':
+      '@hearthkit/adapter-web':
         specifier: workspace:*
         version: link:../adapter-web
 
@@ -239,25 +239,25 @@ importers:
 
   packages/skill-manifest:
     dependencies:
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../core
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
 
   packages/skills-example:
     dependencies:
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../core
 
   packages/ui:
     dependencies:
-      '@tv-ai-agent/core':
+      '@hearthkit/core':
         specifier: workspace:*
         version: link:../core
-      '@tv-ai-agent/platform-api':
+      '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
 

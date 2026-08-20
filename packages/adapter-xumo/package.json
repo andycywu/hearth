@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/adapter-xumo",
+  "name": "@hearthkit/adapter-xumo",
   "version": "0.1.0",
   "description": "Xumo OS adapter stub: the shape of the platform bridge, with typed \"unsupported\" until a real one is wired up. Proves adding an OS touches only its adapter.",
   "type": "module",
@@ -10,6 +10,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
-  "dependencies": { "@tv-ai-agent/platform-api": "workspace:*" },
+  "dependencies": { "@hearthkit/platform-api": "workspace:*" },
   "license": "Apache-2.0"
 }

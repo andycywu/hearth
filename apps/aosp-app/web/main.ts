@@ -1,14 +1,14 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl,
   discoverRoom, deviceTreeText,
-} from "@tv-ai-agent/core";
-import { createAospAdapter } from "@tv-ai-agent/adapter-aosp";
-import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
+} from "@hearthkit/core";
+import { createAospAdapter } from "@hearthkit/adapter-aosp";
+import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
   keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
-} from "@tv-ai-agent/ui";
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+} from "@hearthkit/ui";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 
 declare global {
   interface Window {

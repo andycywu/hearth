@@ -41,7 +41,7 @@ hardware.
 | UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
 | Avatar + on-screen keyboard | ✅ avatar is the default face, `?keyboard` to type — verified on the Android TV **and** Tizen emulators |
-| CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal — `tv-agent "set volume to 30"`. Verified against the mock adapter |
+| CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal — `hearth "set volume to 30"`. Verified against the mock adapter |
 | Linux platform (`adapter-linux`) | ✅ all three backends verified against real tooling: `pactl` and `wpctl` in CI every push, `amixer` by hand on an Ubuntu 26.04 VM with a real sound card |
 | Translucent overlay | ✅ AOSP only. Tizen/webOS web runtimes can't make a window see-through, so those hosts stay opaque; `?translucent` to try anyway |
 | CJK input | ✅ kana keyboard (real characters); Chinese as phrases — an IME is out of scope |
@@ -157,7 +157,7 @@ adapter-webos 6 · adapter-web 5 · acceptance 5.
    audio: the emulator exposes neither audio API, so `volume` and `mute` have
    never executed on this platform. A retail TV in Developer Mode is also where
    Samsung's `webapis` exists, so it settles the rest of that surface at once.
-5. **npm publish.** Waiting on the `@tv-ai-agent` npm organization; GitHub Pages
+5. **npm publish.** Waiting on the `@hearthkit` npm organization; GitHub Pages
    needs enabling in the repo settings for the hosted demo.
 
 ## How to run

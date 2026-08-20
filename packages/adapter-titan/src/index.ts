@@ -4,7 +4,7 @@ import {
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey,
-} from "@tv-ai-agent/platform-api";
+} from "@hearthkit/platform-api";
 
 /**
  * Titan OS adapter — **a stub, deliberately, and not an integration.**
@@ -155,7 +155,7 @@ export function createTitanAdapter(opts: TitanAdapterOptions = {}): PlatformProv
           : "ethernet";
       },
     },
-    storage: createLocalStorageStore("tv-ai-agent"),
+    storage: createLocalStorageStore("hearth"),
     has: (cap) => hasCapability(provider, cap),
     init: async () => { /* nothing to wire until there is a real bridge */ },
   };

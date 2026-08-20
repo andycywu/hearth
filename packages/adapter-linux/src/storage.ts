@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { KeyValueStore } from "@tv-ai-agent/platform-api";
+import type { KeyValueStore } from "@hearthkit/platform-api";
 
 /**
  * The key-value store, as one JSON file under the XDG config directory.
@@ -51,5 +51,5 @@ export function createFileStore(path?: string): KeyValueStore {
 
 export function defaultStorePath(env: Record<string, string | undefined> = process.env): string {
   const base = env.XDG_CONFIG_HOME || join(env.HOME || homedir(), ".config");
-  return join(base, "tv-agent", "store.json");
+  return join(base, "hearth", "store.json");
 }

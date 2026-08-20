@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/acceptance",
+  "name": "@hearthkit/acceptance",
   "version": "0.1.0",
   "private": true,
   "description": "Cross-target acceptance tests — the same command script must behave identically on every adapter.",
@@ -9,15 +9,15 @@
     "typecheck": "echo \"acceptance: test-only package\" && exit 0"
   },
   "devDependencies": {
-    "@tv-ai-agent/core": "workspace:*",
-    "@tv-ai-agent/platform-api": "workspace:*",
-    "@tv-ai-agent/adapter-web": "workspace:*",
-    "@tv-ai-agent/adapter-tizen": "workspace:*",
-    "@tv-ai-agent/adapter-aosp": "workspace:*",
-    "@tv-ai-agent/adapter-webos": "workspace:*",
-    "@tv-ai-agent/adapter-titan": "workspace:*",
-    "@tv-ai-agent/adapter-xumo": "workspace:*",
-    "@tv-ai-agent/llm-connectors": "workspace:*"
+    "@hearthkit/core": "workspace:*",
+    "@hearthkit/platform-api": "workspace:*",
+    "@hearthkit/adapter-web": "workspace:*",
+    "@hearthkit/adapter-tizen": "workspace:*",
+    "@hearthkit/adapter-aosp": "workspace:*",
+    "@hearthkit/adapter-webos": "workspace:*",
+    "@hearthkit/adapter-titan": "workspace:*",
+    "@hearthkit/adapter-xumo": "workspace:*",
+    "@hearthkit/llm-connectors": "workspace:*"
   },
   "license": "Apache-2.0"
 }

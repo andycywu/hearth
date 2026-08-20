@@ -1,4 +1,4 @@
-# TV AI Agent (Harness) — Platform Bring-up Plan
+# Hearth — Platform Bring-up Plan
 
 > **Superseded as the top-level roadmap by [`roadmap.md`](roadmap.md).** The
 > product is an AI agent runtime and cross-OS control plane for living-room

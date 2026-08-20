@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { EventBus, type AgentEvents } from "@tv-ai-agent/core";
-import type { Agent, ConfirmRequest } from "@tv-ai-agent/core";
-import type { PlatformProvider, VoicePipeline } from "@tv-ai-agent/platform-api";
+import { EventBus, type AgentEvents } from "@hearthkit/core";
+import type { Agent, ConfirmRequest } from "@hearthkit/core";
+import type { PlatformProvider, VoicePipeline } from "@hearthkit/platform-api";
 import {
   createConfirmHandler, confirmOverrideFromUrl, commandsFromUrl, speakReplies, keyboardOption,
   renderOption, inviteText, debugRequested, confirmQuestion, runStartupCommands,

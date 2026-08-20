@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/skills-example",
+  "name": "@hearthkit/skills-example",
   "version": "0.1.0",
   "private": true,
   "description": "Worked example of a cross-vendor skill: a keyless weather tool that runs identically on every TV target because it needs no device privilege. See docs/skills.md.",
@@ -12,7 +12,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tv-ai-agent/core": "workspace:*"
+    "@hearthkit/core": "workspace:*"
   },
   "license": "Apache-2.0"
 }

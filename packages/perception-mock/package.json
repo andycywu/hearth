@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/perception-mock",
+  "name": "@hearthkit/perception-mock",
   "version": "0.1.0",
   "description": "Scripted perception sources — occupancy, ambient light, noise — with no camera and no CV model. Proves the perception path end to end.",
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
-  "dependencies": { "@tv-ai-agent/core": "workspace:*" },
-  "devDependencies": { "@tv-ai-agent/adapter-web": "workspace:*" },
+  "dependencies": { "@hearthkit/core": "workspace:*" },
+  "devDependencies": { "@hearthkit/adapter-web": "workspace:*" },
   "license": "Apache-2.0"
 }

@@ -1,7 +1,7 @@
 import type {
   LlmClient, CompletionRequest, CompletionResult, ChatMessage, ToolCall, StreamHandlers,
   ToolParameter,
-} from "@tv-ai-agent/core";
+} from "@hearthkit/core";
 
 export interface OpenAiCompatibleOptions {
   /** Base URL of an OpenAI-compatible /chat/completions endpoint. */

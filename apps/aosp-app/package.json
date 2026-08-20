@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/aosp-web",
+  "name": "@hearthkit/aosp-web",
   "version": "0.1.0",
   "private": true,
   "description": "Web bundle entry for the AOSP host WebView. Bundled into app/src/main/assets/main.js by tools/bundle.mjs.",
@@ -8,11 +8,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.web.json"
   },
   "dependencies": {
-    "@tv-ai-agent/core": "workspace:*",
-    "@tv-ai-agent/platform-api": "workspace:*",
-    "@tv-ai-agent/adapter-aosp": "workspace:*",
-    "@tv-ai-agent/llm-connectors": "workspace:*",
-    "@tv-ai-agent/ui": "workspace:*"
+    "@hearthkit/core": "workspace:*",
+    "@hearthkit/platform-api": "workspace:*",
+    "@hearthkit/adapter-aosp": "workspace:*",
+    "@hearthkit/llm-connectors": "workspace:*",
+    "@hearthkit/ui": "workspace:*"
   },
   "license": "Apache-2.0"
 }

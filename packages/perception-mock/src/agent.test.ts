@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Agent, W, type LlmClient, type CompletionResult } from "@tv-ai-agent/core";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+import { Agent, W, type LlmClient, type CompletionResult } from "@hearthkit/core";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 import { createScriptedSource, occupancyScript } from "./index.js";
 
 /**

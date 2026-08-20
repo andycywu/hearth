@@ -17,7 +17,7 @@
  * `{ volume: 30, muted: false }` is the useful part.
  */
 
-import { isTvUnsupported } from "@tv-ai-agent/platform-api";
+import { isTvUnsupported } from "@hearthkit/platform-api";
 import { UnknownToolError } from "./registry.js";
 
 export type TvResultError = "unsupported" | "failed" | "offline";

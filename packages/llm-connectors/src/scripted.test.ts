@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Agent, defineTool, type Tool } from "@tv-ai-agent/core";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+import { Agent, defineTool, type Tool } from "@hearthkit/core";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 import { createScriptedClient } from "./scripted.js";
 
 function makeAgent(tools: Tool[] = []) {

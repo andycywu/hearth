@@ -4,5 +4,5 @@ pluginManagement {
 dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
-rootProject.name = "tv-ai-agent-aosp"
+rootProject.name = "hearth-aosp"
 include(":app")

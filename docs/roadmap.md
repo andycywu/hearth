@@ -318,7 +318,7 @@ Ordered. Each is independently shippable.
   A side finding: this turn's harness edit deleted a function that nothing
   typechecked, because four app hosts had `typecheck` stubbed out as an `echo`.
   They are real now, and adding them surfaced a latent bug — three hosts imported
-  `@tv-ai-agent/platform-api` without declaring it as a dependency.
+  `@hearthkit/platform-api` without declaring it as a dependency.
 
 ### 10. Titan OS and Xumo adapter stubs with contract tests — **done**
 

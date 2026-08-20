@@ -11,7 +11,7 @@
  *   3. the caller's defaults
  */
 
-import { launchSearch } from "@tv-ai-agent/core";
+import { launchSearch } from "@hearthkit/core";
 
 export interface LlmEndpoint {
   /** Undefined when nothing configured one — the host decides what to do. */

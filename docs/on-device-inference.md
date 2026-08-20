@@ -1,7 +1,7 @@
 # On-device (and local) inference
 
 The agent talks to any **OpenAI-compatible** `/chat/completions` endpoint via
-`@tv-ai-agent/llm-connectors`. That means the *same* build runs against a cloud
+`@hearthkit/llm-connectors`. That means the *same* build runs against a cloud
 gateway or a model running on `localhost` — including on the TV's own SoC. No
 code change is needed; only the base URL differs.
 

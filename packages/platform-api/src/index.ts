@@ -1,5 +1,5 @@
 /**
- * @tv-ai-agent/platform-api
+ * @hearthkit/platform-api
  *
  * The Platform Abstraction Layer (HAL). Every capability the agent needs from
  * the TV is expressed here as a stable, platform-neutral interface. Concrete

@@ -1,10 +1,10 @@
 {
-  "name": "create-tv-agent-skill",
+  "name": "create-hearth-skill",
   "version": "0.1.0",
-  "description": "Scaffold a TV AI Agent skill: a tool, a test with fetch mocked, and the two lines that register it. `npm create tv-agent-skill my-skill`.",
+  "description": "Scaffold a TV AI Agent skill: a tool, a test with fetch mocked, and the two lines that register it. `npm create hearth-skill my-skill`.",
   "type": "module",
   "bin": {
-    "create-tv-agent-skill": "index.mjs"
+    "create-hearth-skill": "index.mjs"
   },
   "files": [
     "index.mjs",

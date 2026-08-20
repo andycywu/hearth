@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 import { createTvTools, capabilitiesForPlatform, tvHandlers } from "../tools/tv-tools.js";
 import { toolsFromCapabilities, toolSpecFor } from "./to-tools.js";
 import type { Capability } from "./types.js";

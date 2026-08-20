@@ -1,4 +1,4 @@
-import { TvUnsupportedError } from "@tv-ai-agent/platform-api";
+import { TvUnsupportedError } from "@hearthkit/platform-api";
 import type { Runner } from "./run.js";
 
 /**

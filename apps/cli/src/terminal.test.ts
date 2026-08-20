@@ -13,7 +13,7 @@ describe("readlineOptions", () => {
 
   it("echoes to stderr, so a pipe still gets only the answer", () => {
     // stdout carries the reply; the prompt and the user's keystrokes must not
-    // end up in `tv-agent … | something`.
+    // end up in `hearth … | something`.
     expect(readlineOptions(true).output).toBe(process.stderr);
   });
 

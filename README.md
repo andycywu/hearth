@@ -1,12 +1,17 @@
-# TV AI Agent
+# Hearth
 
 [![CI](https://github.com/andycywu/tv-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/andycywu/tv-ai-agent/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-informational)](.nvmrc)
 
-**An on-device AI agent runtime for Smart TVs.** Write the agent once; run it on
-Android TV / AOSP, Tizen and webOS, on MediaTek or Novatek silicon, against a
-cloud model or one running on the TV itself.
+**An AI agent runtime for smart TVs and living-room devices.** Write the agent
+once; run it on Android TV / AOSP, Tizen and webOS, on MediaTek or Novatek
+silicon, against a cloud model or one running on the TV itself.
+
+It plans against a model of the room rather than mapping commands, and it
+**never claims to have done something it didn't** — every step comes back
+`verified`, `unverified`, `unsupported` or `failed`, and the difference is the
+point.
 
 ### ▶ [Try it in your browser](https://andycywu.github.io/tv-ai-agent/) — no install, no API key, no TV
 
@@ -75,7 +80,7 @@ pnpm bench          # agent-loop latency (p50/p95 per turn)
 ## Add a skill
 
 ```bash
-npm create tv-agent-skill sleep-timer          # or --http for the fetch variant
+npm create hearth-skill sleep-timer          # or --http for the fetch variant
 ```
 
 You get a package that already passes its own tests — edit the description, the
@@ -86,7 +91,7 @@ A skill is one or more tools. Pure-logic skills — weather, sports, smart home 
 need no device privilege, so the same code runs on every TV:
 
 ```ts
-import { Agent, defineTool } from "@tv-ai-agent/core";
+import { Agent, defineTool } from "@hearthkit/core";
 
 const sleepTimer = defineTool(
   { name: "set_sleep_timer",
@@ -165,7 +170,7 @@ acceptance script reproduces the CI tool sequence exactly. Navigation works with
 
 ```
    your skills  ─┐
-                 ├─▶  @tv-ai-agent/core  ──▶  @tv-ai-agent/platform-api (HAL)
+                 ├─▶  @hearthkit/core  ──▶  @hearthkit/platform-api (HAL)
    built-in tools┘     agent loop, tools,          │
                        memory, events              │ implemented by
                                                    ▼

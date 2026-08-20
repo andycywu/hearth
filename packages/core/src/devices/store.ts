@@ -1,4 +1,4 @@
-import type { KeyValueStore } from "@tv-ai-agent/platform-api";
+import type { KeyValueStore } from "@hearthkit/platform-api";
 import { DeviceGraph } from "./graph.js";
 import type { DeviceNode, DeviceObservation, DiscoverySource } from "./types.js";
 

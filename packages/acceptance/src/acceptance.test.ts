@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Agent, createTvTools } from "@tv-ai-agent/core";
-import { createScriptedClient } from "@tv-ai-agent/llm-connectors";
+import { Agent, createTvTools } from "@hearthkit/core";
+import { createScriptedClient } from "@hearthkit/llm-connectors";
 import { targets } from "./mocks.js";
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertProviderContract, isTvUnsupported } from "@tv-ai-agent/platform-api";
+import { assertProviderContract, isTvUnsupported } from "@hearthkit/platform-api";
 import { createXumoAdapter, type XumoBridge } from "./index.js";
 
 /**

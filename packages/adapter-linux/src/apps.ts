@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { AppEntry } from "@tv-ai-agent/platform-api";
+import type { AppEntry } from "@hearthkit/platform-api";
 
 /**
  * "Installed apps" on Linux, which the desktop-entry spec already answers.

@@ -1,4 +1,4 @@
-import type { PerceptionEvent, PerceptionSource } from "@tv-ai-agent/core";
+import type { PerceptionEvent, PerceptionSource } from "@hearthkit/core";
 
 /**
  * Perception without a sensor.

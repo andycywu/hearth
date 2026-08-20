@@ -39,7 +39,7 @@
  * time, which is also the backstop for an API that loads later than boot.
  */
 
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 import type { Capability } from "../capabilities/types.js";
 import { capabilitiesForPlatform, tvHandlers } from "./tv-tools.js";
 import { classifyToolError } from "./result.js";

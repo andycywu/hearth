@@ -1,14 +1,14 @@
-# @tv-ai-agent/ui
+# @hearthkit/ui
 
 A minimal, **dependency-free** 10-foot UI shell for the agent. `mountAgentOverlay`
 attaches a DOM overlay that subscribes to the agent's event bus and renders
 status, streamed tokens and tool activity.
 
 ```ts
-import { Agent } from "@tv-ai-agent/core";
-import { mountAgentOverlay } from "@tv-ai-agent/ui";
+import { Agent } from "@hearthkit/core";
+import { mountAgentOverlay } from "@hearthkit/ui";
 
-const ui = mountAgentOverlay(agent);   // agent: an @tv-ai-agent/core Agent
+const ui = mountAgentOverlay(agent);   // agent: an @hearthkit/core Agent
 await ui.ask("turn the volume down");  // streams the reply into the overlay
 ```
 
@@ -21,7 +21,7 @@ rendering so the view layer can be swapped without touching agent logic.
 Every renderer here consumes one piece of tested, DOM-free logic:
 
 ```ts
-import { createAgentViewModel } from "@tv-ai-agent/ui";
+import { createAgentViewModel } from "@hearthkit/ui";
 
 const vm = createAgentViewModel(agent);
 vm.subscribe((s) => draw(s));   // { reply, activity, error, busy, streamed }
@@ -44,7 +44,7 @@ The two things every host needs beyond drawing, so the Tizen / AOSP / webOS
 entries don't each grow their own copy:
 
 ```ts
-import { createConfirmHandler, speakReplies } from "@tv-ai-agent/ui";
+import { createConfirmHandler, speakReplies } from "@hearthkit/ui";
 
 const agent = new Agent({ platform, llm, confirm: createConfirmHandler() });
 speakReplies(agent, platform);   // no-op unless platform.has("voice")

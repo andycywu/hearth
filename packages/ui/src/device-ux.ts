@@ -1,5 +1,5 @@
-import { launchSearch, launchSearchSource, redactSecrets, type Agent, type ConfirmRequest } from "@tv-ai-agent/core";
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import { launchSearch, launchSearchSource, redactSecrets, type Agent, type ConfirmRequest } from "@hearthkit/core";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
 import { mountOnScreenKeyboard, remoteIntent } from "./keyboard.js";

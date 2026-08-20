@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertProviderContract } from "@tv-ai-agent/platform-api";
+import { assertProviderContract } from "@hearthkit/platform-api";
 import { createWebAdapter } from "./index.js";
 
 describe("adapter-web", () => {

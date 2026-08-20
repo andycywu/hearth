@@ -2,8 +2,8 @@
 /**
  * Scaffold a TV AI Agent skill.
  *
- *   npm create tv-agent-skill my-skill        # or: pnpm new:skill my-skill
- *   npm create tv-agent-skill my-skill --http # variant that calls an HTTP API
+ *   npm create hearth-skill my-skill        # or: pnpm new:skill my-skill
+ *   npm create hearth-skill my-skill --http # variant that calls an HTTP API
  *
  * Generates a package that already passes its own tests, so the first thing you
  * see is green rather than a compile error. Inside this monorepo it lands in
@@ -23,7 +23,7 @@ const http = flags.has("--http");
 const rawName = positional[0];
 if (!rawName || flags.has("--help")) {
   console.log(`
-  Usage: npm create tv-agent-skill <name> [--http]
+  Usage: npm create hearth-skill <name> [--http]
 
     <name>   kebab-case, e.g. sleep-timer, sports-scores
     --http   generate the variant that calls an HTTP API (timeout + mocked tests)
@@ -75,7 +75,7 @@ mkdirSync(target, { recursive: true });
 console.log(`\nCreating the ${name} skill${http ? " (HTTP variant)" : ""}:\n`);
 
 write("package.json", JSON.stringify({
-  name: `@tv-ai-agent/${name}`,
+  name: `@hearthkit/${name}`,
   version: "0.1.0",
   private: true,
   description: `A TV AI Agent skill: ${toolName}.`,
@@ -83,7 +83,7 @@ write("package.json", JSON.stringify({
   main: "dist/index.js",
   types: "dist/index.d.ts",
   scripts: { build: "tsc -b", typecheck: "tsc --noEmit", test: "vitest run --passWithNoTests" },
-  dependencies: { "@tv-ai-agent/core": coreSpec },
+  dependencies: { "@hearthkit/core": coreSpec },
   license: "Apache-2.0",
 }, null, 2) + "\n");
 
@@ -109,11 +109,11 @@ write("README.md", readme());
 console.log(`
 Next:
 
-  ${workspaceRoot ? `pnpm install && pnpm --filter @tv-ai-agent/${name} test` : `cd ${name} && npm install && npm test`}
+  ${workspaceRoot ? `pnpm install && pnpm --filter @hearthkit/${name} test` : `cd ${name} && npm install && npm test`}
 
 Then register it with an agent:
 
-  import { create${pascal}Tool } from "@tv-ai-agent/${name}";
+  import { create${pascal}Tool } from "@hearthkit/${name}";
   const agent = new Agent({ platform, llm, tools: [create${pascal}Tool()] });
 
 Guide: https://github.com/andycywu/tv-ai-agent/blob/main/docs/skills.md
@@ -122,7 +122,7 @@ Guide: https://github.com/andycywu/tv-ai-agent/blob/main/docs/skills.md
 // --- templates -------------------------------------------------------------
 
 function pureSkill() {
-  return `import { defineTool, type Tool } from "@tv-ai-agent/core";
+  return `import { defineTool, type Tool } from "@hearthkit/core";
 
 /**
  * ${toolName} — a pure-logic skill.
@@ -189,7 +189,7 @@ describe("${toolName}", () => {
 }
 
 function httpSkill() {
-  return `import { defineTool, type Tool } from "@tv-ai-agent/core";
+  return `import { defineTool, type Tool } from "@hearthkit/core";
 
 /**
  * ${toolName} — a skill that calls an HTTP API.
@@ -310,15 +310,15 @@ describe("${toolName}", () => {
 }
 
 function readme() {
-  return `# @tv-ai-agent/${name}
+  return `# @hearthkit/${name}
 
 A [TV AI Agent](https://github.com/andycywu/tv-ai-agent) skill. One tool,
 \`${toolName}\`, that runs unchanged on Android TV, Tizen, webOS and in the
 browser harness${http ? " — it only needs `fetch`" : " — it needs no device capability at all"}.
 
 \`\`\`ts
-import { Agent } from "@tv-ai-agent/core";
-import { create${pascal}Tool } from "@tv-ai-agent/${name}";
+import { Agent } from "@hearthkit/core";
+import { create${pascal}Tool } from "@hearthkit/${name}";
 
 const agent = new Agent({ platform, llm, tools: [create${pascal}Tool()] });
 \`\`\`

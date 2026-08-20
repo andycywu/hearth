@@ -22,13 +22,13 @@ This is pure (no DOM) → unit-testable with a fake Agent/EventBus.
   view-model instead of inline subscriptions.
 - **Edit:** `packages/ui/src/index.ts` to export it.
 - **Edit:** `apps/blits-demo/src/index.js` to import `createAgentViewModel` (via
-  the alias to `@tv-ai-agent/ui` — add it to `vite.config.js` `resolve.alias`
+  the alias to `@hearthkit/ui` — add it to `vite.config.js` `resolve.alias`
   pointing at `packages/ui/dist/index.js`).
 
 ## Steps
 1. Implement `createAgentViewModel`:
    ```ts
-   import type { Agent } from "@tv-ai-agent/core";
+   import type { Agent } from "@hearthkit/core";
    import { formatToolCall, truncate } from "./format.js";
 
    export interface AgentViewState { reply: string; activity: string; error: string }
@@ -65,7 +65,7 @@ This is pure (no DOM) → unit-testable with a fake Agent/EventBus.
    export { createAgentViewModel, type AgentViewModel, type AgentViewState } from "./view-model.js";
    ```
 4. Update `apps/blits-demo`:
-   - `vite.config.js`: add `"@tv-ai-agent/ui": pkg("ui")` to `resolve.alias`.
+   - `vite.config.js`: add `"@hearthkit/ui": pkg("ui")` to `resolve.alias`.
    - `src/index.js`: build the agent, then
      `const vm = createAgentViewModel(agent); vm.subscribe(s => { this.reply = s.reply; this.activity = s.activity; });`
      inside the Blits component `ready()` hook (replaces the manual event subs).

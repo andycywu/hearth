@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 import { Agent } from "./agent.js";
 import { DeviceGraph } from "../devices/graph.js";
 import { matchSkill, isPlannable } from "../skills/match.js";

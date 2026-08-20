@@ -2,7 +2,7 @@
  * Pre-boot only.
  *
  * Everything the app looks like now comes from `applyTvTheme()` in
- * @tv-ai-agent/ui, injected once the runtime starts, so all four hosts share one
+ * @hearthkit/ui, injected once the runtime starts, so all four hosts share one
  * visual language instead of four stylesheets that drifted apart. What's left
  * here is the paint between the window opening and that running: a dark surface,
  * so the launch doesn't flash white.

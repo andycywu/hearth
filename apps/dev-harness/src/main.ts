@@ -2,20 +2,20 @@ import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, summarizeOutcome,
   discoverRoom, deviceTreeText,
   type LlmClient,
-} from "@tv-ai-agent/core";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+} from "@hearthkit/core";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 import {
   mountAgentOverlay, mountAgentCanvas, mountAgentAvatar, createConfirmHandler, speakReplies,
   createListeningState,
-} from "@tv-ai-agent/ui";
+} from "@hearthkit/ui";
 import {
   createScriptedClient, createOpenAiCompatibleClient, resolveLlmEndpoint,
-} from "@tv-ai-agent/llm-connectors";
-import { createWeatherTool } from "@tv-ai-agent/skills-example";
-import { createScriptedSource, occupancyScript } from "@tv-ai-agent/perception-mock";
-import { loadBundledSkills, loadInstalledSkills } from "@tv-ai-agent/skill-manifest";
-import weatherManifest from "@tv-ai-agent/skill-manifest/examples/open-meteo-weather.json";
-import type { Tool } from "@tv-ai-agent/core";
+} from "@hearthkit/llm-connectors";
+import { createWeatherTool } from "@hearthkit/skills-example";
+import { createScriptedSource, occupancyScript } from "@hearthkit/perception-mock";
+import { loadBundledSkills, loadInstalledSkills } from "@hearthkit/skill-manifest";
+import weatherManifest from "@hearthkit/skill-manifest/examples/open-meteo-weather.json";
+import type { Tool } from "@hearthkit/core";
 
 declare global {
   interface Window {

@@ -3,7 +3,7 @@ import {
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey,
-} from "@tv-ai-agent/platform-api";
+} from "@hearthkit/platform-api";
 
 /**
  * In-memory adapter. Lets the whole runtime run in a normal browser or Node for
@@ -53,7 +53,7 @@ export function createWebAdapter(): PlatformProvider {
     network: { isOnline: async () => true, connectionType: async () => "ethernet" },
     // localStorage in a browser, memory in Node — so the harness keeps a
     // session across reloads while tests stay isolated.
-    storage: createLocalStorageStore("tv-ai-agent"),
+    storage: createLocalStorageStore("hearth"),
     media: {
       play: async (uri) => { console.info("[web] play", uri); },
       pause: async () => { console.info("[web] pause"); },

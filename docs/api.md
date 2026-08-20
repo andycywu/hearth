@@ -5,7 +5,7 @@ reference; the source is the ground truth.
 
 ---
 
-## `@tv-ai-agent/core`
+## `@hearthkit/core`
 
 The platform-agnostic agent runtime ("the Harness").
 
@@ -123,7 +123,7 @@ Also exported: `ConversationContext`, `EventBus`, and the message types
 
 ---
 
-## `@tv-ai-agent/platform-api`
+## `@hearthkit/platform-api`
 
 The Platform Abstraction Layer (HAL). Adapters implement `PlatformProvider`.
 
@@ -177,7 +177,7 @@ Types: `InputSource`, `RemoteKey`, `AppEntry`.
 
 ---
 
-## `@tv-ai-agent/llm-connectors`
+## `@hearthkit/llm-connectors`
 
 ```ts
 createOpenAiCompatibleClient(opts: {
@@ -194,7 +194,7 @@ localhost llama.cpp / Ollama / vLLM) and supports streaming.
 
 ---
 
-## `@tv-ai-agent/ui`
+## `@hearthkit/ui`
 
 ```ts
 mountAgentOverlay(agent: Agent, opts?: { mount?: HTMLElement; showActivity?: boolean }): OverlayController;
@@ -223,7 +223,7 @@ undecorated — prefixes and truncation belong to the renderer. See
 
 ---
 
-## `@tv-ai-agent/skills-example`
+## `@hearthkit/skills-example`
 
 ```ts
 createWeatherTool(opts?: { fetchImpl?: typeof fetch; timeoutMs?: number; language?: string }):
@@ -239,10 +239,10 @@ A worked, keyless example of a portable skill — see [`skills.md`](skills.md).
 Each exports a factory returning a `PlatformProvider`:
 
 ```ts
-createWebAdapter()    // @tv-ai-agent/adapter-web   — in-memory mock (+ Web Speech voice)
-createTizenAdapter()  // @tv-ai-agent/adapter-tizen — tizen.* / webapis.*
-createAospAdapter()   // @tv-ai-agent/adapter-aosp  — WebView TvNativeBridge
-createWebosAdapter()  // @tv-ai-agent/adapter-webos — Luna Service Bus
+createWebAdapter()    // @hearthkit/adapter-web   — in-memory mock (+ Web Speech voice)
+createTizenAdapter()  // @hearthkit/adapter-tizen — tizen.* / webapis.*
+createAospAdapter()   // @hearthkit/adapter-aosp  — WebView TvNativeBridge
+createWebosAdapter()  // @hearthkit/adapter-webos — Luna Service Bus
 ```
 
 See [`docs/extending.md`](extending.md) for adding tools, persistence and new OS

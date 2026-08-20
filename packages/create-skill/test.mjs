@@ -40,14 +40,14 @@ test("names things consistently from one kebab-case argument", () => {
   assert.match(skill, /export function createSleepTimerTool/);
   assert.match(readFileSync(join(root, "src", "index.ts"), "utf8"), /createSleepTimerTool/);
   assert.equal(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).name,
-    "@tv-ai-agent/sleep-timer");
+    "@hearthkit/sleep-timer");
   cleanup(dir);
 });
 
 test("outside a workspace it depends on the published core", () => {
   const { dir } = generate(["my-skill"]);
   const pkg = JSON.parse(readFileSync(join(dir, "my-skill", "package.json"), "utf8"));
-  assert.match(pkg.dependencies["@tv-ai-agent/core"], /^\^\d/);
+  assert.match(pkg.dependencies["@hearthkit/core"], /^\^\d/);
   const ts = JSON.parse(readFileSync(join(dir, "my-skill", "tsconfig.json"), "utf8"));
   assert.ok(!ts.extends, "a standalone package can't extend the monorepo base config");
   assert.ok(!ts.references, "and has nothing to reference");
@@ -59,7 +59,7 @@ test("inside a workspace it lands in packages/ and links by workspace protocol",
   const root = join(dir, "packages", "my-skill");
   assert.ok(existsSync(root), "should generate into packages/");
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  assert.equal(pkg.dependencies["@tv-ai-agent/core"], "workspace:*");
+  assert.equal(pkg.dependencies["@hearthkit/core"], "workspace:*");
   const ts = JSON.parse(readFileSync(join(root, "tsconfig.json"), "utf8"));
   assert.equal(ts.extends, "../../tsconfig.base.json");
   assert.deepEqual(ts.references, [{ path: "../core" }]);

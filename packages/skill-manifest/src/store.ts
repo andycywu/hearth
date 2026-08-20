@@ -1,5 +1,5 @@
-import type { Tool } from "@tv-ai-agent/core";
-import type { KeyValueStore } from "@tv-ai-agent/platform-api";
+import type { Tool } from "@hearthkit/core";
+import type { KeyValueStore } from "@hearthkit/platform-api";
 import { parseManifest, type SkillManifest } from "./schema.js";
 import { createManifestTool, type ManifestToolOptions } from "./tool.js";
 

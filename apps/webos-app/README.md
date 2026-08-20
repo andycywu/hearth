@@ -1,7 +1,7 @@
 # webOS app host
 
 Packages the agent runtime as a webOS web app (`.ipk`) for LG webOS TVs, using
-`@tv-ai-agent/adapter-webos` (Luna Service Bus).
+`@hearthkit/adapter-webos` (Luna Service Bus).
 
 > Experimental — webOS is not a v1 target. This host proves the HAL extends to a
 > third OS with no core changes.

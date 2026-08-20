@@ -1,5 +1,5 @@
-import type { Agent } from "@tv-ai-agent/core";
-import { summarizeOutcome } from "@tv-ai-agent/core";
+import type { Agent } from "@hearthkit/core";
+import { summarizeOutcome } from "@hearthkit/core";
 import { formatToolCall } from "./format.js";
 
 /**

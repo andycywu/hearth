@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/dev-harness",
+  "name": "@hearthkit/dev-harness",
   "version": "0.1.0",
   "private": true,
   "description": "Browser dev harness — run the agent end-to-end with the web/mock adapter, the UI overlay and an offline scripted brain. No TV, no API key required.",
@@ -8,13 +8,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@tv-ai-agent/core": "workspace:*",
-    "@tv-ai-agent/adapter-web": "workspace:*",
-    "@tv-ai-agent/ui": "workspace:*",
-    "@tv-ai-agent/llm-connectors": "workspace:*",
-    "@tv-ai-agent/skills-example": "workspace:*",
-    "@tv-ai-agent/perception-mock": "workspace:*",
-    "@tv-ai-agent/skill-manifest": "workspace:*"
+    "@hearthkit/core": "workspace:*",
+    "@hearthkit/adapter-web": "workspace:*",
+    "@hearthkit/ui": "workspace:*",
+    "@hearthkit/llm-connectors": "workspace:*",
+    "@hearthkit/skills-example": "workspace:*",
+    "@hearthkit/perception-mock": "workspace:*",
+    "@hearthkit/skill-manifest": "workspace:*"
   },
   "license": "Apache-2.0"
 }

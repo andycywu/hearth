@@ -1,13 +1,13 @@
 import Blits from "@lightningjs/blits";
-import { Agent } from "@tv-ai-agent/core";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
-import { createScriptedClient } from "@tv-ai-agent/llm-connectors";
-import { createAgentViewModel, truncate } from "@tv-ai-agent/ui";
+import { Agent } from "@hearthkit/core";
+import { createWebAdapter } from "@hearthkit/adapter-web";
+import { createScriptedClient } from "@hearthkit/llm-connectors";
+import { createAgentViewModel, truncate } from "@hearthkit/ui";
 
 /**
  * Lightning 3 / Blits (WebGL) UI for the agent. Everything renders on the GPU
  * canvas — the production path for low-end MTK/NVT GPUs. Crucially, it consumes
- * the SAME `createAgentViewModel` from `@tv-ai-agent/ui` as the DOM overlay and
+ * the SAME `createAgentViewModel` from `@hearthkit/ui` as the DOM overlay and
  * the 2D-canvas renderer: only the view layer changed.
  *
  * A short scripted sequence runs on boot so the demo visibly streams into the

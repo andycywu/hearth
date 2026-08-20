@@ -1,4 +1,4 @@
-import type { Agent } from "@tv-ai-agent/core";
+import type { Agent } from "@hearthkit/core";
 import { truncate } from "./format.js";
 import { wrapLines } from "./wrap.js";
 import { createAgentViewModel, type AgentPhase, type AgentViewState } from "./view-model.js";

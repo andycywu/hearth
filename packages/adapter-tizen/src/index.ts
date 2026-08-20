@@ -4,7 +4,7 @@ import {
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey, type KeyValueStore,
-} from "@tv-ai-agent/platform-api";
+} from "@hearthkit/platform-api";
 
 /**
  * Tizen adapter. On Samsung/NVT/MTK Tizen builds the runtime is a packaged web
@@ -238,7 +238,7 @@ function mapTizenSource(_raw: unknown): InputSource { return "tv"; }
  * quietly did nothing on a real TV.
  */
 function tizenKeyValueStore(): KeyValueStore {
-  const fallback = createLocalStorageStore("tv-ai-agent");
+  const fallback = createLocalStorageStore("hearth");
   const preference = safe(() => tizen?.preference) as
     | { setValue(k: string, v: string): void; getValue(k: string): unknown;
         remove(k: string): void; exists(k: string): boolean }

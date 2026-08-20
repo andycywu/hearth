@@ -29,7 +29,7 @@ would come from the voice pipeline or the remote.
 - `createWebAdapter()` + `createScriptedClient()` — same offline stack as the dev
   harness; swap in a device adapter + `createOpenAiCompatibleClient` for real use.
 - The Blits component consumes `createAgentViewModel(agent)` from
-  `@tv-ai-agent/ui` — the very same tested view-model behind `mountAgentOverlay`
+  `@hearthkit/ui` — the very same tested view-model behind `mountAgentOverlay`
   and `mountAgentCanvas` — and maps its state onto Blits reactive properties.
   There is no duplicated event wiring left.
 

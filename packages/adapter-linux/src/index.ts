@@ -3,7 +3,7 @@ import { networkInterfaces } from "node:os";
 import {
   matchAppsByName, hasCapability, TvUnsupportedError,
   type PlatformProvider, type DeviceInfo, type InputSource,
-} from "@tv-ai-agent/platform-api";
+} from "@hearthkit/platform-api";
 import { systemRunner, type Runner } from "./run.js";
 import { detectAudioBackend, noAudio, type AudioBackend } from "./audio.js";
 import { execArgv, listDesktopEntries, type DesktopEntry } from "./apps.js";

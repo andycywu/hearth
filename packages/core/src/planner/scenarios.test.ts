@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import { createWebAdapter } from "@hearthkit/adapter-web";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 import { CapabilityGraph } from "../capabilities/graph.js";
 import {
   createTvCapabilities, createMediaCapabilities, createDevicePowerCapabilities,

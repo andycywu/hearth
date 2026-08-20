@@ -13,11 +13,11 @@ export default defineConfig({
   plugins: [...blitsVitePlugins],
   resolve: {
     alias: {
-      "@tv-ai-agent/core": pkg("core"),
-      "@tv-ai-agent/platform-api": pkg("platform-api"),
-      "@tv-ai-agent/adapter-web": pkg("adapter-web"),
-      "@tv-ai-agent/llm-connectors": pkg("llm-connectors"),
-      "@tv-ai-agent/ui": pkg("ui"),
+      "@hearthkit/core": pkg("core"),
+      "@hearthkit/platform-api": pkg("platform-api"),
+      "@hearthkit/adapter-web": pkg("adapter-web"),
+      "@hearthkit/llm-connectors": pkg("llm-connectors"),
+      "@hearthkit/ui": pkg("ui"),
     },
   },
 });

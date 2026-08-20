@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/adapter-tizen",
+  "name": "@hearthkit/adapter-tizen",
   "version": "0.1.0",
   "description": "Tizen adapter implementing the platform HAL via the Tizen Web Device API (tizen.*).",
   "type": "module",
@@ -11,7 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@tv-ai-agent/platform-api": "workspace:*"
+    "@hearthkit/platform-api": "workspace:*"
   },
   "license": "Apache-2.0"
 }

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { Agent } from "@tv-ai-agent/core";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+import { Agent } from "@hearthkit/core";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 import { createOpenAiCompatibleClient } from "./openai-compatible.js";
 
 /**

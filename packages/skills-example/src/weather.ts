@@ -1,4 +1,4 @@
-import { defineTool, type Tool } from "@tv-ai-agent/core";
+import { defineTool, type Tool } from "@hearthkit/core";
 
 /**
  * A worked example of a **pure-logic / external-service skill**: it answers a

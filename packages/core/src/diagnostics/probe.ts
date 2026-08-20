@@ -1,5 +1,5 @@
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
-import { detectSpeechEngines } from "@tv-ai-agent/platform-api";
+import type { PlatformProvider } from "@hearthkit/platform-api";
+import { detectSpeechEngines } from "@hearthkit/platform-api";
 
 /**
  * On-device capability self-diagnostic.

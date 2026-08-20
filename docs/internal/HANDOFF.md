@@ -81,7 +81,7 @@ notes record what changed and what was deliberately left for later.
   `<queries>`).
 
 - [x] **A2. Promote Blits to a first-class UI renderer.** *Done.* Extracted the
-  duplicated agent-event wiring into `createAgentViewModel` in `@tv-ai-agent/ui`
+  duplicated agent-event wiring into `createAgentViewModel` in `@hearthkit/ui`
   (10 unit tests); the DOM overlay, the 2D canvas and `apps/blits-demo` all
   consume it, so the renderers differ only in `draw`. Blits/Vite stay out of
   `packages/*` — the demo keeps its own install. `npm run build` in the demo is
@@ -96,7 +96,7 @@ notes record what changed and what was deliberately left for later.
   (`ReferenceError` came first).
 
 - [x] **A4. Wire voice + confirm into the device app entries.** *Done.* Added
-  `createConfirmHandler()` / `speakReplies()` to `@tv-ai-agent/ui` (11 tests) and
+  `createConfirmHandler()` / `speakReplies()` to `@hearthkit/ui` (11 tests) and
   wired all three device hosts plus the dev harness to them, so the parity is
   shared code, not three copies. The handler uses `window.confirm` where the
   engine has one and otherwise logs and approves (configurable via `fallback`),

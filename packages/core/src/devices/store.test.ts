@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { createMemoryStore } from "@tv-ai-agent/platform-api";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+import { createMemoryStore } from "@hearthkit/platform-api";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 import { DeviceGraph, runDiscovery } from "./graph.js";
 import { createPlatformSource } from "./platform-source.js";
 import { createStoredSource, forgetDevice, loadDevices, registerDevice, saveDevices } from "./store.js";

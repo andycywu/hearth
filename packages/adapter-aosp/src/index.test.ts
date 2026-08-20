@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertProviderContract } from "@tv-ai-agent/platform-api";
+import { assertProviderContract } from "@hearthkit/platform-api";
 import { createAospAdapter } from "./index.js";
 
 const bridge = (): any => (globalThis as any).TvNativeBridge;

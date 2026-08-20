@@ -1,4 +1,4 @@
-import { defineTool, type Tool } from "@tv-ai-agent/core";
+import { defineTool, type Tool } from "@hearthkit/core";
 import { LIMITS, validateManifest, type SkillManifest } from "./schema.js";
 
 export interface ManifestToolOptions {

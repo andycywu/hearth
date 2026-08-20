@@ -1,5 +1,5 @@
 {
-  "name": "@tv-ai-agent/webos-web",
+  "name": "@hearthkit/webos-web",
   "version": "0.1.0",
   "private": true,
   "description": "webOS (LG) web-app host — bundles the agent runtime into an .ipk for webOS TVs.",
@@ -8,11 +8,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@tv-ai-agent/core": "workspace:*",
-    "@tv-ai-agent/platform-api": "workspace:*",
-    "@tv-ai-agent/adapter-webos": "workspace:*",
-    "@tv-ai-agent/llm-connectors": "workspace:*",
-    "@tv-ai-agent/ui": "workspace:*"
+    "@hearthkit/core": "workspace:*",
+    "@hearthkit/platform-api": "workspace:*",
+    "@hearthkit/adapter-webos": "workspace:*",
+    "@hearthkit/llm-connectors": "workspace:*",
+    "@hearthkit/ui": "workspace:*"
   },
   "license": "Apache-2.0"
 }

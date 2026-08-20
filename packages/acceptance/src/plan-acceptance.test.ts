@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   Agent, DeviceGraph, createManualSource, runDiscovery, matchSkill,
   type PlanOutcome, type StepOutcome,
-} from "@tv-ai-agent/core";
-import { createScriptedClient } from "@tv-ai-agent/llm-connectors";
+} from "@hearthkit/core";
+import { createScriptedClient } from "@hearthkit/llm-connectors";
 import { targets, type Target } from "./mocks.js";
 
 /**

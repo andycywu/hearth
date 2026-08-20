@@ -4,7 +4,7 @@ import {
   matchAppsByName,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey, type VoicePipeline,
-} from "@tv-ai-agent/platform-api";
+} from "@hearthkit/platform-api";
 
 /**
  * AOSP / Android TV adapter. The runtime web bundle is hosted inside an Android

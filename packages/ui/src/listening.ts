@@ -1,4 +1,4 @@
-import type { VoicePipeline } from "@tv-ai-agent/platform-api";
+import type { VoicePipeline } from "@hearthkit/platform-api";
 
 /**
  * "Is the microphone open" — owned in one place.

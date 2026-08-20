@@ -1,4 +1,4 @@
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 import { launchSearch } from "../launch-flags.js";
 import { DeviceGraph, createManualSource, runDiscovery } from "./graph.js";
 import { createPlatformSource } from "./platform-source.js";

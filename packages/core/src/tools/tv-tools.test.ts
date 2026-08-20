@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createTvTools } from "./tv-tools.js";
 import type { Tool } from "./registry.js";
-import { TvUnsupportedError, type PlatformProvider } from "@tv-ai-agent/platform-api";
+import { TvUnsupportedError, type PlatformProvider } from "@hearthkit/platform-api";
 
 /** Records every HAL call so a tool can be checked against the platform. */
 interface Calls {

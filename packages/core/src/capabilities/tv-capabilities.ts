@@ -1,4 +1,4 @@
-import type { InputSource, RemoteKey } from "@tv-ai-agent/platform-api";
+import type { InputSource, RemoteKey } from "@hearthkit/platform-api";
 import { W } from "../world/state.js";
 import type { Capability } from "./types.js";
 

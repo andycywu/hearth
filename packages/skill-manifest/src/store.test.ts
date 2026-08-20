@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createMemoryStore } from "@tv-ai-agent/platform-api";
+import { createMemoryStore } from "@hearthkit/platform-api";
 import {
   installManifest, uninstallManifest, listInstalledManifests, loadInstalledSkills, MAX_INSTALLED,
 } from "./store.js";

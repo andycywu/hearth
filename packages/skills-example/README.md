@@ -1,4 +1,4 @@
-# @tv-ai-agent/skills-example
+# @hearthkit/skills-example
 
 A worked example of a **cross-vendor skill**: `get_weather`, backed by the keyless
 [Open-Meteo](https://open-meteo.com) API. It needs no HAL capability and no vendor
@@ -7,8 +7,8 @@ the portability argument in [`docs/skills.md`](../../docs/skills.md), made
 concrete.
 
 ```ts
-import { Agent } from "@tv-ai-agent/core";
-import { createWeatherTool } from "@tv-ai-agent/skills-example";
+import { Agent } from "@hearthkit/core";
+import { createWeatherTool } from "@hearthkit/skills-example";
 
 const agent = new Agent({ platform, llm, tools: [createWeatherTool()] });
 await agent.run("what's the weather in Taipei?");

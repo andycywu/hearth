@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import type { VoicePipeline } from "@tv-ai-agent/platform-api";
+import type { VoicePipeline } from "@hearthkit/platform-api";
 import { createListeningState } from "./listening.js";
 
 /**

@@ -1,4 +1,4 @@
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 import type { DeviceObservation, DiscoverySource } from "./types.js";
 
 /**

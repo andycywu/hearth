@@ -1,7 +1,7 @@
 # AOSP / Android TV host
 
 An Android app that hosts the web-based agent runtime in a `WebView` and exposes
-the native `TvNativeBridge` consumed by `@tv-ai-agent/adapter-aosp`.
+the native `TvNativeBridge` consumed by `@hearthkit/adapter-aosp`.
 
 ## Build
 

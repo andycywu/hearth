@@ -1,4 +1,4 @@
-import type { PlatformProvider, InputSource, RemoteKey } from "@tv-ai-agent/platform-api";
+import type { PlatformProvider, InputSource, RemoteKey } from "@hearthkit/platform-api";
 import type { Capability } from "../capabilities/types.js";
 import {
   createTvCapabilities, createMediaCapabilities,

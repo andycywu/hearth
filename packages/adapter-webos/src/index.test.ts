@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertProviderContract } from "@tv-ai-agent/platform-api";
+import { assertProviderContract } from "@hearthkit/platform-api";
 import { createWebosAdapter } from "./index.js";
 
 /** Minimal stand-in for the webOS Luna Service Bus + system globals. */
@@ -131,13 +131,13 @@ describe("a page with no webOSTV.js", () => {
   it("calls a method the build doesn't have `unsupported`, not `failed`", async () => {
     // The bridge reports service errors in the payload rather than throwing, so
     // without this an unknown method looked like success with undefined fields.
-    const { isTvUnsupported } = await import("@tv-ai-agent/platform-api");
+    const { isTvUnsupported } = await import("@hearthkit/platform-api");
     await expect(createWebosAdapter().system.getVolume()).rejects.toSatisfy(isTvUnsupported);
   });
 
   it("says so plainly when there is no bridge at all", async () => {
     delete (globalThis as any).WebOSServiceBridge;
-    const { isTvUnsupported } = await import("@tv-ai-agent/platform-api");
+    const { isTvUnsupported } = await import("@hearthkit/platform-api");
     await expect(createWebosAdapter().network.isOnline()).rejects.toSatisfy(isTvUnsupported);
   });
 });

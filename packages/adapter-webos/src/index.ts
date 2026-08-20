@@ -4,7 +4,7 @@ import {
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
   type InputSource, type RemoteKey,
-} from "@tv-ai-agent/platform-api";
+} from "@hearthkit/platform-api";
 
 /**
  * Experimental webOS (LG) adapter. On webOS the runtime is a web app that talks
@@ -139,7 +139,7 @@ export function createWebosAdapter(): PlatformProvider {
 
   // webOS web apps get a normal localStorage; a bare Map here meant
   // `persistKey` silently lost the conversation on every restart.
-  const kv = createLocalStorageStore("tv-ai-agent");
+  const kv = createLocalStorageStore("hearth");
 
   const provider: PlatformProvider = {
     device,

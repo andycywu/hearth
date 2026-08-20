@@ -1,11 +1,11 @@
-import { Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl} from "@tv-ai-agent/core";
-import { createWebosAdapter } from "@tv-ai-agent/adapter-webos";
-import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@tv-ai-agent/llm-connectors";
+import { Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl} from "@hearthkit/core";
+import { createWebosAdapter } from "@hearthkit/adapter-webos";
+import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
   keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
-} from "@tv-ai-agent/ui";
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+} from "@hearthkit/ui";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 
 declare global {
   interface Window {

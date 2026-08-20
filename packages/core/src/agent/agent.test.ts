@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { Agent } from "./agent.js";
 import { defineTool } from "../tools/registry.js";
 import { PolicyEngine, defaultRules, parentalRules } from "../policy/policy.js";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 import type { LlmClient, CompletionResult } from "../llm/client.js";
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
-import { TvUnsupportedError } from "@tv-ai-agent/platform-api";
+import type { PlatformProvider } from "@hearthkit/platform-api";
+import { TvUnsupportedError } from "@hearthkit/platform-api";
 
 const finalLlm: LlmClient = {
   id: "echo",

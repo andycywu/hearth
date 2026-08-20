@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { runDiagnostics, reportToMarkdown, type DiagnosticsReport } from "./probe.js";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 
 const status = (r: DiagnosticsReport, capability: string): string | undefined =>
   r.results.find((x) => x.capability === capability)?.status;

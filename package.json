@@ -1,8 +1,8 @@
 {
-  "name": "tv-ai-agent",
+  "name": "hearthkit",
   "version": "0.1.0",
   "private": true,
-  "description": "On-device AI Agent runtime (Harness) for Smart TV platforms — cross-OS (AOSP / Tizen) and cross-SoC (MediaTek / Novatek).",
+  "description": "Hearth — an AI agent runtime for smart TVs and living-room devices. Cross-OS, verified, and it never claims to have done something it didn't.",
   "license": "Apache-2.0",
   "packageManager": "pnpm@9.12.0",
   "engines": {
@@ -16,11 +16,11 @@
     "apps/dev-harness"
   ],
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/*\" run build && pnpm --filter @tv-ai-agent/cli run build",
+    "build": "pnpm -r --filter \"./packages/*\" run build && pnpm --filter @hearthkit/cli run build",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "lint": "eslint .",
-    "dev:web": "pnpm --filter @tv-ai-agent/adapter-web run dev",
+    "dev:web": "pnpm --filter @hearthkit/adapter-web run dev",
     "bundle:tizen": "pnpm build && node tools/bundle.mjs tizen",
     "bundle:aosp": "pnpm build && node tools/bundle.mjs aosp",
     "bundle:all": "pnpm build && node tools/bundle.mjs tizen && node tools/bundle.mjs aosp",

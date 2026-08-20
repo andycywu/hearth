@@ -12,12 +12,12 @@
  */
 import { createInterface as createPromptInterface } from "node:readline/promises";
 import { stdin, stdout, stderr, argv, env, exit } from "node:process";
-import { Agent } from "@tv-ai-agent/core";
-import { createWebAdapter } from "@tv-ai-agent/adapter-web";
+import { Agent } from "@hearthkit/core";
+import { createWebAdapter } from "@hearthkit/adapter-web";
 import {
   createOpenAiCompatibleClient, createScriptedClient,
-} from "@tv-ai-agent/llm-connectors";
-import type { PlatformProvider } from "@tv-ai-agent/platform-api";
+} from "@hearthkit/llm-connectors";
+import type { PlatformProvider } from "@hearthkit/platform-api";
 import { parseArgs, HELP, type CliOptions } from "./args.js";
 import { readLines } from "./terminal.js";
 
@@ -28,9 +28,9 @@ async function main(): Promise<number> {
 
   if (opts.help) { stdout.write(HELP); return 0; }
   if (opts.version) { stdout.write(`${VERSION}\n`); return 0; }
-  for (const problem of opts.errors) stderr.write(`tv-agent: ${problem}\n`);
+  for (const problem of opts.errors) stderr.write(`hearth: ${problem}\n`);
   if (opts.errors.length) { stderr.write("try --help\n"); return 2; }
-  for (const warning of opts.warnings) stderr.write(`tv-agent: ${warning}\n`);
+  for (const warning of opts.warnings) stderr.write(`hearth: ${warning}\n`);
 
   const platform = await openPlatform(opts.platform);
   const agent = new Agent({
@@ -50,7 +50,7 @@ async function main(): Promise<number> {
   // "I can set volume" and being able to.
   const capabilities = await agent.probeCapabilities();
   if (!opts.quiet && !opts.json) {
-    for (const note of capabilities.notes) stderr.write(`tv-agent: ${note}
+    for (const note of capabilities.notes) stderr.write(`hearth: ${note}
 `);
   }
 
@@ -76,7 +76,7 @@ async function main(): Promise<number> {
       failures++;
       const message = err instanceof Error ? err.message : String(err);
       if (opts.json) stdout.write(JSON.stringify({ ok: false, input: command, error: message }) + "\n");
-      else stderr.write(`tv-agent: ${message}\n`);
+      else stderr.write(`hearth: ${message}\n`);
     }
   }
   // A non-zero exit for a failed turn, so this composes in a shell script.
@@ -94,7 +94,7 @@ function confirmer(opts: CliOptions): (req: { name: string; args: Record<string,
   return async (req) => {
     if (opts.yes) return true;
     if (stdin.isTTY !== true) {
-      stderr.write(`tv-agent: ${req.name} needs confirmation; re-run with --yes\n`);
+      stderr.write(`hearth: ${req.name} needs confirmation; re-run with --yes\n`);
       return false;
     }
     // The promise flavour: the callback `readline` has no awaitable question().
@@ -115,7 +115,7 @@ async function openPlatform(name: CliOptions["platform"]): Promise<PlatformProvi
     // Deliberately a clear error rather than a silent fall back to the mock:
     // "it ran and did nothing to my TV" is a much worse afternoon than "that
     // adapter isn't here yet".
-    const { createLinuxAdapter } = await import("@tv-ai-agent/adapter-linux");
+    const { createLinuxAdapter } = await import("@hearthkit/adapter-linux");
     const platform = createLinuxAdapter();
     await platform.init();
     return platform;
@@ -134,6 +134,6 @@ function compactArgs(args: unknown): string {
 }
 
 main().then(exit, (err: unknown) => {
-  stderr.write(`tv-agent: ${err instanceof Error ? err.message : String(err)}\n`);
+  stderr.write(`hearth: ${err instanceof Error ? err.message : String(err)}\n`);
   exit(1);
 });

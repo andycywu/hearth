@@ -31,7 +31,7 @@ const DEFAULT_MODEL = "local-tv-agent";
  * Parse argv (without `node` and the script path) and the environment.
  *
  * Flags beat environment variables, which beat defaults — the usual order, and
- * the one that makes `TV_AGENT_LLM=… tv-agent --llm other` do what it looks like.
+ * the one that makes `TV_AGENT_LLM=… hearth --llm other` do what it looks like.
  *
  * The API key is the exception: it is read **only** from the environment. On a
  * shared machine `ps` shows every process's arguments, so a key passed as a flag
@@ -121,11 +121,11 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   return opts;
 }
 
-export const HELP = `tv-agent — the TV agent, in a terminal
+export const HELP = `hearth — the TV agent, in a terminal
 
 USAGE
-  tv-agent [options] [command ...]     run each command, then exit
-  tv-agent [options]                   interactive; one command per line
+  hearth [options] [command ...]     run each command, then exit
+  hearth [options]                   interactive; one command per line
 
 OPTIONS
   --platform mock|linux   which TV to drive (default: mock, or $TV_PLATFORM)
@@ -142,13 +142,13 @@ ENVIRONMENT
                           visible to every user on the machine.
 
 NOTES
-  Replies go to stdout, the tool trace to stderr, so \`tv-agent "…" | …\` pipes
+  Replies go to stdout, the tool trace to stderr, so \`hearth "…" | …\` pipes
   the answer alone. With no --llm the built-in offline brain answers, which
   understands a handful of commands and needs no network.
 
 EXAMPLES
-  tv-agent "set volume to 30"
-  tv-agent --platform linux "mute"
-  TV_AGENT_LLM=http://127.0.0.1:11434/v1 TV_AGENT_MODEL=llama3.2 tv-agent
-  echo "what's the volume?" | tv-agent --json --yes
+  hearth "set volume to 30"
+  hearth --platform linux "mute"
+  TV_AGENT_LLM=http://127.0.0.1:11434/v1 TV_AGENT_MODEL=llama3.2 hearth
+  echo "what's the volume?" | hearth --json --yes
 `;

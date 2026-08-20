@@ -15,7 +15,7 @@ import { stdin, stderr } from "node:process";
  * readline can only offer those when it can draw. This shipped broken, and it is
  * the kind of thing that looks fine in every non-interactive test.
  *
- * stderr rather than stdout: the reply goes to stdout so `tv-agent … | …` pipes
+ * stderr rather than stdout: the reply goes to stdout so `hearth … | …` pipes
  * the answer alone, and neither the prompt nor the user's own keystrokes belong
  * in that. Omitted entirely for a pipe, so nothing extra is written at all.
  */
@@ -37,11 +37,11 @@ export function stripBom(line: string): string {
  * Lines from stdin, one command each.
  *
  * The banner and prompt go to stderr only when stdin is a terminal: `echo … |
- * tv-agent` should emit the answer and nothing else.
+ * hearth` should emit the answer and nothing else.
  */
 export async function* readLines(): AsyncGenerator<string> {
   const interactive = stdin.isTTY === true;
-  if (interactive) stderr.write("tv-agent — type a command, or Ctrl-D to leave\n");
+  if (interactive) stderr.write("hearth — type a command, or Ctrl-D to leave\n");
 
   const rl = createInterface(readlineOptions(interactive));
   if (interactive) rl.prompt();

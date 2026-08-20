@@ -1,6 +1,6 @@
 import type {
   LlmClient, CompletionRequest, CompletionResult, ChatMessage, ToolCall, StreamHandlers,
-} from "@tv-ai-agent/core";
+} from "@hearthkit/core";
 
 /**
  * A deterministic, offline "brain" that maps a handful of natural-language
