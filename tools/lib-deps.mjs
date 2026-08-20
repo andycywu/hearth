@@ -49,5 +49,5 @@ export function collectDependencies() {
 
 // Skip our own workspace packages — they are Apache-2.0 by definition.
 function isWorkspaceExternal(name) {
-  return !name.startsWith("@tv-ai-agent/");
+  return !name.startsWith("@hearthkit/");
 }

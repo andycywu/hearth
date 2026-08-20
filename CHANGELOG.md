@@ -353,7 +353,7 @@ The device hosts run offline:
 
 Skills as data:
 
-- **`@tv-ai-agent/skill-manifest`** — a skill can now be a JSON document the
+- **`@hearthkit/skill-manifest`** — a skill can now be a JSON document the
   runtime interprets rather than TypeScript it loads: a schema the model chooses
   on, one HTTP request whose `{placeholders}` come from validated arguments, and
   paths that reduce the response. That keeps the app's "no remote code" property
@@ -450,7 +450,7 @@ Device bring-up (Phase 2 tooling):
 - Gradle wrapper (8.7) for `apps/aosp-app` so the Android host builds with one
   command; the debug APK now compiles against the Android SDK.
 - Shared, DOM-free **agent view-model** (`createAgentViewModel`) in
-  `@tv-ai-agent/ui` — one tested reducer over the agent events, consumed by all
+  `@hearthkit/ui` — one tested reducer over the agent events, consumed by all
   three renderers (DOM overlay, 2D canvas, Blits WebGL), so a new view layer only
   implements `draw`. Blits is now a first-class renderer without adding Vite or
   Blits to `packages/*`.
@@ -473,7 +473,7 @@ Device bring-up (Phase 2 tooling):
 - The offline scripted brain is now capability-aware: it reads the registered
   tool list and only proposes a custom skill's tool when the host registered it,
   so `?skills=weather` works with no model at all.
-- `createConfirmHandler()` and `speakReplies()` in `@tv-ai-agent/ui`, and all
+- `createConfirmHandler()` and `speakReplies()` in `@hearthkit/ui`, and all
   three device hosts (Tizen / AOSP / webOS) now use them: high-impact tools are
   gated before they fire on a real TV, and replies are spoken where the platform
   advertises voice. The dev harness uses the same two helpers, so "parity with
@@ -591,7 +591,7 @@ The core as it stood on 2026-07-27, before device bring-up.
 
 - Portable agent core ("the Harness"): agent loop, tool registry, LLM
   abstraction, rolling memory, typed event bus.
-- Platform HAL (`@tv-ai-agent/platform-api`) with adapters for Tizen, AOSP
+- Platform HAL (`@hearthkit/platform-api`) with adapters for Tizen, AOSP
   (WebView native bridge) and web/mock, verified by a shared contract test.
 - Tool set: volume, mute, input source, list/search/launch apps, key navigation,
   media transport (auto-registered when `has("media")`).

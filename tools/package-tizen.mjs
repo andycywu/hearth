@@ -114,7 +114,7 @@ if (!existsSync(join(appDir, "icon.png"))) {
  * worst failure mode available. Verified on the TV 10.0 emulator by putting the
  * flag source on screen: it read `flags:none`.
  *
- * So write them as a script instead. `launchSearch()` in @tv-ai-agent/core reads
+ * So write them as a script instead. `launchSearch()` in @hearthkit/core reads
  * `__AGENT_FLAGS__` whenever there's no real query string, so a browser or an
  * `adb`-launched intent still wins over what was baked.
  */
