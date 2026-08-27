@@ -78,6 +78,9 @@ importers:
       '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
+      '@hearthkit/modelpilot':
+        specifier: workspace:*
+        version: link:../../packages/modelpilot
       '@hearthkit/perception-mock':
         specifier: workspace:*
         version: link:../../packages/perception-mock
@@ -224,6 +227,19 @@ importers:
       '@hearthkit/adapter-web':
         specifier: workspace:*
         version: link:../adapter-web
+
+  packages/modelpilot:
+    dependencies:
+      '@hearthkit/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@hearthkit/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
+      '@hearthkit/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
 
   packages/perception-mock:
     dependencies:

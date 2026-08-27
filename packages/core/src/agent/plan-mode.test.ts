@@ -234,7 +234,10 @@ describe("plan mode — the long tail", () => {
     const outcome = await agent.pursueIntent("make it cinematic");
     expect(outcome?.outcomes).toEqual([]);
     expect(outcome?.plan.rejections?.map((r) => r.capabilityId)).toEqual(["tv.display.enable_hdr", "door.unlock"]);
-    // The user hears something specific rather than a shrug.
-    expect(agent.describe(outcome!)).toMatch(/can't do that on this TV|Nothing to do/);
+    // The user hears which capability was refused, rather than a shrug — and
+    // `achieved` is false, because a plan whose every step was thrown out did not
+    // achieve anything even when the goal had nothing measurable in it.
+    expect(outcome?.achieved).toBe(false);
+    expect(agent.describe(outcome!)).toMatch(/no such capability on this device/);
   });
 });

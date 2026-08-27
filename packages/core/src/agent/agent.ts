@@ -76,15 +76,26 @@ export interface AgentOptions {
    */
   unattended?: boolean;
   /**
-   * Let the model plan when the deterministic planner has nothing to offer.
+   * Allow a non-deterministic planner at all.
    *
-   * Off by default. The deterministic planner always goes first: for a goal it
-   * can measure, it is faster, free, offline and predictable, and there is no
-   * argument for asking a model to re-derive an answer we can compute. This is
-   * for the long tail — the goals nobody wrote a skill for — and everything the
-   * model proposes is validated against the Capability Graph before it runs.
+   * Off by default. Without a `planner` of its own this turns on the built-in
+   * LLM planner for the long tail — the goals the deterministic planner cannot
+   * measure — and everything it proposes is validated against the Capability
+   * Graph before it runs. With a `planner`, this is the switch that lets that
+   * planner be consulted.
    */
   llmPlanning?: boolean;
+  /**
+   * Who plans when the deterministic planner cannot.
+   *
+   * Defaults to the built-in LLM planner. The seam exists so a different
+   * decision engine — `@hearthkit/modelpilot`, say — can take that job without
+   * the agent learning anything about it: whatever this returns is still a
+   * `Plan`, still checked against the Capability Graph, still gated by policy,
+   * and still verified locally step by step. Only consulted when
+   * `llmPlanning` is on.
+   */
+  planner?: Planner;
 }
 
 export interface ConfirmRequest {
@@ -394,6 +405,16 @@ export class Agent {
    * measurable desired state, or one whose predicates nothing here can produce.
    */
   private async buildPlan(goal: Goal): Promise<Plan> {
+    // An injected planner owns the whole decision rather than being a fallback.
+    //
+    // A decision engine running in shadow mode has to see the goals the
+    // deterministic planner *can* close, because comparing the two is the entire
+    // point of shadow — and an engine that only ever saw the leftovers would be
+    // evaluated on the hardest cases and none of the easy ones. Deterministic
+    // first is then that planner's decision to make, with the local planner
+    // handed to it for exactly that purpose.
+    if (this.opts.planner && this.opts.llmPlanning) return this.opts.planner.plan(goal);
+
     const direct = await new GoalPlanner({ graph: this.capabilities, world: this.world }).plan(goal);
     if (direct.steps.length || !this.opts.llmPlanning) return direct;
 

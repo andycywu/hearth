@@ -28,6 +28,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`registerDevice` / `saveDevices` / `forgetDevice`), a `platform` discovery
   source reports what the TV itself can see, and `?devices` prints the tree with
   its confidence and sources visible. Power state deliberately does not persist.
+- **ModelPilot integration, first stage** (`packages/modelpilot`). Planning and
+  reasoning can go to the ModelPilot execution decision engine; device control
+  does not. It plugs in as a third `Planner` behind the existing seam, so the
+  tool layer, the HAL and every adapter are untouched, and a returned plan is
+  rebuilt through the local Capability Graph — preconditions, verification and
+  fallbacks come from the television, never from the answer. Three modes
+  (`off` / `shadow` / `enforce`, default `shadow`, forced `off` with no API key),
+  an allowlist-based room-state minimiser, typed errors with an explicit fallback
+  policy, and telemetry that structurally cannot carry a key, a prompt or a room.
+  See [modelpilot-integration.md](docs/modelpilot-integration.md) and
+  [ADR-0004](docs/adr/0004-modelpilot-boundary.md).
 - **A perception path with no camera in it.** `PerceptionManager` gates sensors:
   nothing starts without a policy grant, every event is stripped of raw capture
   and identity fields (frames, data URLs, transcripts, face embeddings) before it

@@ -1,6 +1,6 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, summarizeOutcome,
-  discoverRoom, deviceTreeText,
+  discoverRoom, deviceTreeText, CapabilityGraph, WorldModel, capabilitiesForPlatform,
   type LlmClient,
 } from "@hearthkit/core";
 import { createWebAdapter } from "@hearthkit/adapter-web";
@@ -13,16 +13,33 @@ import {
 } from "@hearthkit/llm-connectors";
 import { createWeatherTool } from "@hearthkit/skills-example";
 import { createScriptedSource, occupancyScript } from "@hearthkit/perception-mock";
+import {
+  createModelPilotClient, createModelPilotPlanner, resolveModelPilotConfig, offReason,
+} from "@hearthkit/modelpilot";
 import { loadBundledSkills, loadInstalledSkills } from "@hearthkit/skill-manifest";
 import weatherManifest from "@hearthkit/skill-manifest/examples/open-meteo-weather.json";
 import type { Tool } from "@hearthkit/core";
 
 declare global {
   interface Window {
+    __MODELPILOT_API_KEY__?: string;
+    __MODELPILOT_BASE_URL__?: string;
     __AGENT_LLM_BASE_URL__?: string;
     __AGENT_LLM_MODEL__?: string;
     __AGENT_LLM_API_KEY__?: string;
   }
+}
+
+/**
+ * The capability graph a planner reasons over, built the same way the agent
+ * builds its own. Two graphs is a smell — the agent owns the authoritative one
+ * and withdraws from it — so this is only for wiring a planner that has to exist
+ * *before* the agent does.
+ */
+function capabilityGraphFor(platform: Parameters<typeof capabilitiesForPlatform>[0]): CapabilityGraph {
+  const graph = new CapabilityGraph();
+  graph.registerAll(capabilitiesForPlatform(platform));
+  return graph;
 }
 
 async function boot(): Promise<void> {
@@ -101,11 +118,53 @@ async function boot(): Promise<void> {
     return;
   }
 
+  // One world, shared by the agent and by whatever plans for it: a planner that
+  // reasoned about a different room than the executor acts on would be a bug
+  // nobody could see.
+  const sharedWorld = new WorldModel();
+
+  // ModelPilot, when a key has been configured. Off otherwise — a television
+  // that quietly tries to reach a cloud endpoint it has no credential for is
+  // both noisy and wrong, so configuring the key is the act that opts in.
+  //
+  // `?modelpilot=shadow|enforce|off` picks the mode without a rebuild. The key
+  // is never read from the URL: set `window.__MODELPILOT_API_KEY__` before the
+  // bundle loads, which for the dev harness means a line in the console or in
+  // index.html.
+  const mpConfig = resolveModelPilotConfig({
+    search: launchSearch(),
+    globals: window as unknown as Record<string, unknown>,
+  });
+  const planner = mpConfig.apiKey
+    ? createModelPilotPlanner({
+        client: createModelPilotClient({
+          baseUrl: mpConfig.baseUrl,
+          apiKey: mpConfig.apiKey,
+          timeoutMs: mpConfig.timeoutMs,
+        }),
+        mode: mpConfig.mode,
+        graph: capabilityGraphFor(platform),
+        world: sharedWorld,
+        devices,
+        maxTaskBudget: mpConfig.maxTaskBudget,
+        // Telemetry to the console here; a device host would persist it. Never
+        // the key, never the prompt, never the room state — the record type and
+        // `sanitizeTelemetry` both see to that.
+        telemetry: (record) => console.info("[modelpilot]", JSON.stringify(record)),
+      })
+    : undefined;
+  console.info(
+    `[modelpilot] mode=${mpConfig.mode} (${mpConfig.source})`
+    + (planner ? ` endpoint=${mpConfig.baseUrl}` : ` — ${offReason({ search: launchSearch(), globals: window as unknown as Record<string, unknown> }) ?? "off"}`),
+  );
+
   const agent = new Agent({
     platform,
     llm,
     tools: skills,
     devices,
+    world: sharedWorld,
+    ...(planner ? { planner, llmPlanning: true } : {}),
     // `?plan=llm` lets the model plan the goals no skill covers. Off by default:
     // the deterministic planner is faster, offline and predictable, and it goes
     // first either way.

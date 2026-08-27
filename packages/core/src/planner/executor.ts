@@ -47,6 +47,25 @@ export class PlanExecutor {
   constructor(private readonly opts: PlanExecutorOptions) {}
 
   async run(plan: Plan, signal?: AbortSignal): Promise<PlanOutcome> {
+    // A plan that proposed steps and had all of them thrown out did not achieve
+    // anything, whatever the goal's predicates say.
+    //
+    // Found by running the ModelPilot integration against a mock that answered
+    // `unverified`: the device was correctly left alone, and the outcome still
+    // read `achieved: true` with "nothing to do — it was already how you wanted
+    // it", because a free-form goal has no measurable desired state to be short
+    // of. Reporting a refusal as success is exactly the class of lie the rest of
+    // this design exists to prevent.
+    if (!plan.steps.length && plan.rejections?.length) {
+      return {
+        plan,
+        outcomes: [],
+        achieved: false,
+        unmet: remainingGap(this.opts.world, plan.goal),
+        blocked: plan.rejections.map((r) => r.reason).join("; "),
+      };
+    }
+
     const outcomes: StepOutcome[] = [];
     for (const step of plan.steps) {
       if (signal?.aborted) break;
