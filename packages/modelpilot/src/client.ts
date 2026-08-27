@@ -47,6 +47,16 @@ export interface ModelPilotClientOptions {
   fetchImpl?: typeof fetch;
   /** Override when the service's paths differ from the documented ones. */
   paths?: Partial<typeof DEFAULT_PATHS>;
+  /**
+   * Who is calling, for the backend to count installs and usage.
+   *
+   * Pseudonymous and device-generated (`loadInstallId`), never a hardware
+   * identifier. It rides on calls that were happening anyway rather than on a
+   * separate analytics channel, which is why `MODELPILOT_MODE=off` means no
+   * signal at all: the runtime is offline by default and stays that way unless a
+   * host configures a credential.
+   */
+  identity?: { installId?: string; runtimeVersion?: string; mode?: string };
   now?: () => number;
 }
 
@@ -104,6 +114,12 @@ export function createModelPilotClient(opts: ModelPilotClientOptions): ModelPilo
           // The one place the credential appears.
           authorization: `Bearer ${opts.apiKey}`,
           ...(body !== undefined ? { "content-type": "application/json" } : {}),
+          // Attribution, so the service can answer "how many televisions, how
+          // often, on which version" without a second endpoint and without
+          // anything that identifies hardware or a household.
+          ...(opts.identity?.installId ? { "x-hearth-install": opts.identity.installId } : {}),
+          ...(opts.identity?.runtimeVersion ? { "x-hearth-runtime": opts.identity.runtimeVersion } : {}),
+          ...(opts.identity?.mode ? { "x-hearth-mode": opts.identity.mode } : {}),
         },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
         ...(controller ? { signal: controller.signal } : {}),

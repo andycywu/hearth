@@ -86,7 +86,11 @@ Saying so up front saves everyone an argument:
   already. Content is a tool provider here, never core logic.
 - **Closed vendor SDK blobs**, or an adapter that cannot be built from source.
 - **Telemetry, analytics, or anything that phones home.** The runtime makes no
-  network call the host did not configure.
+  network call the host did not configure. ModelPilot calls *are* host-configured
+  and carry a pseudonymous, resettable install id so the service can count usage —
+  that is the only egress, there is no analytics endpoint, no hardware
+  identifiers, and in `off` mode nothing is sent at all. See
+  [service-metrics.md](docs/service-metrics.md).
 - **Raw camera frames, audio, transcripts or face data crossing the perception
   boundary** — no matter how useful the feature would be. See
   [policy-and-safety.md](docs/policy-and-safety.md).

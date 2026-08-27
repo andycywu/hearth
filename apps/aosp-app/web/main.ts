@@ -1,6 +1,7 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl,
-  discoverRoom, deviceTreeText,
+  discoverRoom, deviceTreeText, loadInstallId, RUNTIME_VERSION,
+  type PlannerContext,
 } from "@hearthkit/core";
 import { createAospAdapter } from "@hearthkit/adapter-aosp";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
@@ -9,6 +10,9 @@ import {
   exposeDeviceReport,
   keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
 } from "@hearthkit/ui";
+import {
+  createModelPilotClient, createModelPilotPlanner, resolveModelPilotConfig,
+} from "@hearthkit/modelpilot";
 import type { PlatformProvider } from "@hearthkit/platform-api";
 
 declare global {
@@ -81,8 +85,40 @@ async function boot(): Promise<void> {
   // seeds a console on HDMI2 so Scenario B has something to plan for on a
   // device with nothing plugged in — a bring-up aid, like `?confirm=auto`.
   const devices = await discoverRoom(platform);
+  // ModelPilot, when a credential has been configured — and off otherwise, so a
+  // television with no key never reaches for a cloud endpoint. `?modelpilot=shadow`
+  // or `=enforce` picks the mode for one launch without a rebuild; the key is
+  // never read from the URL.
+  //
+  // A factory, so the planner reasons over the agent's own capability graph: the
+  // one the boot probe withdraws from, not a copy that would keep proposing
+  // capabilities this build has already given up on.
+  const mpConfig = resolveModelPilotConfig({
+    search: launchSearch(),
+    globals: window as unknown as Record<string, unknown>,
+  });
+  const installId = await loadInstallId(platform.storage);
+  const modelPilot = mpConfig.apiKey
+    ? (ctx: PlannerContext) => createModelPilotPlanner({
+      client: createModelPilotClient({
+        baseUrl: mpConfig.baseUrl,
+        apiKey: mpConfig.apiKey!,
+        timeoutMs: mpConfig.timeoutMs,
+        identity: { installId, runtimeVersion: RUNTIME_VERSION, mode: mpConfig.mode },
+      }),
+      mode: mpConfig.mode,
+      graph: ctx.capabilities,
+      world: ctx.world,
+      devices: ctx.devices,
+      maxTaskBudget: mpConfig.maxTaskBudget,
+      telemetry: (record: unknown) => console.info("[modelpilot]", JSON.stringify(record)),
+    })
+    : undefined;
+  console.info(`[modelpilot] mode=${mpConfig.mode} (${mpConfig.source})${modelPilot ? ` endpoint=${mpConfig.baseUrl}` : ""}`);
+
   const agent = new Agent({
     platform, llm, confirm, devices,
+    ...(modelPilot ? { planner: modelPilot, llmPlanning: true } : {}),
     ...(turnTimeoutMs ? { turnTimeoutMs } : {}),
   });
   // Ask the device which tools actually work here before anything can ask

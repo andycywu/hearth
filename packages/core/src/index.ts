@@ -27,6 +27,10 @@ export {
   collectDeviceReport, deviceReportToMarkdown, DEFAULT_INTENTS,
   type DeviceReport, type ReportedIntent, type ReportedStep, type CollectOptions,
 } from "./diagnostics/device-report.js";
+export {
+  loadInstallId, resetInstallId, generateInstallId, isPlausibleInstallId,
+  INSTALL_ID_KEY, RUNTIME_VERSION, type InstallIdOptions,
+} from "./identity.js";
 export { ConversationContext } from "./memory/context.js";
 
 // --- Living Room agent runtime (see docs/architecture.md) ---------------------

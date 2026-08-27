@@ -145,6 +145,38 @@ describe("ModelPilotClient", () => {
     ]);
   });
 
+  it("attributes the call to an install, without identifying hardware", async () => {
+    const calls = [];
+    const fetchImpl = (async (_u, init) => {
+      calls.push(init);
+      return new Response(JSON.stringify({ taskId: "t", status: "verified", output: { action: "no_op" } }));
+    }) as unknown as typeof fetch;
+
+    await createModelPilotClient({
+      baseUrl: "https://modelpilot.example", apiKey: KEY, fetchImpl,
+      identity: { installId: "hth_0123456789abcdef0123456789abcdef", runtimeVersion: "0.1.0", mode: "shadow" },
+    }).executeVerifiedTask(request);
+
+    const headers = calls[0]?.headers as Record<string, string>;
+    // Enough for a backend to count televisions, versions and modes. Nothing
+    // about the household, and no second endpoint to do it through.
+    expect(headers["x-hearth-install"]).toBe("hth_0123456789abcdef0123456789abcdef");
+    expect(headers["x-hearth-runtime"]).toBe("0.1.0");
+    expect(headers["x-hearth-mode"]).toBe("shadow");
+  });
+
+  it("sends no attribution headers when the host configured no identity", async () => {
+    const calls = [];
+    const fetchImpl = (async (_u, init) => {
+      calls.push(init);
+      return new Response(JSON.stringify({ taskId: "t", status: "verified", output: { action: "no_op" } }));
+    }) as unknown as typeof fetch;
+
+    await client(fetchImpl).executeVerifiedTask(request);
+    const headers = calls[0]?.headers as Record<string, string>;
+    expect(headers["x-hearth-install"]).toBeUndefined();
+  });
+
   it("marks a decision call as a decision, without a second guessed endpoint", async () => {
     const bodies: string[] = [];
     const fetchImpl = (async (_u: string, init: RequestInit) => {

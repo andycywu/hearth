@@ -1,0 +1,127 @@
+# Counting televisions without watching living rooms
+
+**The shape:** Hearth is a free, open agent runtime. ModelPilot is the service.
+A service business has to know how many devices use it and how often — that is
+not optional, and it is not surveillance. But the difference between the two is
+one design decision wide, so this page states which side of it each choice is on.
+
+## The rule that makes this work
+
+**The runtime does not phone home. The backend counts what it already receives.**
+
+ModelPilot is the only egress this runtime has, and a host opts into it by
+configuring a credential. So the metric question is answered *server-side*, from
+calls that were happening anyway:
+
+```
+                       nothing is sent
+MODELPILOT_MODE=off ──────────────────────►  (no signal, and that is correct)
+
+MODELPILOT_MODE=shadow|enforce
+      │
+      ▼
+  ModelPilot request
+      ├─ authorization: Bearer …        which customer / OEM
+      ├─ x-hearth-install: hth_…        which installation (random, resettable)
+      ├─ x-hearth-runtime: 0.1.0        which runtime version
+      └─ x-hearth-mode: shadow          which mode
+      │
+      ▼
+  ModelPilot already has: a timestamp, a task id, a trajectory id, a cost
+```
+
+From those, entirely server-side and with no new endpoint:
+
+| Question | How |
+|---|---|
+| How many installs are active? | distinct `x-hearth-install` in a window |
+| How often does one use the service? | calls per install per day |
+| Are they upgrading? | `x-hearth-runtime` distribution |
+| Who is in shadow vs enforce? | `x-hearth-mode` |
+| Which customer or OEM? | the API key the call was made with |
+| What does it cost us per install? | `actual_cost` per install |
+
+**There is no analytics client, no event queue, no second endpoint, and nothing
+to disable** — because there is nothing extra being sent. That is the property
+worth protecting: it is what lets the runtime stay honestly free and offline while
+the service still has a business.
+
+## What the install id is, and is not
+
+`loadInstallId` ([`core/src/identity.ts`](../packages/core/src/identity.ts)):
+
+- **Random, generated on the device, stored locally.** `hth_` plus 16 random
+  bytes.
+- **Not a hardware identifier.** Not the Android ID, not a serial number, not a
+  MAC, not an advertising id. Two identical televisions in the same shop get two
+  different ids, and [a test asserts it](../packages/core/src/identity.test.ts).
+- **Resettable.** `resetInstallId` issues a new one; the old one is gone. A
+  household that wants to be a new installation can be.
+- **Carried only on ModelPilot calls.** No key, no calls, no id.
+- **Replaced if something else is found in its slot** — a stored value that is
+  not one of ours (an Android ID somebody helpfully cached there) is discarded.
+
+Known limitation, stated rather than buried: a device whose storage is
+unavailable gets an **ephemeral** id and counts as a new install every boot. That
+overstates device count. If the numbers ever look implausibly high, this is the
+first thing to check.
+
+## What it cannot tell you
+
+- **Devices that never call.** `off` mode, or a runtime running against a local
+  model with no ModelPilot key, is invisible. For an open-source free runtime that
+  is a feature; for a "how many TVs run Hearth" number it is a hard ceiling. The
+  honest phrasing is **service usage**, never install base.
+- **Anything about a household.** No content, no room state, no occupancy, no
+  transcripts — see [modelpilot-integration.md](modelpilot-integration.md) for the
+  minimisation allowlist and its tests.
+- **One device vs one person.** An install id is a television, and a television is
+  a household.
+
+## Two things to fix before this is a product
+
+**1. "Zero retention" currently contradicts counting.** Every TaskRequest we send
+declares `retentionRequirement: "zero"`. If ModelPilot retains request *metadata*
+— timestamps, install ids, costs — to produce these metrics, then that policy has
+to be scoped explicitly to task **content**, in the request, in ModelPilot's own
+docs, and in whatever an OEM's privacy notice says. As written, the two claims
+cannot both be true, and that is the kind of inconsistency a data-protection
+review finds first.
+
+**2. GDPR basis and retention.** A pseudonymous install id plus usage timestamps
+is personal data under GDPR — pseudonymous is not anonymous — and Titan's market
+is Europe. That needs a stated lawful basis (legitimate interest or contract), a
+retention period for the raw per-call rows (aggregate and drop, rather than keep
+forever), a documented reset path, and a line in the privacy notice the OEM ships.
+None of that is code; all of it is a prerequisite to switching a fleet on.
+
+## What this repo promises, and what changed
+
+`CONTRIBUTING.md` refuses "telemetry, analytics, or anything that phones home".
+That promise stands, and it is now more precise:
+
+> The runtime makes no network call the host did not configure. ModelPilot calls
+> are configured by the host, carry a pseudonymous install id so the service can
+> count usage, and are the only egress. There is no separate analytics endpoint,
+> no hardware identifiers, and in `off` mode nothing is sent at all.
+
+A contribution that added an analytics client, a hardware identifier, or a call
+the host did not configure would still be refused.
+
+## The free-runtime / paid-service split
+
+Worth writing down, because it decides what belongs where:
+
+| | Hearth (free, Apache-2.0) | ModelPilot (the service) |
+|---|---|---|
+| Agent loop, world model, capability graph, device graph | ✅ | — |
+| Planning that a device can do for free | ✅ deterministic, zero tokens | — |
+| Planning that needs model intelligence | optional local model | ✅ the product |
+| Device control, verification | ✅ always local | never |
+| Usage metering, billing, evidence, trajectories | — | ✅ |
+| Fleet policy, quotas, per-OEM configuration | — | ✅ |
+
+The thing to keep on the free side is everything a television needs to work when
+the service is unreachable. That is what makes the runtime worth adopting, and
+adoption is what makes the service worth selling. A runtime that stops working
+without the backend is not a free runtime; it is a demo with a subscription.

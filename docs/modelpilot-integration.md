@@ -143,6 +143,15 @@ details, conversation history, or any world path not on the list.
 `retentionRequirement: zero`, `trainingUse: prohibited`, `toolEgress: denied`,
 `humanReview: allowed`.
 
+## Counting installs
+
+`x-hearth-install`, `x-hearth-runtime` and `x-hearth-mode` ride on requests that
+were already going, so the service can answer "how many televisions, how often, on
+which version" with no analytics endpoint and nothing that identifies hardware.
+The id is random, device-generated and resettable. See
+[service-metrics.md](service-metrics.md) — including the two things that have to
+be settled before a fleet is switched on.
+
 ## Telemetry
 
 One record per call, built from named fields and passed through
