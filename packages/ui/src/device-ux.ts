@@ -5,7 +5,8 @@ import {
 import type { PlatformProvider } from "@hearthkit/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
-import { mountOnScreenKeyboard, remoteIntent } from "./keyboard.js";
+import { mountOnScreenKeyboard } from "./keyboard.js";
+import { remoteIntent } from "./remote-keys.js";
 import { mountMicButton } from "./mic-button.js";
 import { createListeningState } from "./listening.js";
 import { createTvConfirmDialog, type TvConfirmDialog } from "./confirm-dialog.js";
@@ -263,6 +264,7 @@ function askAndForget(ui: Pick<OverlayController, "ask">, text: string): void {
  * when that is.
  */
 export function exposeDeviceReport(agent: Agent, platform: PlatformProvider): void {
+  if (typeof __HEARTH_DIAG__ !== "undefined" && !__HEARTH_DIAG__) return;
   (globalThis as unknown as Record<string, unknown>).__hearthReport =
     async (opts: Record<string, unknown> = {}) => {
       const report = await collectDeviceReport({ agent, platform, ...opts });
@@ -313,7 +315,12 @@ export function mountDeviceShell(
   // the moment there is a real reply, and only the renderer knows when that is.
   const hintText = opts.hint ?? inviteText(Boolean(opts.keyboard), Boolean(voice));
 
-  const ui: DeviceShellController = opts.render === "avatar"
+  // The guard is inline and looks redundant next to `renderOption()`, which
+  // already refuses to return "avatar" in a build without one. It is what
+  // actually removes the 4.9 KB renderer from the bundle: esbuild folds the
+  // branch and drops the import with it. See packages/core/src/features.ts.
+  const ui: DeviceShellController =
+    (typeof __HEARTH_AVATAR__ === "undefined" || __HEARTH_AVATAR__) && opts.render === "avatar"
     // Boolean(), not `=== true`: `keyboard` also takes a layout name, and
     // `?keyboard=phrases` was leaving the avatar at full height with its
     // subtitle behind the keys.
@@ -367,7 +374,7 @@ export function mountDeviceShell(
     : document.getElementById(opts.hintId ?? "hint");
   // A remote-driven keyboard, so a TV is no longer limited to `?ask=` at launch.
   // Opt-in per host because bring-up runs want the screen to themselves.
-  const keyboard = opts.keyboard
+  const keyboard = (typeof __HEARTH_KEYBOARD__ === "undefined" || __HEARTH_KEYBOARD__) && opts.keyboard
     ? mountOnScreenKeyboard({
         onSubmit: (text) => askAndForget(ui, text),
         // Speech goes through the same field, so a transcript can be corrected
@@ -467,6 +474,9 @@ export function mountDeviceShell(
  * plain view is the special case.
  */
 export function renderOption(search = launchSearch()): { render: "overlay" | "avatar" } {
+  // A build without the avatar has one renderer, and saying otherwise would put
+  // `?render=avatar` on screen as an empty page.
+  if (typeof __HEARTH_AVATAR__ !== "undefined" && !__HEARTH_AVATAR__) return { render: "overlay" };
   return { render: /(?:^|[?&])render=overlay(?=[&]|$)/.test(search) ? "overlay" : "avatar" };
 }
 
@@ -501,6 +511,7 @@ export function debugRequested(search = launchSearch()): boolean {
 }
 
 export function keyboardOption(search = launchSearch()): { keyboard?: boolean | string } {
+  if (typeof __HEARTH_KEYBOARD__ !== "undefined" && !__HEARTH_KEYBOARD__) return {};
   // The trailing boundary matters: without it `?keyboardless` would switch the
   // keyboard on, which is the kind of thing nobody notices until it happens.
   const match = /(?:^|[?&])keyboard(?:=([^&]*))?(?=&|$)/.exec(search);
@@ -544,7 +555,9 @@ export async function runStartupCommands(
   const hint = document.getElementById(opts.hintId ?? "hint");
   const show = (text: string): void => { if (hint) hint.textContent = text; };
 
-  const demo = demoFromUrl(opts.search);
+  const demo = (typeof __HEARTH_DEMO__ === "undefined" || __HEARTH_DEMO__)
+    ? demoFromUrl(opts.search)
+    : undefined;
   if (demo) {
     // Same reasoning as `askAndForget`: one bad command must not end the demo
     // loop or raise an unhandled rejection on a TV left running it all day.

@@ -50,7 +50,6 @@ export {
 export {
   mountOnScreenKeyboard,
   createKeyboardModel,
-  remoteIntent,
   DEFAULT_TV_KEYBOARD,
   type OnScreenKeyboardOptions,
   type OnScreenKeyboardController,
@@ -58,6 +57,7 @@ export {
   type KeyboardKey,
   type KeyDirection,
 } from "./keyboard.js";
+export { remoteIntent } from "./remote-keys.js";
 export {
   createAgentViewModel,
   type AgentViewModel,

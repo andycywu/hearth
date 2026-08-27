@@ -104,4 +104,8 @@ export type {
   StreamHandlers,
 } from "./llm/client.js";
 export { toolsFromCapabilities, toolSpecFor, type CapabilityHandler } from "./capabilities/to-tools.js";
+
+// Build-time feature flags. See features.ts: guarding on these removes the
+// feature and everything it imports from the bundle.
+export { featureFlags, describeFeatures } from "./features.js";
 export { capabilitiesForPlatform, tvHandlers } from "./tools/tv-tools.js";

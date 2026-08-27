@@ -26,7 +26,7 @@
  * privileged capabilities the POC deliberately leaves out — see docs/POC.md.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { findTizenSdk, findTizenSdks } from "./tizen-sdk.mjs";
@@ -155,6 +155,7 @@ try {
     console.log(`[tizen] signing profile: ${profile} (was ${previousProfile ?? "none"})`);
   }
   run("tz build", tz, ["build"]);
+  pruneBuildOutput();
   packOut = run("tz pack -t wgt", tz, ["pack", "-t", "wgt"]);
 } finally {
   // Don't leave a flagged build lying around for the next person to package.
@@ -162,6 +163,41 @@ try {
   if (profile && previousProfile && profile !== previousProfile) {
     run(`tz security-profiles set-active ${previousProfile}`, tz,
       ["security-profiles", "set-active", previousProfile]);
+  }
+}
+
+/**
+ * Drop what `tz build` leaves behind that a television has no use for.
+ *
+ * A packaged .wgt was measured at 233 KB, of which **129,851 bytes — 56% — was
+ * `.manifest.tmp`**, an SDK scratch file. The sourcemap is the same kind of
+ * passenger: 300-odd KB of it, useful on a bench and dead weight on a TV, which
+ * is why the webOS packager already excludes `*.map`.
+ *
+ * Between build and pack, because pack is what computes the signature digests:
+ * removing a file afterwards would invalidate them, and removing it beforehand
+ * simply means it is never signed and never shipped.
+ */
+function pruneBuildOutput() {
+  const dirs = ["Debug", "Release", ".buildResult"]
+    .map((d) => join(appDir, d))
+    .filter((d) => existsSync(d));
+  if (!dirs.length) return;
+
+  let freed = 0;
+  const dropped = [];
+  for (const dir of dirs) {
+    for (const file of readdirSync(dir, { recursive: true, withFileTypes: true })) {
+      if (!file.isFile()) continue;
+      if (file.name !== ".manifest.tmp" && !file.name.endsWith(".map")) continue;
+      const path = join(file.parentPath ?? file.path, file.name);
+      freed += statSync(path).size;
+      rmSync(path, { force: true });
+      dropped.push(file.name);
+    }
+  }
+  if (dropped.length) {
+    console.log(`[tizen] pruned ${dropped.join(", ")} before packing (${(freed / 1024).toFixed(1)} KB)`);
   }
 }
 

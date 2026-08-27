@@ -1,4 +1,4 @@
-import { remoteIntent } from "./keyboard.js";
+import { remoteIntent } from "./remote-keys.js";
 import { TV_PALETTE, TV_FONT } from "./theme.js";
 
 /**

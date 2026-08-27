@@ -4,6 +4,7 @@
   "private": true,
   "description": "Cross-target acceptance tests — the same command script must behave identically on every adapter.",
   "type": "module",
+  "sideEffects": false,
   "scripts": {
     "test": "vitest run",
     "typecheck": "echo \"acceptance: test-only package\" && exit 0"
@@ -17,7 +18,8 @@
     "@hearthkit/adapter-webos": "workspace:*",
     "@hearthkit/adapter-titan": "workspace:*",
     "@hearthkit/adapter-xumo": "workspace:*",
-    "@hearthkit/llm-connectors": "workspace:*"
+    "@hearthkit/llm-connectors": "workspace:*",
+    "esbuild": "^0.23.0"
   },
   "license": "Apache-2.0"
 }

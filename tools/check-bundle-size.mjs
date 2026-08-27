@@ -16,11 +16,20 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Raw-byte budgets per target. Generous headroom over the current ~7KB runtime;
-// tighten as the UI shell lands.
+/**
+ * Raw-byte budgets per target, set close to the real number rather than far
+ * above it.
+ *
+ * A 250 KB budget against a 119 KB bundle is not a budget: it is permission to
+ * double, silently, one convenient import at a time — which is roughly what had
+ * happened before anyone measured. These sit ~15% over the default profile, so
+ * a feature that ships to every television has to be argued for, and the answer
+ * to "it does not fit" is usually a `--with` flag rather than a bigger number.
+ */
 const BUDGETS = [
-  { name: "tizen", file: "apps/tizen-app/main.js", maxBytes: 250_000 },
-  { name: "aosp", file: "apps/aosp-app/app/src/main/assets/main.js", maxBytes: 250_000 },
+  { name: "tizen", file: "apps/tizen-app/main.js", maxBytes: 115_000 },
+  { name: "aosp", file: "apps/aosp-app/app/src/main/assets/main.js", maxBytes: 112_000 },
+  { name: "webos", file: "apps/webos-app/main.js", maxBytes: 115_000 },
 ];
 
 let failed = false;

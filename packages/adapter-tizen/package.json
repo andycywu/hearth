@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Tizen adapter implementing the platform HAL via the Tizen Web Device API (tizen.*).",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

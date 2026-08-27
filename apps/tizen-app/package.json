@@ -8,12 +8,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@hearthkit/core": "workspace:*",
-    "@hearthkit/modelpilot": "workspace:*",
-    "@hearthkit/platform-api": "workspace:*",
-    "@hearthkit/adapter-tizen": "workspace:*",
-    "@hearthkit/llm-connectors": "workspace:*",
-    "@hearthkit/ui": "workspace:*"
+    "@hearthkit/host": "workspace:*",
+    "@hearthkit/adapter-tizen": "workspace:*"
   },
   "license": "Apache-2.0"
 }

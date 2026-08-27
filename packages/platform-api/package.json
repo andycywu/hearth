@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Platform abstraction layer (HAL) — capability interfaces the agent uses to control a TV, independent of AOSP/Tizen or MTK/NVT.",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

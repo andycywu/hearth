@@ -177,8 +177,11 @@ try {
   }
   if (!ready) {
     throw new Error(
-      "the page never exposed __hearthReport — is this an older build? " +
-      "(rebuild with `pnpm bundle:aosp` and reinstall)",
+      "the page never exposed __hearthReport.\n" +
+      "  The default build does not carry the diagnostics — they are 7.9 KB that a\n" +
+      "  working television never runs. Rebuild the bundle with them and reinstall:\n" +
+      "      node tools/bundle.mjs aosp --with diag\n" +
+      "  (or --full for every optional feature). See packages/core/src/features.ts.",
     );
   }
 

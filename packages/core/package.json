@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Platform-agnostic on-device AI agent runtime: agent loop, tool registry, LLM client abstraction, context/memory and event bus.",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

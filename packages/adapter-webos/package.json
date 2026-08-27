@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Experimental webOS (LG) adapter implementing the platform HAL via the Luna Service Bus. Demonstrates that the HAL extends to a third OS with no core changes.",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -10,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
-  "dependencies": { "@hearthkit/platform-api": "workspace:*" },
+  "dependencies": {
+    "@hearthkit/platform-api": "workspace:*"
+  },
   "license": "Apache-2.0"
 }

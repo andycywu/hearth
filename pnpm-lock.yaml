@@ -32,21 +32,9 @@ importers:
       '@hearthkit/adapter-aosp':
         specifier: workspace:*
         version: link:../../packages/adapter-aosp
-      '@hearthkit/core':
+      '@hearthkit/host':
         specifier: workspace:*
-        version: link:../../packages/core
-      '@hearthkit/llm-connectors':
-        specifier: workspace:*
-        version: link:../../packages/llm-connectors
-      '@hearthkit/modelpilot':
-        specifier: workspace:*
-        version: link:../../packages/modelpilot
-      '@hearthkit/platform-api':
-        specifier: workspace:*
-        version: link:../../packages/platform-api
-      '@hearthkit/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
+        version: link:../../packages/host
 
   apps/cli:
     dependencies:
@@ -102,42 +90,18 @@ importers:
       '@hearthkit/adapter-tizen':
         specifier: workspace:*
         version: link:../../packages/adapter-tizen
-      '@hearthkit/core':
+      '@hearthkit/host':
         specifier: workspace:*
-        version: link:../../packages/core
-      '@hearthkit/llm-connectors':
-        specifier: workspace:*
-        version: link:../../packages/llm-connectors
-      '@hearthkit/modelpilot':
-        specifier: workspace:*
-        version: link:../../packages/modelpilot
-      '@hearthkit/platform-api':
-        specifier: workspace:*
-        version: link:../../packages/platform-api
-      '@hearthkit/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
+        version: link:../../packages/host
 
   apps/webos-app:
     dependencies:
       '@hearthkit/adapter-webos':
         specifier: workspace:*
         version: link:../../packages/adapter-webos
-      '@hearthkit/core':
+      '@hearthkit/host':
         specifier: workspace:*
-        version: link:../../packages/core
-      '@hearthkit/llm-connectors':
-        specifier: workspace:*
-        version: link:../../packages/llm-connectors
-      '@hearthkit/modelpilot':
-        specifier: workspace:*
-        version: link:../../packages/modelpilot
-      '@hearthkit/platform-api':
-        specifier: workspace:*
-        version: link:../../packages/platform-api
-      '@hearthkit/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
+        version: link:../../packages/host
 
   packages/acceptance:
     devDependencies:
@@ -168,6 +132,9 @@ importers:
       '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
+      esbuild:
+        specifier: ^0.23.0
+        version: 0.23.1
 
   packages/adapter-aosp:
     dependencies:
@@ -226,6 +193,24 @@ importers:
         version: link:../adapter-web
 
   packages/create-skill: {}
+
+  packages/host:
+    dependencies:
+      '@hearthkit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@hearthkit/llm-connectors':
+        specifier: workspace:*
+        version: link:../llm-connectors
+      '@hearthkit/modelpilot':
+        specifier: workspace:*
+        version: link:../modelpilot
+      '@hearthkit/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
+      '@hearthkit/ui':
+        specifier: workspace:*
+        version: link:../ui
 
   packages/llm-connectors:
     dependencies:

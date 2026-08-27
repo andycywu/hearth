@@ -181,6 +181,34 @@ world, capabilities, devices, planner, policy, perception, memory
 `adapters/` and nothing else — that is the single test of whether this
 architecture is holding.
 
+### What actually ships to a television
+
+The layer above the core is a **single boot sequence**, `@hearthkit/host`. There
+used to be three — Android 200 lines, Tizen 174, webOS 159 — which is not three
+implementations but one, pasted twice: wiring ModelPilot in meant writing the
+same forty lines three times, and the `?diag&reach` probe and the plan-event
+logging each ended up on exactly one host. A platform entry is now about fifteen
+lines, and supplies only what genuinely differs: the adapter, whether its window
+can really be see-through, what to check before starting, and where a credential
+the platform provisioned is read from.
+
+The second rule is that **the default build is what a working television needs
+and nothing else**. Optional features are removed at build time rather than
+skipped at runtime, because a feature that is merely never invoked is still
+downloaded, parsed and held in memory on every launch:
+
+| Profile | Size | What it is |
+|---|---|---|
+| `--without modelpilot --without avatar` | 74.0 KB | The floor: agent loop, world, capabilities, devices, planner, policy, one adapter |
+| default | 94.5 KB | What a set ships with — the above plus ModelPilot and the avatar |
+| `--full` | 120.5 KB | Adds `?diag`, the offline scripted brain, the on-screen keyboard and `?demo`. The bench build |
+
+Guards are written inline against the `define`d identifier — see
+[`packages/core/src/features.ts`](../packages/core/src/features.ts) for the exact
+form and why the readable-looking alternative silently removes nothing.
+`packages/acceptance/src/bundle-features.test.ts` builds the real entry and
+weighs it, because that is the only check that can tell the two apart.
+
 ---
 
 ## 4. Migration plan (no big bang)

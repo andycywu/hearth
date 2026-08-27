@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Titan OS adapter stub: the shape of the platform bridge, with typed \"unsupported\" until a real one is wired up. Proves adding an OS touches only its adapter.",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -10,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
-  "dependencies": { "@hearthkit/platform-api": "workspace:*" },
+  "dependencies": {
+    "@hearthkit/platform-api": "workspace:*"
+  },
   "license": "Apache-2.0"
 }

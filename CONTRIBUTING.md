@@ -101,6 +101,12 @@ Saying so up front saves everyone an argument:
 - **Making a test pass by weakening a verification.** If a target starts
   reporting `verified` where it used to report `unsupported`, that is either a
   real new capability with a device report behind it, or a regression.
+- **A feature every television has to carry so that a few can use it.** The
+  default bundle is what a working set needs and nothing else; bring-up tooling,
+  demo material and optional renderers go behind a build-time flag. The budget in
+  `tools/check-bundle-size.mjs` sits close to the real number on purpose, and the
+  right answer to "it does not fit" is usually a `--with` flag rather than a
+  bigger budget. See [`packages/core/src/features.ts`](packages/core/src/features.ts).
 
 ## Commit / PR
 

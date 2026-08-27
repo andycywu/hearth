@@ -54,3 +54,11 @@ apps/tizen-app/author-signature.xml
 apps/tizen-app/signature1.xml
 apps/tizen-app/.manifest.tmp
 apps/tizen-app/*.wgt
+
+# tizen-core (`tz build`) build output. This was committed once — a signed .wgt,
+# two signature files carrying X509 certificates, a 126 KB SDK temp file and a
+# stale bundle, ~800 KB of it. Build output does not belong in a repository, and
+# signing material belongs there least of all.
+apps/tizen-app/Debug/
+apps/tizen-app/Release/
+apps/tizen-app/.buildResult/

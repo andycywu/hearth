@@ -24,6 +24,7 @@
     "bundle:tizen": "pnpm build && node tools/bundle.mjs tizen",
     "bundle:aosp": "pnpm build && node tools/bundle.mjs aosp",
     "bundle:all": "pnpm build && node tools/bundle.mjs tizen && node tools/bundle.mjs aosp",
+    "bundle:bringup": "pnpm build && node tools/bundle.mjs aosp --full",
     "bundle:webos": "pnpm build && node tools/bundle.mjs webos",
     "bundle:dev": "pnpm build && node tools/bundle.mjs dev",
     "dev": "pnpm bundle:dev && node tools/serve.mjs apps/dev-harness",

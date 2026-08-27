@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "ModelPilot Execution Decision Engine adapter: routes planning and reasoning through ModelPilot while device control stays local and locally verified.",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -10,7 +11,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
-  "dependencies": { "@hearthkit/core": "workspace:*" },
-  "devDependencies": { "@hearthkit/adapter-web": "workspace:*", "@hearthkit/platform-api": "workspace:*" },
+  "dependencies": {
+    "@hearthkit/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@hearthkit/adapter-web": "workspace:*",
+    "@hearthkit/platform-api": "workspace:*"
+  },
   "license": "Apache-2.0"
 }

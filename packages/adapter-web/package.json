@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Browser/mock adapter for local development and CI — no TV hardware required.",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
