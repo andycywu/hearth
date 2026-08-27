@@ -1,4 +1,47 @@
-# Capability matrix (fill during Phase 2 bring-up)
+# The Hearth Report
+
+**What a television can actually do — one verified device at a time.**
+
+This is the project's main output. The runtime is how the answers are collected;
+this page is the answer. Nobody can buy twenty TVs across five firmware
+generations, and no amount of further software will produce this table — only
+people with different televisions in different living rooms can.
+
+## What is covered so far
+
+| Device | How | What it settled |
+|---|---|---|
+| Android TV 34 emulator | `?diag`, `?plan`, acceptance run | 12 ok / 0 errors. Input switching refused (platform signature). Volume is quantised to 15 steps — which broke exact-match verification until a tolerance was added. |
+| Samsung Tizen TV 10.0 emulator | `?diag`, `?demo` | **No audio API at all** — neither `webapis.audiocontrol` nor `tizen.tvaudiocontrol` exists. Apps, storage and network pass. |
+| webOS TV 26 simulator | install + boot | Network is real; audio and app management are Luna stubs. Found that `webOS.service.request` is not a platform global. |
+| Ubuntu 26.04 (real machine, real sound card) | CI + by hand | All three audio backends verified. No TV inputs, and it says so. |
+| **Your TV** | see below | — |
+
+Nothing in the table below is claimed for hardware that has not run it. `❔`
+means untested, and untested stays untested until somebody pastes a report.
+
+## Add your device
+
+The most valuable contribution to this project needs no code and takes about ten
+minutes:
+
+1. Install a build — the browser demo does not count here; it has to be a TV.
+   [`EMULATOR_SETUP.md`](../EMULATOR_SETUP.md) or the packaging commands in the
+   README.
+2. Launch with `?diag&writes` and copy the capability table it prints. It is
+   already markdown; it is meant to be pasted.
+3. Optional but the interesting half: launch with `?plan&room=demo&confirm=auto`
+   and one or two `?ask=` commands, and copy the `[plan]` lines from the log.
+   That is what shows whether a *plan* survives on your firmware, not just
+   whether an API exists.
+4. Open an issue with the **Platform bring-up report** template, or a PR that
+   adds a section to this page.
+
+What makes a report useful: the exact model and firmware version, the WebView or
+Chromium version, and — above all — **what the device did rather than what it
+returned**. A capability that answered `ok` and changed nothing is the single
+most valuable row anyone can contribute, because it is the one no adapter can
+self-report.
 
 Legend: ✅ works · ⚠️ needs partner/platform/system signing · ❔ untested · ➖ n/a
 
