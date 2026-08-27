@@ -6,6 +6,7 @@ import { createAospAdapter } from "@hearthkit/adapter-aosp";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
+  exposeDeviceReport,
   keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
 } from "@hearthkit/ui";
 import type { PlatformProvider } from "@hearthkit/platform-api";
@@ -95,6 +96,8 @@ async function boot(): Promise<void> {
   for (const line of deviceTreeText(devices).split("\n")) console.info(`[devices] ${line}`);
   window.__tvAgent = agent;
   window.__tvPlatform = platform;
+  // One call, one pasteable Hearth Report — see tools/device-report.mjs.
+  exposeDeviceReport(agent, platform);
   console.info(
     `[aosp] agent ready on ${platform.device.model} (${platform.device.soc}) · ` +
     `llm=${llm.id} via ${endpoint.source} ${endpoint.baseUrl}`,

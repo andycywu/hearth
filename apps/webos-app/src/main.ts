@@ -3,6 +3,7 @@ import { createWebosAdapter } from "@hearthkit/adapter-webos";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
+  exposeDeviceReport,
   keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
 } from "@hearthkit/ui";
 import type { PlatformProvider } from "@hearthkit/platform-api";
@@ -85,6 +86,8 @@ async function boot(): Promise<void> {
     for (const note of capabilities.notes) console.info(`[capability] ${note}`);
     window.__tvAgent = agent;
     window.__tvPlatform = platform;
+    // One call, one pasteable Hearth Report — see tools/device-report.mjs.
+    exposeDeviceReport(agent, platform);
 
     const ui = mountDeviceShell(agent, platform, {
       detail: `llm=${endpoint.baseUrl ?? "offline"}`,

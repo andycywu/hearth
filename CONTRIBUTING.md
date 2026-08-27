@@ -2,7 +2,7 @@
 
 Thanks for your interest. This is an **experimental project and a testbed**, not
 a product: Apache-2.0, no support hours, no roadmap promises. What it does have
-is a demo you can run in sixty seconds, 614 tests, and a boundary it takes
+is a demo you can run in sixty seconds, 620 tests, and a boundary it takes
 seriously.
 
 ## The most valuable contribution needs no code
@@ -14,11 +14,13 @@ people already own them. That is the whole reason
 [the Hearth Report](docs/platform/capability-matrix.md) can exist, and it is the
 part of this project that writing more software cannot produce.
 
-Ten minutes: install a build, launch with `?diag&writes`, paste the table it
-prints into the **Device report** issue template. The optional half — launching
-with `?plan&room=demo&confirm=auto&ask=…` and pasting the `[plan]` lines — is the
-more interesting one, because it shows whether a *plan* survives on your firmware
-rather than whether an API merely exists.
+On Android TV it is one command — `node tools/device-report.mjs` — which runs the
+probe and the four scenarios and writes a finished report into
+[`docs/platform/reports/`](docs/platform/reports/). Elsewhere, ask the page
+directly: `(await window.__hearthReport({ allowWrites: true })).markdown`. With no
+tooling at all, `?diag&writes` prints a table that is already markdown.
+
+Then paste it into the **Device report** issue template, or open a PR.
 
 The single most valuable thing you can report: **a capability that accepted a
 command and then did nothing.** No adapter can self-report that, and it is

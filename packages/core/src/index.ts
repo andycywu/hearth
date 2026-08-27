@@ -23,6 +23,10 @@ export {
   type ProbeResult,
   type ProbeStatus,
 } from "./diagnostics/probe.js";
+export {
+  collectDeviceReport, deviceReportToMarkdown, DEFAULT_INTENTS,
+  type DeviceReport, type ReportedIntent, type ReportedStep, type CollectOptions,
+} from "./diagnostics/device-report.js";
 export { ConversationContext } from "./memory/context.js";
 
 // --- Living Room agent runtime (see docs/architecture.md) ---------------------

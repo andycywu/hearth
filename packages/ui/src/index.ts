@@ -6,6 +6,8 @@ export {
   commandsFromUrl,
   runStartupCommands,
   mountDeviceShell,
+  exposeDeviceReport,
+  planRequested,
   speakReplies,
   keyboardOption,
   confirmQuestion,

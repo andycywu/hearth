@@ -1,4 +1,7 @@
-import { launchSearch, launchSearchSource, redactSecrets, type Agent, type ConfirmRequest } from "@hearthkit/core";
+import {
+  launchSearch, launchSearchSource, redactSecrets, collectDeviceReport, deviceReportToMarkdown,
+  type Agent, type ConfirmRequest,
+} from "@hearthkit/core";
 import type { PlatformProvider } from "@hearthkit/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
@@ -244,6 +247,27 @@ function askAndForget(ui: Pick<OverlayController, "ask">, text: string): void {
   void ui.ask(text).catch(() => {
     /* already rendered via the agent's `error` event */
   });
+}
+
+/**
+ * Put a one-call device report on `window`, for the bring-up tools to fetch.
+ *
+ * The contribution this exists for is someone with a television nobody here owns
+ * running one command and pasting the result. That only happens if the output
+ * needs no editing — so the *page* formats it, using the same code every host
+ * ships, and `tools/device-report.mjs` just asks for it over the devtools
+ * protocol and writes it to a file.
+ *
+ * Deliberately on `window` rather than a URL flag: a report has to be taken
+ * *after* the app has booted, probed and settled, and a flag would have to guess
+ * when that is.
+ */
+export function exposeDeviceReport(agent: Agent, platform: PlatformProvider): void {
+  (globalThis as unknown as Record<string, unknown>).__hearthReport =
+    async (opts: Record<string, unknown> = {}) => {
+      const report = await collectDeviceReport({ agent, platform, ...opts });
+      return { report, markdown: deviceReportToMarkdown(report) };
+    };
 }
 
 /**

@@ -22,20 +22,29 @@ means untested, and untested stays untested until somebody pastes a report.
 
 ## Add your device
 
-The most valuable contribution to this project needs no code and takes about ten
-minutes:
+The most valuable contribution to this project needs no code. On Android TV it
+is one command:
 
-1. Install a build — the browser demo does not count here; it has to be a TV.
-   [`EMULATOR_SETUP.md`](../EMULATOR_SETUP.md) or the packaging commands in the
-   README.
-2. Launch with `?diag&writes` and copy the capability table it prints. It is
-   already markdown; it is meant to be pasted.
-3. Optional but the interesting half: launch with `?plan&room=demo&confirm=auto`
-   and one or two `?ask=` commands, and copy the `[plan]` lines from the log.
-   That is what shows whether a *plan* survives on your firmware, not just
-   whether an API exists.
-4. Open an issue with the **Platform bring-up report** template, or a PR that
-   adds a section to this page.
+```bash
+node tools/device-report.mjs
+```
+
+That launches the app in goal mode, runs the capability probe and the four
+scenarios, and writes a finished section into
+[`reports/`](reports/) — no editing, no reformatting. Paste it into an issue or
+open a PR adding it to this page.
+
+Anywhere else (Tizen, webOS, a platform with no adb): open the app and ask the
+page directly, in the WebView console —
+
+```js
+(await window.__hearthReport({ allowWrites: true })).markdown
+```
+
+— or, with no tooling at all, launch with `?diag&writes` and copy the capability
+table it prints. It is already markdown. Then, if you can, launch with
+`?plan&room=demo&confirm=auto&ask=…` and copy the `[plan]` lines: that shows
+whether a *plan* survives on your firmware, not just whether an API exists.
 
 What makes a report useful: the exact model and firmware version, the WebView or
 Chromium version, and — above all — **what the device did rather than what it

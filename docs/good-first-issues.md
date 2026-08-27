@@ -84,6 +84,10 @@ them emulators. Every retail television is new information. Fire TV, Roku,
 Vidaa, Titan OS, an old Android TV box, a Chromecast with Google TV — all
 unknown here.
 
+**How:** `node tools/device-report.mjs` on Android TV, or
+`(await window.__hearthReport({ allowWrites: true })).markdown` in the WebView
+console anywhere else. Both produce the finished section.
+
 **Done:** an issue using the Device report template, or a PR adding a section to
 the Hearth Report. A failure is a result: "would not install, here is the error"
 is worth posting.

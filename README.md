@@ -121,7 +121,7 @@ Useful flags: `?render=canvas`, `?diag` (capability report), `?skills=weather`
 (example skill), `?llm=http://127.0.0.1:11434/v1&model=llama3.2` (real model).
 
 ```bash
-pnpm test           # 614 tests
+pnpm test           # 620 tests
 pnpm bench          # agent-loop latency (p50/p95 per turn)
 ```
 
@@ -242,7 +242,7 @@ on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 614 tests |
+| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 620 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
 | Goal mode on the Android TV emulator | ✅ device graph → plan → verify, through logcat |
@@ -293,7 +293,7 @@ Other ways in, roughly by effort:
 
 | | Needs a TV? |
 |---|---|
-| A device report — paste what `?diag` and `?plan` said | yes, any TV |
+| A device report — `node tools/device-report.mjs`, then paste | yes, any TV |
 | A skill, as [code](docs/skills.md) or as a [JSON manifest](packages/skill-manifest) | no |
 | A scenario — a goal worth planning that we have not written | no |
 | A renderer, a language, a docs fix | no |

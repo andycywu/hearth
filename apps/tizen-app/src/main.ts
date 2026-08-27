@@ -3,6 +3,7 @@ import { createTizenAdapter } from "@hearthkit/adapter-tizen";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
   createConfirmHandler, confirmOverrideFromUrl, runStartupCommands, mountDeviceShell, speakReplies,
+  exposeDeviceReport,
   keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
 } from "@hearthkit/ui";
 import type { PlatformProvider } from "@hearthkit/platform-api";
@@ -83,6 +84,8 @@ async function boot(): Promise<void> {
     for (const note of capabilities.notes) console.info(`[capability] ${note}`);
     window.__tvAgent = agent;
     window.__tvPlatform = platform;
+    // One call, one pasteable Hearth Report — see tools/device-report.mjs.
+    exposeDeviceReport(agent, platform);
 
     // Say which brain is answering: "it works but the model isn't real" is a
     // distinction someone watching a TV has no other way to make.
