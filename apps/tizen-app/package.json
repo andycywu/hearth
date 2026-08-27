@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@hearthkit/core": "workspace:*",
+    "@hearthkit/modelpilot": "workspace:*",
     "@hearthkit/platform-api": "workspace:*",
     "@hearthkit/adapter-tizen": "workspace:*",
     "@hearthkit/llm-connectors": "workspace:*",

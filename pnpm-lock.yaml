@@ -108,6 +108,9 @@ importers:
       '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
+      '@hearthkit/modelpilot':
+        specifier: workspace:*
+        version: link:../../packages/modelpilot
       '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../../packages/platform-api
@@ -126,6 +129,9 @@ importers:
       '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
+      '@hearthkit/modelpilot':
+        specifier: workspace:*
+        version: link:../../packages/modelpilot
       '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../../packages/platform-api

@@ -196,6 +196,7 @@ export class Agent {
         world: this.world,
         devices: this.devices,
         policy: this.policy,
+        meter: this.planning,
       })
       : opts.planner;
     for (const capability of capabilitiesForPlatform(opts.platform)) {

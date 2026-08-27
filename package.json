@@ -35,6 +35,7 @@
     "bench": "pnpm build && node tools/bench.mjs",
     "check:size": "node tools/check-bundle-size.mjs",
     "license:check": "node tools/license-check.mjs",
+    "secrets:check": "node tools/secrets-check.mjs",
     "sbom": "node tools/sbom.mjs"
   },
   "devDependencies": {

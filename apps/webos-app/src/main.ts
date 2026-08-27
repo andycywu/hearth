@@ -1,4 +1,8 @@
-import { Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl} from "@hearthkit/core";
+import {
+  Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl,
+  discoverRoom, deviceTreeText, loadInstallId, RUNTIME_VERSION,
+  type PlannerContext,
+} from "@hearthkit/core";
 import { createWebosAdapter } from "@hearthkit/adapter-webos";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
@@ -6,6 +10,9 @@ import {
   exposeDeviceReport,
   keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
 } from "@hearthkit/ui";
+import {
+  createModelPilotClient, createModelPilotPlanner, resolveModelPilotConfig,
+} from "@hearthkit/modelpilot";
 import type { PlatformProvider } from "@hearthkit/platform-api";
 
 declare global {
@@ -77,7 +84,49 @@ async function boot(): Promise<void> {
     // `?timeout=90` when the model is slow — a local model on modest hardware
     // can take a minute a turn, and the 30s default makes that look broken.
     const turnTimeoutMs = turnTimeoutFromUrl();
-    const agent = new Agent({ platform, llm, confirm, ...(turnTimeoutMs ? { turnTimeoutMs } : {}) });
+    // What is in the room: what was registered into storage, plus what the TV
+    // itself can see. `?room=demo` seeds a console on HDMI2 so the multi-device
+    // scenario has something to plan for on a set with nothing plugged in.
+    const devices = await discoverRoom(platform);
+    for (const line of deviceTreeText(devices).split("\n")) console.info(`[devices] ${line}`);
+
+    // ModelPilot, when a credential has been configured — and off otherwise, so
+    // a television with no key never reaches for a cloud endpoint.
+    // `?modelpilot=shadow|enforce` picks the mode for one launch without a
+    // rebuild; the key is never read from the URL.
+    //
+    // A factory, so the planner reasons over the agent's own capability graph:
+    // the one the boot probe withdraws from, not a copy that would keep
+    // proposing capabilities this build has already given up on.
+    const mpConfig = resolveModelPilotConfig({
+      search: launchSearch(),
+      globals: window as unknown as Record<string, unknown>,
+    });
+    const installId = await loadInstallId(platform.storage);
+    const modelPilot = mpConfig.apiKey
+      ? (ctx: PlannerContext) => createModelPilotPlanner({
+        client: createModelPilotClient({
+          baseUrl: mpConfig.baseUrl,
+          apiKey: mpConfig.apiKey!,
+          timeoutMs: mpConfig.timeoutMs,
+          identity: { installId, runtimeVersion: RUNTIME_VERSION, mode: mpConfig.mode },
+        }),
+        mode: mpConfig.mode,
+        graph: ctx.capabilities,
+        world: ctx.world,
+        devices: ctx.devices,
+        meter: ctx.meter,
+        maxTaskBudget: mpConfig.maxTaskBudget,
+        telemetry: (record: unknown) => console.info("[modelpilot]", JSON.stringify(record)),
+      })
+      : undefined;
+    console.info(`[modelpilot] mode=${mpConfig.mode} (${mpConfig.source})`);
+
+    const agent = new Agent({
+      platform, llm, confirm, devices,
+      ...(modelPilot ? { planner: modelPilot, llmPlanning: true } : {}),
+      ...(turnTimeoutMs ? { turnTimeoutMs } : {}),
+    });
     // Ask the device which tools actually work here before anything can ask
     // what we can do. On a build missing a capability inside a required
     // member — Tizen with no audio API — the alternative is promising it and

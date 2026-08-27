@@ -3,6 +3,7 @@ import type { CapabilityGraph } from "../capabilities/graph.js";
 import type { DeviceGraph } from "../devices/graph.js";
 import type { PolicyEngine } from "../policy/policy.js";
 import type { WorldModel } from "../world/model.js";
+import type { PlanningMeter } from "./meter.js";
 
 /**
  * A goal, a plan, and what happened when we ran it.
@@ -161,6 +162,14 @@ export interface PlannerContext {
   world: WorldModel;
   devices: DeviceGraph;
   policy: PolicyEngine;
+  /**
+   * Where a planner reports what a call cost, if it knows.
+   *
+   * Handed over rather than looked up so a planner never has to reach back into
+   * the agent — it receives everything it may touch, which is also the list of
+   * everything it may touch.
+   */
+  meter: PlanningMeter;
 }
 
 export type PlannerFactory = (ctx: PlannerContext) => Planner;

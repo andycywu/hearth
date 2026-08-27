@@ -5,7 +5,10 @@ import { ModelPilotError } from "./errors.js";
 import { sanitizeTelemetry } from "./telemetry.js";
 import type { TaskRequest } from "./task-mapper.js";
 
-const KEY = "mp_live_supersecret_do_not_log";
+// Deliberately not key-shaped. A fixture that looks like a real credential
+// trips secret scanners forever — in a file whose whole subject is credentials
+// not leaking, that would be an unusually stupid way to fail CI.
+const KEY = "NOT-A-REAL-CREDENTIAL-test-fixture-0000";
 
 const request: TaskRequest = {
   task: { instruction: "plan a step", context: "{}" },
@@ -207,7 +210,9 @@ describe("the API key never reaches a log", () => {
     // Both halves matter: the key we hold, and the credential-shaped thing we
     // were never given and so cannot match exactly.
     expect(redact(`fetch failed for https://x?token=${KEY}`, KEY)).not.toContain(KEY);
-    expect(redact("Authorization: Bearer sk-someoneelses-key")).not.toContain("sk-someoneelses-key");
+    // Shape-y enough to exercise the pattern, short and obviously synthetic so
+    // no scanner mistakes it for the thing it is imitating.
+    expect(redact("Authorization: Bearer xx-EXAMPLE-other-credential")).not.toContain("EXAMPLE-other-credential");
     expect(redact('{"api_key":"abcdefghijklmnop"}')).not.toContain("abcdefghijklmnop");
     // And it must not mangle an ordinary message.
     expect(redact("Failed to fetch")).toBe("Failed to fetch");

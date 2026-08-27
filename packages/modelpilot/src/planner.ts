@@ -52,6 +52,14 @@ export interface ModelPilotPlannerOptions {
   /** Used by `off`, by `shadow`, and by enforce when ModelPilot is unavailable. */
   local?: Planner;
   telemetry?: TelemetrySink;
+  /**
+   * Where the engine's reported cost is accumulated.
+   *
+   * The agent's meter, normally. It turns "what share of planning needed a
+   * model" into "what that share costs per device per year", which is the
+   * question a product decision is actually made on.
+   */
+  meter?: { recordCost(usd: number): void };
   /** Ceiling handed to ModelPilot and echoed in telemetry. */
   maxTaskBudget?: number;
   maxLatencyMs?: number;
@@ -147,6 +155,8 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
         : new ModelPilotError("server", String((err as Error)?.message ?? err));
       return handleUnavailable(goal, workflowId, taskType, error);
     }
+
+    if (result.actualCost !== undefined) opts.meter?.recordCost(result.actualCost);
 
     // Reached, but ModelPilot itself is not satisfied. No device operation, and
     // no substituting our own plan for the answer we asked it to stand behind.

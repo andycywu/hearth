@@ -14,6 +14,8 @@ apps/aosp-app/local.properties
 # Env & secrets
 .env
 .env.*
+# …except the template, which holds placeholders and no values.
+!.env.example
 *.keystore
 *.p12
 signing/

@@ -108,7 +108,7 @@ network. Default is `"all"`.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `MODELPILOT_API_KEY` | — | **Environment or host global only.** Never read from the launch URL; see below. No key ⇒ mode `off`. |
+| `MODELPILOT_API_KEY` | — | **Environment, host global, or the Android keystore. Never the launch URL.** No key ⇒ mode `off`. |
 | `MODELPILOT_MODE` | `shadow` | `off` \| `shadow` \| `enforce` |
 | `MODELPILOT_BASE_URL` | `https://modelpilot.andycywu.workers.dev` | point at `tools/mock-modelpilot-server.mjs` for testing |
 | `MODELPILOT_TIMEOUT_MS` | `5000` | per call; also the abort deadline |
@@ -119,10 +119,24 @@ On a device host, the same values as globals: `__MODELPILOT_API_KEY__`,
 `__MODELPILOT_MAX_COST__`. The mode (not the key) may also come from the launch
 URL: `?modelpilot=enforce`, `?modelpilotUrl=…`, `?modelpilotTimeout=…`.
 
+### Where the key actually goes
+
+| Host | How |
+|---|---|
+| CLI / Node | `MODELPILOT_API_KEY` in the environment. Copy `.env.example` to `.env.local` — `.env*` is gitignored. |
+| Dev harness | `window.__MODELPILOT_API_KEY__ = "…"` before the bundle loads |
+| Android TV | `adb shell am start -n tv.aiagent.harness/.MainActivity -e mpKey <key>` — stored AES-GCM encrypted in the device keystore ([`LlmSecrets`](../apps/aosp-app/app/src/main/java/tv/aiagent/harness/LlmSecrets.kt)), removed from the intent, never logged, and read back through the bridge |
+| Tizen / webOS | host global, set before the bundle loads |
+
 **Why the key is not a URL flag** — this repo has already shipped that bug once:
 `?key=sk-…` was printed on a television's own status line, and on a shipped TV
 that key is the same on every unit of the model. A launch URL also lives in shell
 history, in the launch intent and in logcat.
+
+**And why nothing key-shaped reaches git**: `pnpm secrets:check` scans tracked
+files (or `--staged`) for credential patterns and runs in CI. It is a tripwire,
+not a guarantee — the real defence is that no host reads a key from anywhere a
+repository can see.
 
 ## What is sent, and what is not
 

@@ -136,6 +136,7 @@ async function boot(): Promise<void> {
         graph: ctx.capabilities,
         world: ctx.world,
         devices: ctx.devices,
+    meter: ctx.meter,
         maxTaskBudget: mpConfig.maxTaskBudget,
         // Telemetry to the console here; a device host would persist it. Never
         // the key, never the prompt, never the room state — the record type and

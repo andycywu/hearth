@@ -181,13 +181,24 @@ class MainActivity : AppCompatActivity() {
      * this does and doesn't protect against; it is not a substitute for a relay.
      */
     private fun provisionApiKey(intent: Intent?) {
-        val provided = intent?.getStringExtra("llmKey") ?: return
-        LlmSecrets.save(this, provided)
-        intent.removeExtra("llmKey")
-        android.util.Log.i(
-            "MainActivity",
-            if (provided.isBlank()) "LLM API key cleared" else "LLM API key stored (${provided.length} chars)",
-        )
+        intent?.getStringExtra("llmKey")?.let { provided ->
+            LlmSecrets.save(this, provided)
+            intent.removeExtra("llmKey")
+            android.util.Log.i(
+                "MainActivity",
+                if (provided.isBlank()) "LLM API key cleared" else "LLM API key stored (${provided.length} chars)",
+            )
+        }
+        // The ModelPilot credential, same treatment:
+        //     adb shell am start -n tv.aiagent.harness/.MainActivity -e mpKey <key>
+        intent?.getStringExtra("mpKey")?.let { provided ->
+            LlmSecrets.save(this, provided, LlmSecrets.MODELPILOT_KEY)
+            intent.removeExtra("mpKey")
+            android.util.Log.i(
+                "MainActivity",
+                if (provided.isBlank()) "ModelPilot key cleared" else "ModelPilot key stored (${provided.length} chars)",
+            )
+        }
     }
 
     /**

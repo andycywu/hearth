@@ -35,6 +35,29 @@ export interface PlanningSnapshot {
   /** Model-backed *planning* calls: `model + remote`. Excludes chat. */
   modelBackedPlans: number;
   totalPlans: number;
+  /** Observed cost, when a planner reported one (ModelPilot does). USD. */
+  observedCost: number;
+}
+
+/**
+ * What this would cost per television per year, at a stated rate of use.
+ *
+ * A ratio is not a decision. "82% of planning is free" does not tell anyone
+ * whether to ship it; "$0.40 per set per year against an ARPU of $6" does. The
+ * arithmetic is trivial and that is the point — the number nobody had was the
+ * *input*, and the meter now has it.
+ */
+export interface CostProjection {
+  /** Model-backed calls per turn, from what was actually measured. */
+  modelBackedShare: number;
+  /** USD per model-backed call. Measured if available, else the caller's guess. */
+  costPerCall: number;
+  /** Where `costPerCall` came from — a measurement or an assumption. */
+  costBasis: "measured" | "assumed";
+  perDay: number;
+  perYear: number;
+  /** Restates the assumption, so a number is never quoted without it. */
+  assumption: string;
 }
 
 export class PlanningMeter {
@@ -43,6 +66,7 @@ export class PlanningMeter {
   };
   private chat = 0;
   private empty = 0;
+  private cost = 0;
 
   /** Record a plan as it is produced, whoever produced it. */
   record(plan: Plan): void {
@@ -73,6 +97,42 @@ export class PlanningMeter {
       ...(totalPlans ? { zeroTokenRatio: free / totalPlans } : {}),
       modelBackedPlans,
       totalPlans,
+      observedCost: this.cost,
+    };
+  }
+
+  /** Add a cost a planner actually reported, in USD. */
+  recordCost(usd: number): void {
+    if (Number.isFinite(usd) && usd > 0) this.cost += usd;
+  }
+
+  /**
+   * Project the annual cost per device from what has been measured so far.
+   *
+   * `turnsPerDay` is the household behaviour nobody here knows — it is an
+   * assumption and is reported as one. Everything else comes from counters.
+   */
+  project(opts: { turnsPerDay: number; costPerCall?: number }): CostProjection | undefined {
+    const s = this.snapshot();
+    const turns = s.totalPlans + s.chatTurns;
+    if (!turns) return undefined;
+
+    const modelBacked = s.modelBackedPlans + s.chatTurns;
+    const share = modelBacked / turns;
+    const measured = s.observedCost > 0 && s.modelBackedPlans > 0
+      ? s.observedCost / s.modelBackedPlans
+      : undefined;
+    const costPerCall = measured ?? opts.costPerCall ?? 0.001;
+    const perDay = share * opts.turnsPerDay * costPerCall;
+
+    return {
+      modelBackedShare: share,
+      costPerCall,
+      costBasis: measured === undefined ? "assumed" : "measured",
+      perDay,
+      perYear: perDay * 365,
+      assumption: `${opts.turnsPerDay} turns/day/device, $${costPerCall.toFixed(5)} per model-backed call `
+        + `(${measured === undefined ? "assumed" : "measured"}), ${Math.round(share * 100)}% of turns model-backed`,
     };
   }
 
@@ -80,6 +140,7 @@ export class PlanningMeter {
     this.counts = { deterministic: 0, model: 0, remote: 0, "local-fallback": 0, unattributed: 0 };
     this.chat = 0;
     this.empty = 0;
+    this.cost = 0;
   }
 
   /** One line for `?diag`, a boot log or a bench run. */

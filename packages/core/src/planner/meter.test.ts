@@ -140,3 +140,55 @@ describe("the agent counts its own planning", () => {
     expect(seen).toEqual({ sameGraph: true, sameWorld: true });
   });
 });
+
+describe("cost projection", () => {
+  it("turns a ratio into a number a product decision can use", () => {
+    const meter = new PlanningMeter();
+    // Eight free plans, two model-backed — the shape the P0 skills produce once
+    // real utterances are mixed in.
+    for (let i = 0; i < 8; i++) meter.record(plan("deterministic"));
+    meter.record(plan("model"));
+    meter.record(plan("remote"));
+
+    const p = meter.project({ turnsPerDay: 10, costPerCall: 0.002 });
+    expect(p?.modelBackedShare).toBe(0.2);
+    expect(p?.perDay).toBeCloseTo(0.004, 6);
+    expect(p?.perYear).toBeCloseTo(1.46, 2);
+    expect(p?.costBasis).toBe("assumed");
+  });
+
+  it("prefers a measured cost over an assumed one, and says which", () => {
+    const meter = new PlanningMeter();
+    meter.record(plan("remote"));
+    meter.record(plan("remote"));
+    meter.recordCost(0.004);
+    meter.recordCost(0.006);
+
+    const p = meter.project({ turnsPerDay: 10, costPerCall: 0.5 });
+    // $0.010 over two model-backed calls. The caller's guess is ignored, and the
+    // projection says so rather than quietly using a better number.
+    expect(p?.costPerCall).toBeCloseTo(0.005, 6);
+    expect(p?.costBasis).toBe("measured");
+    expect(p?.assumption).toContain("measured");
+  });
+
+  it("counts chat turns as model-backed, because they always are", () => {
+    const meter = new PlanningMeter();
+    meter.record(plan("deterministic"));
+    meter.recordChatTurn();
+    expect(meter.project({ turnsPerDay: 1 })?.modelBackedShare).toBe(0.5);
+  });
+
+  it("never quotes a number without the assumption behind it", () => {
+    const meter = new PlanningMeter();
+    meter.record(plan("model"));
+    const p = meter.project({ turnsPerDay: 6, costPerCall: 0.001 });
+    expect(p?.assumption).toMatch(/6 turns\/day\/device/);
+    expect(p?.assumption).toMatch(/\$0\.00100 per model-backed call/);
+    expect(p?.assumption).toMatch(/100% of turns model-backed/);
+  });
+
+  it("projects nothing from nothing", () => {
+    expect(new PlanningMeter().project({ turnsPerDay: 10 })).toBeUndefined();
+  });
+});

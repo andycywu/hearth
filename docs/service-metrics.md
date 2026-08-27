@@ -78,6 +78,23 @@ first thing to check.
 - **One device vs one person.** An install id is a television, and a television is
   a household.
 
+## What a call costs, per television
+
+The planning meter turns the ratio into money: `agent.planning.project({ turnsPerDay })`
+uses ModelPilot's own reported `actual_cost` when there is one and says so
+(`costBasis: "measured"`), falls back to a stated assumption when there is not,
+and never returns a number without the assumption attached.
+
+```
+0.2 model-backed share × 10 turns/day × $0.002 = $0.004/day = $1.46/device/year
+```
+
+Against European smart-TV platform ARPU in the single-digit dollars, that is the
+line item to watch — and the deterministic planner is what keeps it small. The
+four P0 scenarios currently plan for **100% zero tokens**; the number that matters
+is what real utterances score, which is a device-report question rather than a
+code question.
+
 ## Two things to fix before this is a product
 
 **1. "Zero retention" currently contradicts counting.** Every TaskRequest we send

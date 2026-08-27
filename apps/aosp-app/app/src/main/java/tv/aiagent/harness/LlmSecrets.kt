@@ -36,28 +36,38 @@ object LlmSecrets {
     private const val PREFS = "tv_agent_secrets"
     private const val PREF_KEY = "llm_api_key"
     private const val ALIAS = "tv.aiagent.llm"
+
+    /**
+     * The ModelPilot credential lives in the same store under its own name.
+     *
+     * A separate slot rather than a second file: same protection, same
+     * provisioning path, and clearing one does not clear the other. The keystore
+     * alias is shared because it is the *device's* key that wraps both — two
+     * aliases would double the ceremony for no extra safety.
+     */
+    const val MODELPILOT_KEY = "modelpilot_api_key"
     private const val TRANSFORM = "AES/GCM/NoPadding"
     private const val IV_BYTES = 12
     private const val TAG_BITS = 128
 
     /** Store (or, with a blank value, forget) the key. Never logged. */
-    fun save(ctx: Context, apiKey: String) {
+    fun save(ctx: Context, apiKey: String, name: String = PREF_KEY) {
         val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (apiKey.isBlank()) {
-            prefs.edit().remove(PREF_KEY).apply()
+            prefs.edit().remove(name).apply()
             return
         }
         val cipher = Cipher.getInstance(TRANSFORM).apply { init(Cipher.ENCRYPT_MODE, secretKey()) }
         val body = cipher.doFinal(apiKey.toByteArray(Charsets.UTF_8))
         // IV first: GCM needs a fresh one per encryption and it isn't secret.
         val blob = cipher.iv + body
-        prefs.edit().putString(PREF_KEY, Base64.encodeToString(blob, Base64.NO_WRAP)).apply()
+        prefs.edit().putString(name, Base64.encodeToString(blob, Base64.NO_WRAP)).apply()
     }
 
     /** The stored key, or null. Returns null rather than throwing on a bad blob. */
-    fun load(ctx: Context): String? {
+    fun load(ctx: Context, name: String = PREF_KEY): String? {
         val stored = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(PREF_KEY, null) ?: return null
+            .getString(name, null) ?: return null
         return try {
             val blob = Base64.decode(stored, Base64.NO_WRAP)
             if (blob.size <= IV_BYTES) return null

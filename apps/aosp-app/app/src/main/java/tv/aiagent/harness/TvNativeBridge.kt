@@ -191,6 +191,15 @@ class TvNativeBridge(
      */
     @JavascriptInterface fun getLlmApiKey(): String = LlmSecrets.load(ctx) ?: ""
 
+    /**
+     * The ModelPilot credential, provisioned the same way and for the same
+     * reason: it must never be a launch flag. A television's launch URL lives in
+     * shell history, in the intent and in logcat, and on a shipped model that key
+     * is identical on every unit.
+     */
+    @JavascriptInterface
+    fun getModelPilotApiKey(): String = LlmSecrets.load(ctx, LlmSecrets.MODELPILOT_KEY) ?: ""
+
     private fun detectSoc(): String {
         val h = (android.os.Build.HARDWARE + " " + android.os.Build.BOARD).lowercase()
         return when {

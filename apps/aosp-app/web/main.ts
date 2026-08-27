@@ -93,9 +93,19 @@ async function boot(): Promise<void> {
   // A factory, so the planner reasons over the agent's own capability graph: the
   // one the boot probe withdraws from, not a copy that would keep proposing
   // capabilities this build has already given up on.
+  // The credential comes from the device keystore, provisioned once with
+  //     adb shell am start -n tv.aiagent.harness/.MainActivity -e mpKey <key>
+  // and never from the launch URL, which lives in shell history, in the intent
+  // and in logcat. `resolveModelPilotConfig` refuses a URL key anyway; this is
+  // where the allowed source is actually read.
+  const bridge = (window as unknown as { TvNativeBridge?: { getModelPilotApiKey?: () => string } }).TvNativeBridge;
+  const provisionedKey = bridge?.getModelPilotApiKey?.() || undefined;
   const mpConfig = resolveModelPilotConfig({
     search: launchSearch(),
-    globals: window as unknown as Record<string, unknown>,
+    globals: {
+      ...(window as unknown as Record<string, unknown>),
+      ...(provisionedKey ? { __MODELPILOT_API_KEY__: provisionedKey } : {}),
+    },
   });
   const installId = await loadInstallId(platform.storage);
   const modelPilot = mpConfig.apiKey
@@ -110,6 +120,7 @@ async function boot(): Promise<void> {
       graph: ctx.capabilities,
       world: ctx.world,
       devices: ctx.devices,
+    meter: ctx.meter,
       maxTaskBudget: mpConfig.maxTaskBudget,
       telemetry: (record: unknown) => console.info("[modelpilot]", JSON.stringify(record)),
     })
