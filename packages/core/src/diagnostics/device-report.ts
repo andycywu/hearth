@@ -4,6 +4,7 @@ import { runDiagnostics, type DiagnosticsReport } from "./probe.js";
 import { deviceTreeText } from "../devices/report.js";
 import { summarizeOutcome } from "../planner/report.js";
 import type { StepStatus } from "../planner/types.js";
+import type { PlanningSnapshot } from "../planner/meter.js";
 
 /**
  * Everything the Hearth Report wants from one television, collected in one pass
@@ -50,6 +51,14 @@ export interface DeviceReport {
   intents: ReportedIntent[];
   /** Steps whose read-back disagreed — the accept-and-ignore signature. */
   acceptedButDidNothing: ReportedStep[];
+  /**
+   * How much of this run's planning needed a model.
+   *
+   * In a device report because it is per-device: the same four scenarios can be
+   * free on a TV whose capability graph closes them and model-backed on one that
+   * withdrew the capability, and that difference is a cost difference.
+   */
+  planning: PlanningSnapshot;
   notes: string[];
 }
 
@@ -119,6 +128,7 @@ export async function collectDeviceReport(opts: CollectOptions): Promise<DeviceR
     // the whole point of collecting this: it is the one class of defect a device
     // will never admit to.
     acceptedButDidNothing: intents.flatMap((i) => i.outcomes.filter((o) => o.status === "failed")),
+    planning: agent.planning.snapshot(),
     notes: opts.notes ?? [],
   };
 }
@@ -200,6 +210,16 @@ export function deviceReportToMarkdown(report: DeviceReport): string {
     out.push("anything reported `unverified` above is a case where the device cannot say.)");
   }
   out.push("");
+
+  const p = report.planning;
+  if (p.totalPlans || p.chatTurns) {
+    out.push("### Planning cost");
+    out.push("");
+    const ratio = p.zeroTokenRatio === undefined ? "n/a" : `${Math.round(p.zeroTokenRatio * 100)}%`;
+    out.push(`${p.totalPlans} plan(s), **${ratio} needed no model** — deterministic ${p.deterministic}, `
+      + `model ${p.model}, remote ${p.remote}, fallback ${p.localFallback}, chat turns ${p.chatTurns}.`);
+    out.push("");
+  }
 
   out.push("### The room");
   out.push("");

@@ -84,6 +84,7 @@ export class GoalPlanner implements Planner {
       goal,
       steps: order(steps, goal.preferredOrder),
       createdAt: this.now(),
+      source: "deterministic",
       ...(unreachable.length ? { unreachable } : {}),
       rationale: describe(goal, steps),
     };

@@ -214,10 +214,15 @@ set `window.__MODELPILOT_API_KEY__` before the bundle loads and launch with
 2. **REST, not MCP.** Deliberate ([ADR-0004](adr/0004-modelpilot-boundary.md)): an
    MCP client is a large dependency for a TV bundle. If a ModelPilot tool gains
    streaming or server-initiated messages, that decision needs revisiting.
-3. **Cost is unmeasured on real traffic.** A household making a handful of goal
-   turns a day at even a fraction of a cent is material against smart-TV platform
-   ARPU. `enforceScope` and the zero-token deterministic planner are the levers;
-   the ratio is not yet instrumented.
+3. **Cost is measured, but only against scripted intents.** `PlanningMeter`
+   counts every plan by source, and `pnpm bench` reports it: **the four P0
+   scenarios plan for 100% zero tokens** on the mock adapter — the deterministic
+   planner closes all of them, in 1.7ms average, with no model call. That is the
+   number `enforceScope: "unmeasurable"` protects.
+   What is still unknown is the ratio on *real* utterances, which by definition
+   include the ones no skill covers; those fall to a model. Nothing about the
+   measurement is sent anywhere — local counters, read by `agent.planning`, the
+   device report and the bench.
 4. **`getTaskEvidence` and `getTaskTrajectory` are implemented and unused.** They
    are there for a host that wants to store or display evidence; nothing calls
    them yet, so their response shapes are the least validated part of the client.

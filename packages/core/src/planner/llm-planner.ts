@@ -117,6 +117,7 @@ export function createLlmPlanner(opts: LlmPlannerOptions): Planner {
         goal,
         steps,
         createdAt: now(),
+        source: "model",
         ...(rejections.length ? { rejections } : {}),
         rationale: `${goal.intent ?? goal.id}: ${steps.map((s) => s.action.capabilityId).join(" -> ") || "nothing runnable"}`,
       };

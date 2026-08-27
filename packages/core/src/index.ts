@@ -78,9 +78,11 @@ export {
 } from "./planner/planner.js";
 export { createLlmPlanner, parseSteps, type LlmPlannerOptions } from "./planner/llm-planner.js";
 export { PlanExecutor, type PlanExecutorOptions } from "./planner/executor.js";
+export { PlanningMeter, type PlanningSnapshot } from "./planner/meter.js";
 export { evaluate, allTrue, unsatisfied, interpolate, targetValue, type Truth } from "./planner/predicates.js";
 export type {
-  Goal, Plan, PlanStep, PlanOutcome, PlanRejection, StepOutcome, StepStatus, Action, Planner,
+  Goal, Plan, PlanStep, PlanOutcome, PlanRejection, StepOutcome, StepStatus, Action,
+  Planner, PlannerContext, PlannerFactory, PlanSource,
 } from "./planner/types.js";
 export {
   SKILLS, findSkill, resolveDeviceParams, type Skill, type SkillContext,

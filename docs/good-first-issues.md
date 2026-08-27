@@ -155,18 +155,20 @@ handler in the relevant adapter, and a device report showing it working.
 
 ---
 
-## 10. Make the zero-token ratio measurable — *no hardware*
+## 10. ~~Make the zero-token ratio measurable~~ — **done**
 
-**Labels:** `good first issue`, `instrumentation`
+`PlanningMeter` counts plans by source (`deterministic` / `model` / `remote` /
+`local-fallback`) plus chat turns, exposed as `agent.planning`, carried in the
+device report and printed by `pnpm bench`. Local counters only, sent nowhere.
 
-The deterministic planner handles known intents with **no model call at all**;
-the LLM planner is only consulted for the long tail. Nobody knows the ratio,
-and on a television that ratio is the difference between a product and a demo:
-inference cost per turn against a platform ARPU of a few dollars a year.
+First measurement: **the four P0 scenarios plan for 100% zero tokens** on the
+mock adapter. The open question is the ratio on real utterances — which is a
+question about *what people actually say*, so the follow-up is a device report,
+not more code.
 
-**Done:** a counter on the agent (planned deterministically / planned by model /
-chat), exposed on the event bus, printed by `?diag`, and a line in the bench
-output. No telemetry — local counters only.
+**A follow-up worth taking:** the meter counts plans, not money. Multiplying the
+model-backed share by a per-call cost, and showing it per day, would turn a ratio
+into the number a product decision actually needs.
 
 ---
 

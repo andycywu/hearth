@@ -219,6 +219,7 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
       goal,
       steps,
       createdAt: now(),
+      source: "remote",
       ...(rejections.length ? { rejections } : {}),
       rationale: [
         `modelpilot(${result.taskId ?? "no task id"})`,
@@ -375,7 +376,14 @@ function compare(localSteps: string[], remoteSteps: string[]): NonNullable<Model
 
 function withWorkflow(plan: Plan, workflowId: string, fallbackReason?: string): Plan {
   const note = fallbackReason ? `local plan (ModelPilot fallback: ${fallbackReason})` : "local plan";
-  return { ...plan, rationale: [plan.rationale, `${note} · ${workflowId}`].filter(Boolean).join(" · ") };
+  return {
+    ...plan,
+    // A local plan produced *because the engine could not answer* is a different
+    // number from one produced because the graph closed the goal: the first still
+    // cost a network round trip.
+    ...(fallbackReason ? { source: "local-fallback" as const } : {}),
+    rationale: [plan.rationale, `${note} · ${workflowId}`].filter(Boolean).join(" · "),
+  };
 }
 
 function ids(result: ModelPilotTaskResult): Partial<ModelPilotTelemetry> {

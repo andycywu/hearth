@@ -1,7 +1,7 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, summarizeOutcome,
-  discoverRoom, deviceTreeText, CapabilityGraph, WorldModel, capabilitiesForPlatform,
-  type LlmClient,
+  discoverRoom, deviceTreeText, WorldModel,
+  type LlmClient, type PlannerContext,
 } from "@hearthkit/core";
 import { createWebAdapter } from "@hearthkit/adapter-web";
 import {
@@ -28,18 +28,6 @@ declare global {
     __AGENT_LLM_MODEL__?: string;
     __AGENT_LLM_API_KEY__?: string;
   }
-}
-
-/**
- * The capability graph a planner reasons over, built the same way the agent
- * builds its own. Two graphs is a smell — the agent owns the authoritative one
- * and withdraws from it — so this is only for wiring a planner that has to exist
- * *before* the agent does.
- */
-function capabilityGraphFor(platform: Parameters<typeof capabilitiesForPlatform>[0]): CapabilityGraph {
-  const graph = new CapabilityGraph();
-  graph.registerAll(capabilitiesForPlatform(platform));
-  return graph;
 }
 
 async function boot(): Promise<void> {
@@ -136,16 +124,18 @@ async function boot(): Promise<void> {
     globals: window as unknown as Record<string, unknown>,
   });
   const planner = mpConfig.apiKey
-    ? createModelPilotPlanner({
+    // A factory, so the planner reasons over the agent's *own* capability graph —
+    // the one the boot probe withdraws from — rather than a copy beside it.
+    ? (ctx: PlannerContext) => createModelPilotPlanner({
         client: createModelPilotClient({
           baseUrl: mpConfig.baseUrl,
-          apiKey: mpConfig.apiKey,
+          apiKey: mpConfig.apiKey!,
           timeoutMs: mpConfig.timeoutMs,
         }),
         mode: mpConfig.mode,
-        graph: capabilityGraphFor(platform),
-        world: sharedWorld,
-        devices,
+        graph: ctx.capabilities,
+        world: ctx.world,
+        devices: ctx.devices,
         maxTaskBudget: mpConfig.maxTaskBudget,
         // Telemetry to the console here; a device host would persist it. Never
         // the key, never the prompt, never the room state — the record type and
@@ -197,6 +187,10 @@ async function boot(): Promise<void> {
     if (pending) appendLog("You", pending, 0.85);
     appendLog("Agent", summarizeOutcome(outcome), 1);
     pending = "";
+    // What that plan cost, cumulatively. Local counters, printed here and sent
+    // nowhere — the free share is the number that decides whether goal mode is
+    // affordable per household.
+    console.info(`[planning] ${agent.planning.describe()}`);
   });
 
   function appendLog(who: string, text: string, opacity: number): void {

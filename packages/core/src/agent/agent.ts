@@ -8,11 +8,12 @@ import { DeviceGraph } from "../devices/graph.js";
 import { PolicyEngine, capabilityForTool } from "../policy/policy.js";
 import { PerceptionManager } from "../perception/manager.js";
 import { GoalPlanner } from "../planner/planner.js";
+import { PlanningMeter } from "../planner/meter.js";
 import { createLlmPlanner } from "../planner/llm-planner.js";
 import { PlanExecutor } from "../planner/executor.js";
 import { summarizeOutcome } from "../planner/report.js";
 import { remainingGap } from "../planner/planner.js";
-import type { Goal, Plan, PlanOutcome, Planner } from "../planner/types.js";
+import type { Goal, Plan, PlanOutcome, Planner, PlannerFactory } from "../planner/types.js";
 import { findSkill, type Skill } from "../skills/scenarios.js";
 import { isPlannable, matchSkill } from "../skills/match.js";
 import { WorldModel } from "../world/model.js";
@@ -94,8 +95,13 @@ export interface AgentOptions {
    * `Plan`, still checked against the Capability Graph, still gated by policy,
    * and still verified locally step by step. Only consulted when
    * `llmPlanning` is on.
+   *
+   * Pass a **factory** to get the agent's own capability graph, world and device
+   * graph rather than a second copy: a planner reasoning over a graph the boot
+   * probe has not withdrawn from would keep proposing capabilities the agent has
+   * already given up on.
    */
-  planner?: Planner;
+  planner?: Planner | PlannerFactory;
 }
 
 export interface ConfirmRequest {
@@ -144,8 +150,18 @@ export class Agent {
    * nothing starts without a grant. See docs/policy-and-safety.md.
    */
   readonly perception: PerceptionManager;
+  /**
+   * How often a plan needed a model, and how often it did not.
+   *
+   * Local counters, never sent anywhere. On a television the ratio is a margin
+   * question: a deterministic plan is free, a model-backed one is not, and the
+   * difference decides whether goal mode is affordable per household.
+   */
+  readonly planning = new PlanningMeter();
   /** Tool name -> the capability it performs, for reading results into state. */
   private readonly byTool = new Map<string, Capability>();
+  /** Resolved once: a factory needs the graph, world and devices to exist. */
+  private readonly injectedPlanner?: Planner;
   private readonly ctx: ConversationContext;
   private readonly maxIterations: number;
   private readonly turnTimeoutMs: number;
@@ -174,6 +190,14 @@ export class Agent {
       onEvent: (event, sourceId) => this.events.emit("perception:event", { event, sourceId }),
       onGrantChange: (grant, sourceId) => this.events.emit("perception:grant", { grant, sourceId }),
     });
+    this.injectedPlanner = typeof opts.planner === "function"
+      ? opts.planner({
+        capabilities: this.capabilities,
+        world: this.world,
+        devices: this.devices,
+        policy: this.policy,
+      })
+      : opts.planner;
     for (const capability of capabilitiesForPlatform(opts.platform)) {
       this.capabilities.register(capability);
       if (capability.tool) this.byTool.set(capability.tool, capability);
@@ -413,16 +437,24 @@ export class Agent {
     // evaluated on the hardest cases and none of the easy ones. Deterministic
     // first is then that planner's decision to make, with the local planner
     // handed to it for exactly that purpose.
-    if (this.opts.planner && this.opts.llmPlanning) return this.opts.planner.plan(goal);
+    if (this.injectedPlanner && this.opts.llmPlanning) {
+      return this.metered(await this.injectedPlanner.plan(goal));
+    }
 
     const direct = await new GoalPlanner({ graph: this.capabilities, world: this.world }).plan(goal);
-    if (direct.steps.length || !this.opts.llmPlanning) return direct;
+    if (direct.steps.length || !this.opts.llmPlanning) return this.metered(direct);
 
     // Nothing to do because it is already true is not a gap worth a model call.
     const gap = remainingGap(this.world, goal);
-    if (!gap.length && !goal.intent) return direct;
+    if (!gap.length && !goal.intent) return this.metered(direct);
 
-    return this.llmPlanner().plan(goal);
+    return this.metered(await this.llmPlanner().plan(goal));
+  }
+
+  /** Count a plan on the way past, whoever produced it. */
+  private metered(plan: Plan): Plan {
+    this.planning.record(plan);
+    return plan;
   }
 
   private llmPlanner(): Planner {
@@ -544,6 +576,9 @@ ${summary}` },
   }
 
   private async runLoop(userInput: string, deadline: Promise<never>): Promise<string> {
+    // A conversational turn always costs a model call — there is no free path
+    // through `run()` the way there is through `pursue()`.
+    this.planning.recordChatTurn();
     this.events.emit("turn:start", { input: userInput });
     this.ctx.add({ role: "user", content: userInput });
 

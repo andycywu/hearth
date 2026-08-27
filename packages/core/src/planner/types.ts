@@ -1,4 +1,8 @@
 import type { Constraint, StateEffect, StatePredicate, Verification } from "../capabilities/types.js";
+import type { CapabilityGraph } from "../capabilities/graph.js";
+import type { DeviceGraph } from "../devices/graph.js";
+import type { PolicyEngine } from "../policy/policy.js";
+import type { WorldModel } from "../world/model.js";
 
 /**
  * A goal, a plan, and what happened when we ran it.
@@ -56,11 +60,30 @@ export interface PlanStep {
   maxRetries?: number;
 }
 
+/**
+ * Who produced a plan — the input to the planning-cost meter.
+ *
+ * On a television this is a margin question as much as an engineering one: a
+ * `deterministic` plan costs no tokens, no latency and no network, and nobody
+ * knew the ratio until it was counted.
+ */
+export type PlanSource =
+  /** The Capability Graph closed the gap. Free. */
+  | "deterministic"
+  /** A local model planned it. */
+  | "model"
+  /** A remote decision engine planned it. */
+  | "remote"
+  /** A remote engine was asked and could not answer, so the local planner did. */
+  | "local-fallback";
+
 export interface Plan {
   id: string;
   goal: Goal;
   steps: PlanStep[];
   createdAt: number;
+  /** Who planned it. Absent on a plan built by hand, e.g. in a test. */
+  source?: PlanSource;
   /** Why these steps — shown in the UI and in logs, never fed back as truth. */
   rationale?: string;
   /** Goal predicates that no capability on this device can satisfy. */
@@ -124,3 +147,20 @@ export interface PlanOutcome {
 export interface Planner {
   plan(goal: Goal): Promise<Plan>;
 }
+
+/**
+ * What a planner needs from the agent that owns it.
+ *
+ * Handed to a `PlannerFactory` so a planner can reason over the *authoritative*
+ * capability graph — the one the boot probe withdraws from — rather than a second
+ * copy built beside it. Two graphs is a bug waiting to happen: the planner would
+ * keep proposing a capability the agent had already given up on.
+ */
+export interface PlannerContext {
+  capabilities: CapabilityGraph;
+  world: WorldModel;
+  devices: DeviceGraph;
+  policy: PolicyEngine;
+}
+
+export type PlannerFactory = (ctx: PlannerContext) => Planner;
