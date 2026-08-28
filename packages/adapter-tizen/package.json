@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/adapter-tizen",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Tizen adapter implementing the platform HAL via the Tizen Web Device API (tizen.*).",
   "type": "module",
   "sideEffects": false,

@@ -13,12 +13,12 @@ Packages the agent runtime as a webOS web app (`.ipk`) for LG webOS TVs, using
 npm i -g @webos-tools/cli          # or: npm i @webos-tools/cli, then --ares-bin
 
 # Bundle + package (generates icon.png if missing):
-pnpm package:webos                 # → dist-ipk/tv.aiagent.harness_0.1.0_all.ipk
+pnpm package:webos                 # → dist-ipk/tv.aiagent.harness_0.2.0_all.ipk
 pnpm package:webos --ares-bin ./node_modules/.bin      # local CLI install
 
 # Install on a TV in developer mode
 ares-setup-device                  # one-time: register the TV
-ares-install dist-ipk/tv.aiagent.harness_0.1.0_all.ipk -d <device>
+ares-install dist-ipk/tv.aiagent.harness_0.2.0_all.ipk -d <device>
 ares-launch tv.aiagent.harness -d <device>
 ares-inspect tv.aiagent.harness -d <device>            # devtools
 ```

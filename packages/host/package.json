@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/host",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "One boot sequence for every device host: adapter, model, room, planner, shell. The per-platform entries supply only what actually differs.",
   "type": "module",
   "sideEffects": false,

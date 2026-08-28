@@ -33,11 +33,12 @@ still needed, it is just no longer the top-level story.
 
 Shipped and verified (see [`STATUS.md`](STATUS.md)): the agent loop, the HAL and
 five adapters under one contract test, tool registry with validation, the
-`TvResult` envelope, boot capability probing with tool withdrawal, voice, three
-renderers, declarative skills, packaging for Android TV / Tizen / webOS, 518
-tests green.
+`TvResult` envelope, boot capability probing with capability withdrawal, voice,
+four renderers, declarative skills, packaging for Android TV / Tizen / webOS,
+**696 tests green**. Goal mode is verified on the Android TV emulator, not only
+in CI.
 
-Added in this change (M0, additive — nothing existing was modified):
+The state and reasoning tier (M0, additive — nothing existing was modified):
 
 | Module | Purpose |
 |---|---|
@@ -51,6 +52,17 @@ Added in this change (M0, additive — nothing existing was modified):
 
 All four P0 scenarios pass headless in
 [`scenarios.test.ts`](../packages/core/src/planner/scenarios.test.ts).
+
+Landed since, and not otherwise described by any plan document here:
+
+| | What it is | Why it is on this roadmap at all |
+|---|---|---|
+| `packages/modelpilot` | Planning and reasoning can go to the **ModelPilot** execution decision engine, as a third `Planner` behind the seam tasks 4 and 9 created. `off` / `shadow` / `enforce`, `shadow` by default, forced `off` with no credential | It is the answer to "who plans?" when the local model is too small — and it is where the boundary gets tested: a remote engine cannot name a capability this TV lacks, cannot weaken a check, and **cannot mark its own work as verified**. The local read-back keeps the last word in every mode. [ADR-0004](adr/0004-modelpilot-boundary.md) |
+| `core/src/planner/meter.ts` | Every plan carries a `source` — `deterministic`, `model`, `remote`, `local-fallback` — and `agent.planning` counts them | The ratio between a free plan and a paid one decides whether goal mode is a product or a demo, and nobody had counted it. First measurement: **the four P0 scenarios plan for 100% zero tokens**, 1.7 ms average |
+| `core/src/identity.ts` + [`service-metrics.md`](service-metrics.md) | A random, local, resettable install id, sent only where a ModelPilot call was already going | A service has to count installs; this runtime promised not to phone home. Both hold, because the count happens server-side on calls the host opted into |
+| `core/src/features.ts` | Optional code removed at **build** time by `esbuild` `define` — 74 / 95 / 121 KB for the three profiles | A TV parses the whole bundle on every launch. "Ship it and skip it at runtime" is not free there |
+| `packages/host` | One boot sequence for all four hosts | Four copies had drifted; the fifth host would have made it five |
+| `tools/device-report.mjs` | One command turns a television into a pasteable markdown section of [the Hearth Report](platform/capability-matrix.md) | The report is the project's main output, and every manual step between a stranger's TV and that table is a place the report does not get sent |
 
 ---
 

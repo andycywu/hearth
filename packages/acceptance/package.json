@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/acceptance",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Cross-target acceptance tests — the same command script must behave identically on every adapter.",
   "type": "module",

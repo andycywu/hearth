@@ -118,7 +118,7 @@ Repeat on the **NVT** AOSP board.
 npm i -g @webos-tools/cli         # one-time; no account needed to build
 pnpm package:webos                # → apps/webos-app/dist-ipk/*.ipk (verified, 34 KB)
 ares-setup-device                 # register the TV (one-time)
-ares-install apps/webos-app/dist-ipk/tv.aiagent.harness_0.1.0_all.ipk -d <device>
+ares-install apps/webos-app/dist-ipk/tv.aiagent.harness_0.2.0_all.ipk -d <device>
 ares-launch tv.aiagent.harness -d <device>
 ```
 - [ ] Launch with `?diag`; copy the report. (`ares-inspect` opens devtools.)

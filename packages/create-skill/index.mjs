@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve, basename } from "node:path";
 
-const CORE_VERSION = "^0.1.0";
+const CORE_VERSION = "^0.2.0";
 
 const args = process.argv.slice(2).filter((a) => a !== "--");
 const flags = new Set(args.filter((a) => a.startsWith("--")));

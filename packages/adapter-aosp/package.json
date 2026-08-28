@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/adapter-aosp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AOSP / Android TV adapter implementing the platform HAL via an injected WebView JS bridge.",
   "type": "module",
   "sideEffects": false,

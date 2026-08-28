@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Run the TV agent from a terminal on the device itself \u2014 a set-top box, a Pi, any Linux box with Node. Same agent loop, same tools, no browser.",
   "type": "module",
