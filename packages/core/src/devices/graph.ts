@@ -57,6 +57,8 @@ export class DeviceGraph {
     if (model !== undefined) merged.model = model;
     const parentId = better(obs.parentId, existing?.parentId);
     if (parentId !== undefined) merged.parentId = parentId;
+    const cecAddress = better(obs.cecAddress, existing?.cecAddress);
+    if (cecAddress !== undefined) merged.cecAddress = cecAddress;
 
     this.nodes.set(id, merged);
     return merged;
@@ -126,9 +128,19 @@ export class DeviceGraph {
       const hit = all.find((d) => d.connection.kind === "network" && d.connection.mac === obs.mac);
       if (hit) return hit;
     }
+    if (obs.cecAddress) {
+      const hit = all.find((d) => d.cecAddress === obs.cecAddress);
+      if (hit) return hit;
+    }
     if (obs.connection?.kind === "hdmi") {
       const port = obs.connection.port;
-      const hit = all.find((d) => d.connection.kind === "hdmi" && d.connection.port === port);
+      // Two devices really can share one of the TV's ports: an AVR on HDMI3 and
+      // the console plugged into *it* both arrive as "hdmi3". So the port is
+      // only an identity when nothing stronger says otherwise — two known and
+      // different CEC addresses are exactly that, and without this check the
+      // second device silently merges into the first and the room loses a box.
+      const hit = all.find((d) => d.connection.kind === "hdmi" && d.connection.port === port
+        && !(d.cecAddress && obs.cecAddress && d.cecAddress !== obs.cecAddress));
       if (hit) return hit;
     }
     if (obs.name) {

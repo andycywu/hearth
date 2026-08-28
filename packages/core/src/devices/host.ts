@@ -3,7 +3,7 @@ import { launchSearch } from "../launch-flags.js";
 import { DeviceGraph, createManualSource, runDiscovery } from "./graph.js";
 import { createPlatformSource } from "./platform-source.js";
 import { createStoredSource, saveDevices } from "./store.js";
-import type { DeviceObservation } from "./types.js";
+import type { DeviceObservation, DiscoverySource } from "./types.js";
 
 /**
  * The room, assembled the way every host needs it — once, here.
@@ -42,6 +42,17 @@ export interface RoomOptions {
   /** Persist what was found. Off for `empty`. */
   persist?: boolean;
   search?: string;
+  /**
+   * Transports this host can also discover with — HDMI-CEC today, mDNS and
+   * Matter later.
+   *
+   * They are passed in rather than constructed here because core must not learn
+   * what a CEC bus is, and because a transport is a *host* decision: the same
+   * Android build has CEC or does not depending on how it was signed. An
+   * unavailable source costs one `available()` call and contributes nothing,
+   * which is the normal outcome and not a failure.
+   */
+  sources?: DiscoverySource[];
 }
 
 /** `?room=demo|empty`. Anything else means "just use what is stored". */
@@ -58,7 +69,7 @@ export async function discoverRoom(
   const devices = new DeviceGraph();
 
   if (room === "empty") {
-    await runDiscovery(devices, [createPlatformSource(platform)]);
+    await runDiscovery(devices, [createPlatformSource(platform), ...(opts.sources ?? [])]);
     return devices;
   }
 
@@ -71,6 +82,7 @@ export async function discoverRoom(
     stored,
     createPlatformSource(platform),
     createManualSource(seed),
+    ...(opts.sources ?? []),
   ]);
   if (result.failed.length) {
     console.warn(`[devices] sources failed: ${result.failed.join(", ")}`);

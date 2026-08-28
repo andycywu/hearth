@@ -6,6 +6,75 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **HDMI-CEC, the first transport past the television** (`packages/adapter-cec`,
+  [docs/cec.md](docs/cec.md), roadmap task 7). Everything until now reached
+  exactly one device, where "did it work?" is answered by asking the object that
+  just did it. A console on HDMI2 has its own power state, its own name, and its
+  own ways of ignoring you — so it is the first real test of the claim this
+  runtime is built on.
+  - A **message-shaped `CecTransport`**: six methods, each named after the CEC
+    message it sends. `wake()` resolving means the *bus accepted*
+    `<Set Stream Path>` and nothing more; an interface that called itself
+    `turnOn(): Promise<void>` would invite exactly the reading this project
+    exists to refuse.
+  - An **`hdmi_cec` discovery source** that derives the HDMI port *and the parent
+    hop* from the physical address — `3.1.0.0` is on port 1 of the device at
+    `3.0.0.0`, which is how an AVR with a console behind it announces itself, and
+    it is the `parentId` the Device Graph has had a field for since before
+    anything could fill it. Devices are identified by physical address, not
+    logical: logical addresses are reallocated when devices come and go, and a
+    console that is address 4 today can be 8 tomorrow. The logical address is
+    used for the type only where the spec is unambiguous (0 is a TV, 5 is an
+    audio system) — a playback device stays `unknown`, because a console, a
+    Blu-ray player and a streaming stick all take a playback slot and which one
+    depends on who plugged in first.
+  - **Power that can finally be verified.** `<Give Device Power Status>` is the
+    first read that can speak for a device other than the TV, so the writes
+    verify by read-back against it. The four outcomes then come from the
+    hardware: the console says `on` → `verified`; it woke and never answers →
+    `unverified`; the bus accepted the message and it stayed asleep → `failed`;
+    there is no CEC here → `unsupported`, withdrawn, never offered again. One
+    goal, one plan, four buses, all four pinned by name.
+  - **A mock bus that misbehaves on purpose**, following `perception-mock`: a
+    device that never answers the power question, one that accepts
+    `<Set Stream Path>` and stays in standby, and a platform with no bus at all.
+    A mock that only behaves well is a mock that agrees with you.
+  - `discoverRoom(platform, { sources })` lets a host wire a transport in without
+    core learning what a CEC bus is.
+  - **No real CEC bus has run any of this.** The Android API is `@SystemApi`,
+    Tizen and webOS expose none, so an absent transport is the *normal* case. The
+    cheapest verification anyone can buy is a Raspberry Pi and `cec-ctl`, which
+    makes a Linux transport the next thing worth writing.
+
+### Fixed
+
+Three defects in code that was already green, all found by CEC being the first
+thing that reaches past the television — and all correct for every device that
+had existed until now:
+
+- **A read-back could verify against its own assumption.** The executor's
+  `read_back` branch checked that the verifying read *succeeded*, not that it
+  *answered*, while the step's optimistic write was already sitting on that path.
+  Every reader in this repo always answers — a TV that reports its volume at all
+  reports a number — so the case had never arisen. Over CEC, a device that
+  acknowledges `<Give Device Power Status>` and says nothing is ordinary, and the
+  result would have been a confident `verified` for a console that never woke:
+  the worst answer this system can give. It now checks the backing source,
+  exactly as `state` verification already did.
+- **Two devices on one HDMI port merged into one.** Device identity fell back to
+  the HDMI port, and an AVR at `3.0.0.0` and the box plugged into it at
+  `3.1.0.0` are both "on HDMI3" — so the room silently lost a device. The
+  identity rule already named the CEC address; nothing stored it. `DeviceNode`
+  now carries `cecAddress`, `match()` uses it ahead of the port, and the stored
+  source carries it back through persistence so the room does not re-merge them
+  on every boot.
+- **Two CEC devices could not coexist.** Core names a device-power tool after its
+  *provider*, so a second CEC device also wanted to be `cec_power_on`, and the
+  registry throws on a duplicate name — a boot crash in any living room with a
+  console and a set-top box. Tool names are per device now.
+
 ## [0.2.0] - 2026-08-28
 
 The living-room tier: the runtime stopped being a chat loop with tools attached

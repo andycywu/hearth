@@ -20,6 +20,28 @@ describe("the room, remembered", () => {
     expect(graph.inputPortFor("ps5")).toBe("hdmi2");
   });
 
+  it("remembers which of two devices on one HDMI port is which", async () => {
+    // An AVR on HDMI3 with a streaming box plugged into it: both are "on HDMI3",
+    // and the CEC address is the only thing that tells them apart. It has to
+    // survive the round-trip through storage, or the room re-merges them on
+    // every boot and quietly loses a device.
+    const storage = createMemoryStore();
+    await registerDevice(storage, {
+      id: "avr", type: "avr", name: "Denon AVR",
+      connection: { kind: "hdmi", port: "hdmi3" }, cecAddress: "3.0.0.0", source: "manual",
+    });
+    await registerDevice(storage, {
+      id: "stick", type: "streaming_stick", name: "Apple TV", parentId: "avr",
+      connection: { kind: "hdmi", port: "hdmi3" }, cecAddress: "3.1.0.0", source: "manual",
+    });
+
+    const graph = new DeviceGraph();
+    await runDiscovery(graph, [createStoredSource(storage)]);
+    expect(graph.list().map((d) => d.id).sort()).toEqual(["avr", "stick"]);
+    expect(graph.get("stick")?.cecAddress).toBe("3.1.0.0");
+    expect(graph.get("stick")?.parentId).toBe("avr");
+  });
+
   it("forgets one on request, and leaves the rest", async () => {
     const storage = createMemoryStore();
     await registerDevice(storage, { id: "ps5", name: "PS5", connection: { kind: "hdmi", port: "hdmi2" }, source: "manual" });
