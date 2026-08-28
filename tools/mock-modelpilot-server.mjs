@@ -4,6 +4,7 @@
  * spending real money on a real engine.
  *
  *   node tools/mock-modelpilot-server.mjs [--port 8090] [--answer set_input:hdmi3]
+ *                                          [--idle <seconds, 0 = never>]
  *
  * Speaks the three documented REST paths and returns a verified task whose
  * output is one TV action plan. Every request is echoed to stderr **with the
@@ -122,8 +123,38 @@ const server = createServer((req, res) => {
   });
 });
 
+/**
+ * Shut down when nothing has used it for a while. `--idle 0` disables it.
+ *
+ * Five of these were found still running days after their tests finished,
+ * holding five ports and — because they were started as
+ * `node tools/mock-modelpilot-server.mjs` with a relative path — a working
+ * directory handle on the repository root, which is what made the project
+ * folder un-renameable. A fixture that outlives its test is not harmless: it is
+ * a process nobody is watching, answering on a port somebody else may want.
+ */
+const idleMs = Number(opt("--idle", 900)) * 1000;
+let idleTimer;
+function touch() {
+  if (!idleMs) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    console.error(`[mock-modelpilot] idle for ${idleMs / 1000}s — exiting`);
+    server.close(() => process.exit(0));
+  }, idleMs);
+  // Don't let the timer alone keep the process alive once the server closes.
+  idleTimer.unref?.();
+}
+server.on("request", touch);
+
 server.listen(port, () => {
   console.error(`[mock-modelpilot] listening on http://127.0.0.1:${port} (answer: ${answer})`);
   console.error("[mock-modelpilot] point the runtime at it:");
   console.error(`[mock-modelpilot]   MODELPILOT_BASE_URL=http://127.0.0.1:${port} MODELPILOT_API_KEY=test-key MODELPILOT_MODE=shadow`);
+  if (idleMs) console.error(`[mock-modelpilot] will exit after ${idleMs / 1000}s idle (--idle 0 to stay up)`);
+  touch();
 });
+
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => server.close(() => process.exit(0)));
+}
