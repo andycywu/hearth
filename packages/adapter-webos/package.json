@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/adapter-webos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Experimental webOS (LG) adapter implementing the platform HAL via the Luna Service Bus. Demonstrates that the HAL extends to a third OS with no core changes.",
   "type": "module",
   "sideEffects": false,

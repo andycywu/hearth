@@ -16,8 +16,8 @@ runtime bundles, and creates a GitHub Release.
    ```
 4. Tag and push:
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag vx.y.z
+   git push origin vx.y.z
    ```
 5. CI creates the release with `tizen-runtime.js`, `aosp-runtime.js` and
    `SHA256SUMS` attached, plus auto-generated notes.

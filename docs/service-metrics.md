@@ -23,7 +23,7 @@ MODELPILOT_MODE=shadow|enforce
   ModelPilot request
       ├─ authorization: Bearer …        which customer / OEM
       ├─ x-hearth-install: hth_…        which installation (random, resettable)
-      ├─ x-hearth-runtime: 0.1.0        which runtime version
+      ├─ x-hearth-runtime: 0.2.0        which runtime version
       └─ x-hearth-mode: shadow          which mode
       │
       ▼

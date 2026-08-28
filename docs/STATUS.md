@@ -1,178 +1,134 @@
 # Project Status
 
-A snapshot of what's built, what's verified, and what remains. For the plan see
+A snapshot of what is built, what is verified, and by what. For the plan see
 [`roadmap.md`](roadmap.md) (product) and [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md)
-(platform bring-up).
+(platform bring-up). For what an emulator structurally cannot answer, see
+[`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
 
-**2026-08-18 — repositioning.** The product is an AI agent runtime and cross-OS
-control plane for living-room devices, not a TV OS and not a voice assistant. The
-state and reasoning tier this needs — World Model, Capability Graph, Device
-Graph, planner, verification, policy — landed as additive modules under
-`packages/core/src/`, with the four P0 scenarios passing headless. Nothing in the
-existing agent loop changed. See [`architecture.md`](architecture.md).
+_Last updated: 2026-08-28 · released: v0.1.0 (2026-08-05) · cutting: v0.2.0_
 
-_Last updated: 2026-08-18 · target release: v0.1.0_
+**The honest one-line version: the runtime works and is verified on emulators;
+it has not run on retail TV hardware, and nothing with a second device in it has
+run at all.**
 
-**The agent runs end-to-end on two TV emulators, and you can talk to it.** On
-Android TV the capability probe is clean (11 ok / 0 errors), the CI acceptance
-script passes unchanged, a real local model drives it, and speech works both ways
-through the native bridge. On the Samsung Tizen TV emulator the app installs,
-apps/storage/network pass and a real local model drives it — but **that emulator
-has no audio API at all** (neither `webapis.audiocontrol` nor
-`tizen.tvaudiocontrol`), so volume and mute on Tizen are unexercised code and
-need a retail TV; an earlier version of this page claimed they passed. The
-built-in demo runs the whole agent loop — including Chinese
-and Japanese commands moving real device state — with **no network, no endpoint
-and no API key**. There is an avatar and a remote-driven on-screen keyboard, so a
-TV is no longer limited to whatever was baked into the launch flags. Packaging is
-verified for all three hosts (APK / signed `.wgt` / `.ipk`). webOS still needs an
-install target; real MTK/NVT boards (B5) and the Blits GPU pass (C1) need
-hardware.
+The agent runs end-to-end on the Android TV and Samsung Tizen emulators and on
+the webOS 26 simulator, driven by a real local model, with goal mode — device
+graph → plan → policy → execute → verify — proven on the Android TV emulator
+through logcat. Packaging is verified for all three hosts (APK / signed `.wgt` /
+`.ipk`). What is *not* proven is anything the emulators do not have: Tizen has no
+audio API on that image, webOS stubs audio and app management, and CEC, IR, an
+AVR, a console, a camera and a far-field microphone need a room rather than a TV.
+
+**696 tests green**, across 17 packages.
 
 ## At a glance
 
 | Area | State |
 |------|-------|
 | Agent core (loop, tools, memory, events, streaming) | ✅ done |
-| Platform HAL + adapters (web, Tizen, AOSP, webOS, Linux) | ✅ done (5 implemented) |
+| World Model · Capability Graph · Device Graph · planner · verification · policy | ✅ done, wired into the agent loop |
+| Goal mode (`agent.pursue`, `pursueSkill`, `pursueIntent`) | ✅ done, beside the chat path and sharing its world, policy and confirm gate |
+| LLM planner (model proposes, graph validates) | ✅ done — five rejections run before anything executes |
+| ModelPilot planner (remote decision engine) | ✅ stage 1 — `off`/`shadow`/`enforce`, `shadow` by default, `off` with no key |
+| Planning cost meter (`agent.planning`) | ✅ done — the four P0 scenarios plan for **zero tokens**, 1.7 ms average |
+| Perception boundary + mock camera | ✅ done — no grant no sensor, raw capture stripped, revocation beats `stop()` |
+| Platform HAL + adapters (web, Tizen, AOSP, webOS, Linux) | ✅ 5 implemented, one shared contract test |
 | Titan OS / Xumo adapters | 🟡 stubs: bridge shape + contract test, no integration. Both in the 6-target acceptance run |
-| App hosts (Tizen `.wgt`, AOSP APK, webOS `.ipk`, dev harness) | ✅ bundled; **APK compiles** |
+| Host boot (`@hearthkit/host`) | ✅ one boot sequence for all four hosts, replacing four divergent copies |
+| Build profiles (`--full` / `--with` / `--without`) | ✅ optional code removed at build time, not skipped at runtime — 74 / 95 / 121 KB |
+| Install identity + service metrics | ✅ random, local, resettable id on ModelPilot calls only; no analytics endpoint exists |
+| Device report (`tools/device-report.mjs`) | ✅ one command turns a TV into a pasteable markdown section |
 | LLM connectors (OpenAI-compatible + offline scripted) | ✅ done, with retry |
-| UI renderers (DOM overlay, 2D canvas, Blits WebGL) | ✅ done, one shared view-model |
+| UI renderers (avatar, DOM overlay, 2D canvas, Blits WebGL) | ✅ one shared view-model behind all of them |
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
-| Avatar + on-screen keyboard | ✅ avatar is the default face, `?keyboard` to type — verified on the Android TV **and** Tizen emulators |
-| CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal — `hearth "set volume to 30"`. Verified against the mock adapter |
-| Linux platform (`adapter-linux`) | ✅ all three backends verified against real tooling: `pactl` and `wpctl` in CI every push, `amixer` by hand on an Ubuntu 26.04 VM with a real sound card |
-| Translucent overlay | ✅ AOSP only. Tizen/webOS web runtimes can't make a window see-through, so those hosts stay opaque; `?translucent` to try anyway |
-| CJK input | ✅ kana keyboard (real characters); Chinese as phrases — an IME is out of scope |
-| Confirmation dialog | ✅ focusable 10-foot modal, defaults to No; `window.confirm` only as a no-DOM fallback |
-| Skills — code (guide + runnable example) | ✅ `docs/skills.md`, `packages/skills-example` |
-| Skills — data (JSON manifests, bundled + installable) | ✅ `packages/skill-manifest`, [ADR-0002](adr/0002-declarative-skill-manifests.md) |
-| Offline demo on device (`?demo`, no network) | ✅ verified on the Android **and** Tizen emulators |
-| Tests / CI / lint / bundle-size / license / SBOM | ✅ 574 tests, CI green |
-| Security (review, WebView hardening, tool confirm) | ✅ self-review done; confirm gate wired on device |
+| CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal |
+| Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 696 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
-| **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18 — device graph, plan, policy, execute, verify, all through logcat. Two device-only defects found and fixed (quantised-volume verification; the world believing a request over a reading). See [`capability-matrix.md`](platform/capability-matrix.md) |
-| **Local-model run on device** | ✅ real model drives the TV; 1.5B too weak to chain tools |
-| **Tizen / webOS packaging** | ✅ signed `.wgt` + `.ipk` verified |
-| **Tizen TV emulator bring-up** | ✅ installs, runs, offline demo runs — but no audio API on that build, so volume/mute are untested |
-| **Tizen against a real model** | ✅ works. The earlier "the emulator's NAT is broken" was a misdiagnosis: `config.xml` declared no `<access>` origin, so the app could not reach *any* host. Fixed |
-| **Tizen audio (volume, mute)** | ⛔ needs a retail Samsung TV — see [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) |
-| **webOS install run** | ✅ runs on the webOS TV 26 Simulator — first run found that the app shipped no webOSTV.js, so every capability threw `ReferenceError`. Audio/apps are stubs there; needs an LG TV |
+| **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
+| **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
+| **Tizen emulator bring-up** | ✅ installs, runs, offline demo runs, real model works |
+| **webOS install run** | ✅ runs on the TV 26 Simulator; audio and app management are stubs there |
+| **Linux platform** | ✅ all three backends against real tooling — `pactl`/`wpctl` in CI, `amixer` on a real sound card |
+| **Tizen audio (volume, mute)** | ⛔ unexercised code — that emulator has no audio API at all |
+| **HDMI-CEC** | 🟡 in progress — see roadmap task 7 |
 | **Real MTK/NVT device bring-up** | ⛔ needs hardware |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Done (verified in CI/sandbox)
+## Test coverage (696 tests)
 
-- **Core "Harness":** agent loop with per-turn timeout + cancellation, tool
-  registry with schema validation, rolling memory (+ persistence via storage),
-  typed event bus, token streaming, multilingual replies, custom-tool extension
-  point (`defineTool`), confirmation gate for high-impact tools.
-- **HAL + 7 adapters** (5 implemented, 2 stubs) all passing one shared behavioural
-  contract test — which now checks coherence rather than privilege: an adapter
-  either round-trips a capability group or refuses all of it as `unsupported`.
-- **Cross-target acceptance test:** identical command script → identical tool
-  sequence + end state on web/Tizen/AOSP/webOS/Titan/Xumo (mocked). Hardware-free
-  parity proof, six targets.
-- **Bundling:** esbuild → per-target `main.js`; bundle-size budget enforced in CI.
-- **Offline everything:** `pnpm dev` runs the full stack in a browser with a
-  scripted brain — no TV, no API key. `?llm=` points at a local model.
-- **On-device inference path:** OpenAI-compatible connector works against
-  Ollama/llama.cpp/vLLM (`docs/on-device-inference.md`).
-- **Diagnostics:** `runDiagnostics` / `?diag` capability self-probe.
-- **AOSP non-privileged paths:** AccessibilityService navigation, passthrough
-  input Intent.
-- **OSS hygiene:** Apache-2.0, CHANGELOG, release workflow, Dependabot, license
-  gate (CI), SBOM, security review, WebView hardening + CSP, full docs.
-- **Android host compiles** (Gradle wrapper 8.7 committed, debug APK builds); the
-  launch-crash theme bug and API 30+ package-visibility bug are fixed.
-- **One shared view-model** (`createAgentViewModel`) behind all three renderers,
-  so a new view layer only implements `draw`.
-- **Confirm gate + spoken replies on every host** via `createConfirmHandler()` /
-  `speakReplies()` — gated tools no longer fire unprompted on a real TV.
-- **Skills:** `docs/skills.md` (portable vs capability-gated) plus a runnable
-  keyless example, opt-in in the harness with `?skills=weather`.
-- **`pnpm bench`:** harness-only per-turn latency (p50 0.03ms / p95 0.14ms on a
-  dev laptop) as a regression baseline for TV silicon.
-- **First on-device bring-up (Android TV 34 emulator):** `?diag` reports 12 ok /
-  0 errors, navigation works with no signing via the AccessibilityService, and
-  `tools/device-acceptance.mjs` reproduces the CI tool sequence on the device.
-  Five device-only defects were found and fixed in the process — chiefly that the
-  ES-module bundle could never load from `file://`, and that Android's cleartext
-  policy blocked every call to a local model. Results and the platform quirks that
-  are *not* bugs: [`platform/capability-matrix.md`](platform/capability-matrix.md).
-- **Second on-device bring-up (Samsung Tizen TV 10.0 emulator):** installs and
-  runs; volume, mute, 82 apps, `sendKey` and storage all pass, and `?demo` drives
-  the whole agent loop offline — `?diag` afterwards reads the volume the demo's
-  Japanese command set, so the tool calls reach the real platform. Four more
-  device-only defects found here: `webapis` was never loaded so nothing under it
-  could work, launch flags never reached `location.search` (Tizen drops the query
-  from `config.xml`), `--profile` signed with the wrong certificate, and the
-  adapter answered confident constants — `isOnline: true`, `connectionType:
-  "none"` — where it should have measured. The emulator's own NAT is broken and
-  that is written up with the full elimination, since the obvious suspects
-  (proxy, bridge, firewall, VPN) are all wrong.
-- **Avatar, keyboard and voice:** an abstract form drawn in code with four states
-  driven by agent events (the default renderer), a remote-driven on-screen keyboard
-  (`?keyboard`), and speech both ways. Verified on the Android TV emulator by
-  typing "mute" letter-by-letter with real D-pad events — `?diag` afterwards read
-  `getMute ✅ true` — and by pressing 🎤 Speak, which drove the permission dialog
-  and then opened the microphone (`RecognitionService#onMicrophoneOpened`, with
-  Android's own green mic indicator lit). Voice needs no native code on
-  web/Tizen/webOS: their WebViews are Chromium and expose Web Speech, which
-  contradicted the assumption that Samsung would require a partner agreement.
-- **A confirmation dialog you can answer from a sofa,** replacing
-  `window.confirm` — which blocks the JS thread, isn't reliably D-pad focusable
-  and is stubbed out on some TV builds, silently turning the gate into "always
-  approve". Defaults to No; Back declines. Two device-only defects fixed on the
-  way: Android routes hardware BACK to the Activity rather than the WebView (so
-  Back closed the app instead of declining), and an inline `display:flex` beats
-  `[hidden]`, so the dialog stayed on screen after being answered. Both paths
-  verified on the emulator.
-- **Skills as data:** a skill can be a JSON manifest rather than TypeScript,
-  bundled or installed into `platform.storage`, with the host owning the origin
-  allowlist ([ADR-0002](adr/0002-declarative-skill-manifests.md)).
+core 196 · ui 167 · llm-connectors 61 · skill-manifest 56 · modelpilot 46 ·
+adapter-aosp 28 · adapter-linux 24 · cli 21 · acceptance 20 · perception-mock 14 ·
+adapter-tizen 14 · skills-example 13 · adapter-webos 10 · platform-api 8 ·
+adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 
-## Test coverage (348 tests)
+## What has been verified on a device, and what it cost
 
-ui 114 · core 59 · skill-manifest 56 · llm-connectors 44 · adapter-aosp 25 ·
-skills-example 13 · adapter-tizen 11 · platform-api 8 · create-skill 8 ·
-adapter-webos 6 · adapter-web 5 · acceptance 5.
+Every bring-up so far has found defects that no test here could have found, all
+of the same shape: **code that only executes when a real counterpart is on the
+other end**. That is the argument for the whole verification design, so it is
+recorded rather than summarised.
+
+- **Android TV 34 emulator** (first run): the ES-module bundle could never load
+  from `file://`; Android's cleartext policy blocked every call to a local model;
+  three more. Later, in goal mode: quantised volume made a successful write read
+  as a failure, and the world believed a request over a reading.
+- **Samsung Tizen TV 10.0 emulator**: `webapis` was never loaded, so nothing
+  under it could work; launch flags never reached `location.search`; the profile
+  signed with the wrong certificate; the adapter answered confident constants
+  where it should have measured. The "broken NAT" diagnosis was itself wrong —
+  `config.xml` declared no `<access>` origin, so the app could reach no host at
+  all.
+- **webOS 26 Simulator** (first run): the app shipped no `webOSTV.js`, so every
+  capability threw `ReferenceError`.
+- **Voice on Android**: the voice key never reached the WebView (`onKeyDown` is
+  not called when a view has consumed the key), and the first reply was never
+  spoken because `TextToSpeech` binds in ~3 s while the offline brain answers
+  instantly.
+
+Results, and the platform quirks that are *not* bugs, live in
+[`platform/capability-matrix.md`](platform/capability-matrix.md) — the Hearth
+Report.
 
 ## Remaining — needs external resources
 
-1. **Phase 2 device bring-up (critical path).** Install on MTK + NVT boards
-   (Tizen + AOSP), run `?diag`, fill `docs/platform/capability-matrix.md`,
-   obtain signing (partner/platform on Tizen, system on Android) for the gated
-   controls. Compare against the acceptance-test baseline.
-2. **Blits → default UI.** The renderer already shares the view-model and builds
-   in CI; what's left is validating WebGL rendering/perf on the weakest target
-   GPU, then deciding whether it becomes the default with a DOM fallback (needs a
-   browser/device).
-3. **On-device model benchmark.** Measure model size vs. RAM/latency on real
-   silicon; finalize cloud/on-device routing policy.
-4. **Tizen audio on a retail TV.** A real model on Tizen now works (the blocker
-   was a missing `<access>` origin, not the emulator's NAT). What remains is
-   audio: the emulator exposes neither audio API, so `volume` and `mute` have
-   never executed on this platform. A retail TV in Developer Mode is also where
-   Samsung's `webapis` exists, so it settles the rest of that surface at once.
-5. **npm publish.** Waiting on the `@hearthkit` npm organization; GitHub Pages
-   needs enabling in the repo settings for the hosted demo.
+1. **HDMI-CEC (roadmap task 7).** The transport, the discovery source and a mock
+   bus can be built and tested here; a *real* CEC bus is what turns
+   `ps5.power.on` from `unverified` into `verified`, and that needs a console and
+   a TV that both admit to speaking CEC.
+2. **Phase 2 device bring-up (critical path).** MTK + NVT boards (Tizen + AOSP),
+   `?diag`, fill the capability matrix, obtain signing (partner on Tizen,
+   platform on Android) for the gated controls.
+3. **Tizen audio on a retail TV.** The emulator exposes neither audio API, so
+   `volume` and `mute` have never executed on that platform. A retail TV in
+   Developer Mode is also where Samsung's `webapis` exists, so it settles the
+   rest of that surface at once.
+4. **Blits → default UI.** Needs WebGL rendering and perf validated on the
+   weakest target GPU before it can replace the DOM fallback.
+5. **On-device model benchmark.** Model size vs. RAM/latency on real silicon;
+   finalise the cloud/on-device routing policy. The known floor so far: 1.5B
+   drives single tools but cannot chain them.
+6. **npm publish.** Waiting on the `@hearthkit` npm organisation.
 
 ## How to run
 
 ```bash
 pnpm install && pnpm build && pnpm test    # verify
-pnpm dev                                    # browser demo (offline)
-pnpm bundle:tizen | bundle:aosp | bundle:webos   # device bundles
-pnpm bench                                  # agent-loop latency
+pnpm dev                                   # browser demo (offline harness)
+pnpm bundle:bringup                        # AOSP bundle with ?diag and ?demo in it
+pnpm bundle:all                            # default device bundles
+pnpm bench                                 # agent-loop latency + planning cost
+pnpm package:tizen                         # signed .wgt   (needs tizen-core `tz`)
+pnpm package:webos                         # .ipk          (needs @webos-tools/cli)
 cd apps/aosp-app && ./gradlew :app:assembleDebug   # Android host (JDK 17+, SDK)
-pnpm package:tizen                          # signed .wgt   (needs tizen-core `tz`)
-pnpm package:webos                          # .ipk          (needs @webos-tools/cli)
+```
 
-# On a connected Android device/emulator:
-node tools/mock-llm-server.mjs &            # offline brain over HTTP
+On a connected Android device or emulator:
+
+```bash
+node tools/mock-llm-server.mjs &           # offline brain over HTTP
 adb reverse tcp:8080 tcp:8080
-node tools/device-acceptance.mjs            # CI acceptance script, on the device
+node tools/device-acceptance.mjs           # the CI acceptance script, on the device
+node tools/device-report.mjs               # → docs/platform/reports/<target>.md
 ```

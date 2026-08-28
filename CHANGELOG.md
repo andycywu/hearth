@@ -6,8 +6,71 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-28
+
+The living-room tier: the runtime stopped being a chat loop with tools attached
+and became an agent with a model of the room, a plan, a policy and a read-back.
+It also acquired a name — **Hearth** — and a size budget.
+
 ### Added
 
+- **The project is called Hearth, and its namespaces are `hearthkit`.**
+  `tv-ai-agent` was a description, not a name: it could not be searched for and
+  it generated no vocabulary for the ideas here. Every globally-unique namespace
+  is `hearthkit` (the only candidate free on npm, GitHub and the domain at once);
+  the repository is `andycywu/hearth`, because *Hearth* is the product and
+  `@hearthkit/*` is where its packages live. Storage prefixes changed from
+  `tv-ai-agent` to `hearth`, which breaks continuity once — history, installed
+  skills and the saved device graph under the old prefix become invisible.
+  Pre-release is the only moment that is free. Deliberately **not** renamed: the
+  Android / Tizen / webOS application ids, because an app id is an installed
+  identity and changing it invalidates every documented `adb` line.
+  [ADR-0003](docs/adr/0003-name-and-namespace.md) records the availability checks
+  and the runners-up. The GitHub Pages demo URL is now
+  `andycywu.github.io/hearth/`; GitHub redirects a renamed repo's own URLs but
+  **not** its Pages site, so the old link is dead rather than forwarded.
+- **Build profiles — optional code is removed at build time, not skipped at
+  runtime** (`core/src/features.ts`, `tools/bundle.mjs`). A television parses the
+  whole bundle on every single launch, on a launcher's memory budget, so "ship it
+  and branch around it" is not free there. `--full` / `--with` / `--without` fold
+  six features out through `esbuild` `define`, taking everything they import with
+  them — measured on the ModelPilot planner: 17.4 KB → 0.1 KB. Three profiles:
+  **74 KB** minimal, **95 KB** default, **121 KB** `--full` (adds `?diag`, the
+  offline brain, the keyboard and `?demo` — **use it for bring-up**). Installable
+  packages, measured rather than estimated: `.wgt` 92.6 KB, `.ipk` 41.9 KB.
+  `bundle-features.test.ts` builds the real entry and weighs it, so a regression
+  is a failing test rather than a fatter download.
+- **`@hearthkit/host` — one boot sequence for all four hosts**, replacing four
+  copies that had drifted apart in the ways copies do. A fifth host now
+  implements an adapter, not a boot.
+- **Planning cost is counted** (`core/src/planner/meter.ts`). Every plan carries a
+  `source` — `deterministic`, `model`, `remote`, or `local-fallback` for a remote
+  engine that was asked and could not answer — and `agent.planning` counts them
+  beside chat turns, which are never free. The ratio between the two decides
+  whether goal mode is a product or a demo, and it had never been measured.
+  First result, from `pnpm bench`: **the four P0 scenarios plan for 100% zero
+  tokens**, 1.7 ms average, no model call at all. Counters are local and read by
+  `pnpm bench` and the device report; they are sent nowhere.
+- **`tools/device-report.mjs` — one command turns a television into a pasteable
+  report.** It launches the app in goal mode, runs the capability probe with
+  writes, puts the four P0 scenarios through the planner, and writes a finished
+  markdown section into `docs/platform/reports/`. The formatting happens *on the
+  device*, by the same code every host ships, so a report taken by hand from a
+  WebView console — `(await window.__hearthReport({allowWrites: true})).markdown`
+  — is byte-identical to one the tool collects. A platform with no `adb` is not a
+  second-class contributor. The section that earns it is the one no adapter can
+  produce about itself: **did anything accept a command and then do nothing?**
+- **Install identity and service metrics** (`core/src/identity.ts`,
+  [`docs/service-metrics.md`](docs/service-metrics.md)). A service business has to
+  know how many devices use it; this repo had already promised the runtime does
+  not phone home. Both hold, because ModelPilot is the only egress and a host
+  opts into it with a credential: three headers ride along on calls that were
+  already happening (`x-hearth-install`, `x-hearth-runtime`, `x-hearth-mode`) and
+  the rest is derived server-side. No analytics client, no event queue, no second
+  endpoint. In `off` mode no signal exists at all. The id is random, generated on
+  the device, stored locally and resettable — not the Android ID, not a serial,
+  not a MAC, not an advertising id; two identical televisions in the same shop
+  get different ids and a test asserts it.
 - **A Living Room agent runtime under the chat loop.** The agent kept no state
   between tool calls, could not describe the room it was in, and reported every
   action as a success whether or not the TV did it. Six additive modules in
@@ -237,6 +300,59 @@ Voice on AOSP, which didn't work at all on a device despite passing every test:
   window but never closed it; the engine now holds one pending utterance and
   speaks it on init. A failed init releases it, so the avatar can't get stuck
   mid-sentence.
+
+### Build, CI and dependencies
+
+- **TypeScript 6.0.3, ESLint 10.9.1, typescript-eslint 8.68, esbuild 0.28** —
+  verified rather than trusted, because two are major versions and one is the
+  tool the whole size story rests on. esbuild was re-measured: **97.3 / 94.5 /
+  97.2 KB, byte-identical to 0.23**. ESLint was checked to be actually linting
+  rather than quietly finding nothing (`--format json` → 156 files, 0 problems),
+  which is the failure mode a config-discovery change in a major produces.
+  GitHub Actions bumped to current majors; `action-gh-release` only runs on a
+  tag, so this release is its first exercise.
+- **`tools/secrets-check.mjs`** — a credential tripwire over changed files,
+  wired into CI.
+- **`check:size` now bundles the targets it checks.** A webos budget was added
+  while `bundle:all` still built only tizen and aosp, so the check was looking
+  for a bundle nobody had built.
+- **The pipewire CI leg waits for the daemon it is about to use.** It waited on
+  WirePlumber and then called `pactl`, whose socket belongs to a third daemon —
+  so whether the null sink existed came down to a race, which is why the fix
+  looked like a fix and then like a regression. Readiness is a property of the
+  thing you are about to use, not of the thing that happens to be nearby.
+- **`tools/mock-modelpilot-server.mjs` exits after 15 idle minutes**
+  (`--idle <seconds>`). Five abandoned instances, days old, once made the
+  repository directory itself un-renameable — each holds a working-directory
+  handle on the repo root. A fixture that outlives its test is not harmless.
+
+### Documentation
+
+- **The README says what this is and what it is not**, on the first screen:
+  an experimental open runtime and a testbed, not a TV OS, a launcher or a
+  content product, and affiliated with nobody. The finding that shaped it is
+  stated rather than buried — on every OS whose image we do not own, the flagship
+  scenario is **refused**, because input switching needs a platform signature on
+  Android and a partner certificate on Tizen and webOS.
+- **[The Hearth Report](docs/platform/capability-matrix.md) is promoted from an
+  internal note to the project's main output.** No company can buy twenty
+  televisions across five firmware generations, and no amount of further software
+  produces that table — only people with different TVs in different living rooms
+  can. So the highest-value contribution here needs no code: run `?diag` on a
+  television nobody here owns and paste what it said.
+- **CONTRIBUTING gains support tiers, a refusal list and a review promise** —
+  what will not be accepted (content search, telemetry, vendor blobs, guessed
+  platform APIs, anything widening the perception boundary), because a short firm
+  list attracts the right people and saves an argument.
+- **[`HARDWARE_VERIFICATION.md`](docs/HARDWARE_VERIFICATION.md) covers the room,
+  not just the TV** — grouped by what you would have to physically obtain, since
+  "needs hardware" on its own is not actionable.
+- **STATUS, the roadmap and the internal handoff were rewritten against the
+  code.** All three had drifted: two different wrong test counts, no mention of
+  ModelPilot, `@hearthkit/host`, build profiles or the device report, and a
+  handoff still describing a `tv-ai-agent` repo with 163 tests. A project whose
+  entire premise is not claiming things it hasn't verified cannot ship a stale
+  status page.
 
 ## [0.1.0] - 2026-08-05
 
@@ -622,4 +738,5 @@ The core as it stood on 2026-07-27, before device bring-up.
   a partner/platform certificate (Tizen) or system signature (Android); the
   open-source build degrades gracefully via `has()`.
 
+[0.2.0]: https://github.com/andycywu/hearth/releases/tag/v0.2.0
 [0.1.0]: https://github.com/andycywu/hearth/releases/tag/v0.1.0

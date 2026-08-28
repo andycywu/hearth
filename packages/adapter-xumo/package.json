@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/adapter-xumo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Xumo OS adapter stub: the shape of the platform bridge, with typed \"unsupported\" until a real one is wired up. Proves adding an OS touches only its adapter.",
   "type": "module",
   "sideEffects": false,

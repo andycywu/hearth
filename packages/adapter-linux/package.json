@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/adapter-linux",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "PlatformProvider for a Linux device that is itself the TV — a set-top box, a Pi, an embedded panel. Node only.",
   "type": "module",

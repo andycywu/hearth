@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/skill-manifest",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Skills as data: interpret a JSON manifest as an agent tool. No code is loaded, so the app's CSP and 'no remote code' property are preserved. See docs/adr/0002.",
   "type": "module",
   "sideEffects": false,
