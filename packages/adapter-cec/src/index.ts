@@ -6,6 +6,7 @@ export {
   connectionFor, deviceIdFor, deviceTypeFor, fallbackName, parentPhysical, parsePhysical,
 } from "./addresses.js";
 export { createCecSource } from "./source.js";
+export { createCecTransport } from "./transport-binding.js";
 export {
   createCecCapabilities, createCecTools, cecHandlers, cecTargets, toolSuffix,
   type CecCapabilityOptions,

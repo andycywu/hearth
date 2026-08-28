@@ -60,6 +60,10 @@ export {
 } from "./devices/store.js";
 export { deviceTreeText } from "./devices/report.js";
 export {
+  attachTransports, transportSources,
+  type DeviceTransport, type TransportAttachment,
+} from "./devices/transport.js";
+export {
   discoverRoom, roomOptionFromUrl, DEMO_ROOM, type RoomOptions,
 } from "./devices/host.js";
 export type {

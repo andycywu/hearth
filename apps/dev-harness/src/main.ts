@@ -1,7 +1,7 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, summarizeOutcome,
-  discoverRoom, deviceTreeText, WorldModel,
-  type LlmClient, type PlannerContext,
+  discoverRoom, deviceTreeText, WorldModel, attachTransports, transportSources,
+  type DeviceTransport, type LlmClient, type PlannerContext,
 } from "@hearthkit/core";
 import { createWebAdapter } from "@hearthkit/adapter-web";
 import {
@@ -13,16 +13,13 @@ import {
 } from "@hearthkit/llm-connectors";
 import { createWeatherTool } from "@hearthkit/skills-example";
 import { createScriptedSource, occupancyScript } from "@hearthkit/perception-mock";
-import {
-  createCecSource, createCecTools, createCecCapabilities, cecTargets,
-  createMockCecBus, MOCK_LIVING_ROOM,
-} from "@hearthkit/adapter-cec";
+import { createCecTransport, createMockCecBus, MOCK_LIVING_ROOM } from "@hearthkit/adapter-cec";
 import {
   createModelPilotClient, createModelPilotPlanner, resolveModelPilotConfig, offReason,
 } from "@hearthkit/modelpilot";
 import { loadBundledSkills, loadInstalledSkills } from "@hearthkit/skill-manifest";
 import weatherManifest from "@hearthkit/skill-manifest/examples/open-meteo-weather.json";
-import type { Capability, Tool } from "@hearthkit/core";
+import type { Tool } from "@hearthkit/core";
 
 declare global {
   interface Window {
@@ -107,28 +104,21 @@ async function boot(): Promise<void> {
   // Two of the three mock devices misbehave the way real ones do, so the demo
   // shows all three answers rather than a happy path: the console verifies, the
   // AVR never answers `<Give Device Power Status>` and comes back `unverified`.
-  const cecBus = params.get("cec") === "mock"
-    ? createMockCecBus(MOCK_LIVING_ROOM.map((d) => (
+  const transports: DeviceTransport[] = params.get("cec") === "mock"
+    ? [createCecTransport(createMockCecBus(MOCK_LIVING_ROOM.map((d) => (
         d.logical === 5 ? { ...d, answersPowerStatus: false } : { ...d }
-      )))
-    : undefined;
+      ))))]
+    : [];
 
   const devices = await discoverRoom(platform, {
     room: params.get("room") === "empty" ? "empty" : "demo",
-    ...(cecBus ? { sources: [createCecSource(cecBus)] } : {}),
+    ...(transports.length ? { sources: transportSources(transports) } : {}),
   });
 
-  // Capabilities for whatever CEC found *and* the room already holds, keyed by
-  // the graph's node id rather than the CEC address — that is what a skill
-  // resolves to when someone says 「我要打 PS5」.
-  const cecTools: Tool[] = [];
-  const cecCapabilities: Capability[] = [];
-  if (cecBus) {
-    const targets = cecTargets(devices, await cecBus.scan());
-    cecTools.push(...await createCecTools(cecBus, targets));
-    cecCapabilities.push(...targets.flatMap((t) => createCecCapabilities(t.deviceId)));
-    console.info(`[cec] ${targets.length} device(s) reachable: ${targets.map((t) => t.deviceId).join(", ") || "none"}`);
-  }
+  // What each transport can do *given what was found* — the same two calls the
+  // television hosts make, so the harness cannot drift from them.
+  const reach = await attachTransports(devices, transports);
+  for (const note of reach.notes) console.info(`[transport] ${note}`);
 
   // `?devices` prints the room the same way `?diag` prints the capabilities.
   if (params.has("devices")) {
@@ -187,8 +177,8 @@ async function boot(): Promise<void> {
   const agent = new Agent({
     platform,
     llm,
-    tools: [...skills, ...cecTools],
-    ...(cecCapabilities.length ? { capabilities: cecCapabilities } : {}),
+    tools: [...skills, ...reach.tools],
+    ...(reach.capabilities.length ? { capabilities: reach.capabilities } : {}),
     devices,
     world: sharedWorld,
     ...(planner ? { planner, llmPlanning: true } : {}),

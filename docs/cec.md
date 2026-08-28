@@ -65,26 +65,39 @@ CecTransport ──► createCecSource()     ──► DiscoverySource "hdmi_cec
              └─► createCecTools()      ──► tools ──► Capability Graph ──► planner
 ```
 
-A host wires it in three lines — a source for the room, then capabilities and
-tools for whatever that room turned out to contain:
+A host wires it in **one line**, because the boot sequence understands
+transports rather than understanding CEC:
 
 ```ts
-const devices = await discoverRoom(platform, { sources: [createCecSource(bus)] });
-const targets = cecTargets(devices, await bus.scan());
-new Agent({ …, capabilities: targets.flatMap((t) => createCecCapabilities(t.deviceId)),
-                tools: await createCecTools(bus, targets) });
+// apps/aosp-app — the day an Android build is signed to reach HdmiControlManager
+bootRuntime({ name: "aosp", createAdapter, transports: () => [createCecTransport(bus)] });
 ```
 
-`cecTargets` is the join, and it is the easiest thing here to get subtly wrong:
-CEC knows a console as `2.0.0.0`, a person knows it as "the PS5", and a skill
-resolving 「我要打 PS5」 looks for the latter. Capabilities registered under the
-CEC address would produce a plan for a device the goal has never heard of —
-every step correct, the whole thing useless. So targets are keyed by the
-*Device Graph node id*, after the merge.
+`DeviceTransport` ([`core/src/devices/transport.ts`](../packages/core/src/devices/transport.ts))
+is the seam, and it has two stages because the order matters:
 
-`capabilities` on `AgentOptions` exists for this: a tool is what the model may
-ask for, a capability is what the planner may reason about. A transport that
-registered only tools would be invisible to goal mode.
+1. **Before the room is built** it offers discovery sources, since what it can
+   see is part of what the room *is*.
+2. **After the room is built** it is handed the graph and asked what it can now
+   do — because the answer depends on what was found, and on what the merge
+   decided to call it.
+
+That second stage is the easiest thing here to get subtly wrong. CEC knows a
+console as `2.0.0.0`, a person knows it as "the PS5", and a skill resolving
+「我要打 PS5」 looks for the latter — so `cecTargets` keys everything by the
+*Device Graph node id*, after the merge. Capabilities registered under the CEC
+address would produce a plan for a device the goal has never heard of: every step
+correct, the whole thing useless.
+
+The attachment returns capabilities **and** tools, because they answer different
+questions — a tool is what the model may ask for, a capability is what the
+planner may reason about. A transport supplying only tools is invisible to goal
+mode; one supplying only capabilities makes plans nothing can execute. That is
+what `AgentOptions.capabilities` exists for.
+
+A transport that throws is dropped with a note in the boot log. A CEC adapter
+that is not there must never stop a television from booting, and not being there
+is the normal case.
 
 Try it in the browser — [`?cec=mock`](https://andycywu.github.io/hearth/?cec=mock)
 in the dev harness puts a mock bus behind the demo room, then ask 「我要打 PS5」.
