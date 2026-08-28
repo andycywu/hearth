@@ -36,6 +36,18 @@ export interface AgentOptions {
    */
   tools?: Tool[];
   /**
+   * Capabilities this device has beyond the television's own — a transport that
+   * reaches another device, an IoT bridge, a partner service.
+   *
+   * Separate from `tools` because the two answer different questions. A tool is
+   * what the *model* may ask for; a capability is what the *planner* may reason
+   * about, with its preconditions, its risk level and how it gets verified. A
+   * transport that only registered tools would be invisible to goal mode, and
+   * one that only registered capabilities would be a plan nothing can execute.
+   * Both, and they are matched by id.
+   */
+  capabilities?: Capability[];
+  /**
    * When set, conversation history is auto-saved to `platform.storage` under
    * this key after every turn. Call `restore()` at startup to reload it.
    */
@@ -199,7 +211,7 @@ export class Agent {
         meter: this.planning,
       })
       : opts.planner;
-    for (const capability of capabilitiesForPlatform(opts.platform)) {
+    for (const capability of [...capabilitiesForPlatform(opts.platform), ...(opts.capabilities ?? [])]) {
       this.capabilities.register(capability);
       if (capability.tool) this.byTool.set(capability.tool, capability);
     }

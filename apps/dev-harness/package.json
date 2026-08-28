@@ -14,6 +14,7 @@
     "@hearthkit/llm-connectors": "workspace:*",
     "@hearthkit/skills-example": "workspace:*",
     "@hearthkit/perception-mock": "workspace:*",
+    "@hearthkit/adapter-cec": "workspace:*",
     "@hearthkit/modelpilot": "workspace:*",
     "@hearthkit/skill-manifest": "workspace:*"
   },

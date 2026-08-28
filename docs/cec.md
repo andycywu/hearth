@@ -65,8 +65,30 @@ CecTransport ──► createCecSource()     ──► DiscoverySource "hdmi_cec
              └─► createCecTools()      ──► tools ──► Capability Graph ──► planner
 ```
 
-A host wires it in one place — `discoverRoom(platform, { sources: [createCecSource(bus)] })`
-— and the planner, the policy engine and the world model are unchanged.
+A host wires it in three lines — a source for the room, then capabilities and
+tools for whatever that room turned out to contain:
+
+```ts
+const devices = await discoverRoom(platform, { sources: [createCecSource(bus)] });
+const targets = cecTargets(devices, await bus.scan());
+new Agent({ …, capabilities: targets.flatMap((t) => createCecCapabilities(t.deviceId)),
+                tools: await createCecTools(bus, targets) });
+```
+
+`cecTargets` is the join, and it is the easiest thing here to get subtly wrong:
+CEC knows a console as `2.0.0.0`, a person knows it as "the PS5", and a skill
+resolving 「我要打 PS5」 looks for the latter. Capabilities registered under the
+CEC address would produce a plan for a device the goal has never heard of —
+every step correct, the whole thing useless. So targets are keyed by the
+*Device Graph node id*, after the merge.
+
+`capabilities` on `AgentOptions` exists for this: a tool is what the model may
+ask for, a capability is what the planner may reason about. A transport that
+registered only tools would be invisible to goal mode.
+
+Try it in the browser — [`?cec=mock`](https://andycywu.github.io/hearth/?cec=mock)
+in the dev harness puts a mock bus behind the demo room, then ask 「我要打 PS5」.
+The planner, the policy engine and the world model are unchanged by any of it.
 
 ### What CEC tells the Device Graph, and what it refuses to
 

@@ -1,6 +1,6 @@
 import {
   W, createDevicePowerCapabilities, toolsFromCapabilities,
-  type Capability, type CapabilityHandler, type Tool,
+  type Capability, type CapabilityHandler, type DeviceGraph, type Tool,
 } from "@hearthkit/core";
 import { TvUnsupportedError } from "@hearthkit/platform-api";
 import type { CecDevice, CecTransport } from "./types.js";
@@ -158,6 +158,39 @@ export function cecHandlers(
     };
   }
   return handlers;
+}
+
+/**
+ * Match what CEC found against what the room already believes.
+ *
+ * The two are not the same list, and the difference is the useful part. A
+ * console someone registered by hand is `ps5` in the Device Graph; CEC knows it
+ * as `2.0.0.0`. The graph merges them into one node — by HDMI port, or by CEC
+ * address once one is known — and **the node's id is the one that matters**,
+ * because that is what a skill resolves to when someone says 「我要打 PS5」.
+ * Registering capabilities under `cec-2-0-0-0` instead would produce a plan for
+ * a device the goal has never heard of.
+ *
+ * Devices CEC saw but the graph does not hold, and nodes with no CEC address,
+ * are both simply absent from the result: one is a device we cannot name, the
+ * other a device we cannot reach.
+ */
+export function cecTargets(graph: DeviceGraph, found: CecDevice[]): CecCapabilityOptions[] {
+  const byPhysical = new Map<string, CecDevice>();
+  for (const device of found) {
+    if (device.physical) byPhysical.set(device.physical, device);
+  }
+  const targets: CecCapabilityOptions[] = [];
+  for (const node of graph.list()) {
+    const address = node.cecAddress;
+    if (!address) continue;
+    const device = byPhysical.get(address);
+    // The television answers on the bus at 0.0.0.0 and is not something to
+    // power on over CEC from itself.
+    if (!device || device.logical === 0) continue;
+    targets.push({ deviceId: node.id, device });
+  }
+  return targets;
 }
 
 /**

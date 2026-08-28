@@ -35,7 +35,7 @@ Shipped and verified (see [`STATUS.md`](STATUS.md)): the agent loop, the HAL and
 five adapters under one contract test, tool registry with validation, the
 `TvResult` envelope, boot capability probing with capability withdrawal, voice,
 four renderers, declarative skills, packaging for Android TV / Tizen / webOS,
-**742 tests green**. Goal mode is verified on the Android TV emulator, not only
+**746 tests green**. Goal mode is verified on the Android TV emulator, not only
 in CI.
 
 The state and reasoning tier (M0, additive — nothing existing was modified):

@@ -66,6 +66,20 @@ export interface DeviceObservation {
   /** Strong identity keys, used to merge observations from different sources. */
   mac?: string;
   cecAddress?: string;
+  /**
+   * The parent, named by *its* CEC address rather than by a node id.
+   *
+   * A source knows the topology in its own id space, and that id space stops
+   * being true the moment the graph merges: a hand-registered box on HDMI3 and
+   * the AVR that answered from `3.0.0.0` become one node, under the id the
+   * person gave it, and a child pointing at `cec-3-0-0-0` is then pointing at
+   * nothing. A dangling parent is worse than no parent — `inputPortFor` walks
+   * the chain to find which input shows a device, and it would walk off the end.
+   *
+   * So the link is expressed as a key and resolved by `linkParents()` once
+   * everything has been folded in.
+   */
+  parentCecAddress?: string;
 }
 
 export interface DiscoverySource {

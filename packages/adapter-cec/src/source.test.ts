@@ -23,6 +23,9 @@ describe("the CEC discovery source", () => {
     // 3.1.0.0 is port 1 of the device at 3.0.0.0. That is the parent hop, and it
     // came out of the address rather than out of a second discovery pass.
     expect(devices.get("cec-3-1-0-0")?.parentId).toBe("cec-3-0-0-0");
+    // And the walk that answers "which input shows this device" reaches HDMI3
+    // through the AVR rather than stopping at a device with no port of its own.
+    expect(devices.inputPortFor("cec-3-1-0-0")).toBe("hdmi3");
     expect(devices.get("cec-3-0-0-0")?.type).toBe("avr");
     // Straight into the TV: no parent, rather than the TV as a parent.
     expect(devices.get("cec-2-0-0-0")?.parentId).toBeUndefined();

@@ -36,12 +36,15 @@ export function summarizeOutcome(outcome: PlanOutcome): string {
   if (done.length) lines.push(`Done: ${names(done)}.`);
   if (already.length) lines.push(`Already set: ${names(already)}.`);
   if (assumed.length) {
-    lines.push(`Asked the TV to ${names(assumed)}, but this device can't confirm it.`);
+    const subject = subjectFor(assumed);
+    lines.push(subject
+      ? `Asked ${subject} to ${names(assumed)}, but this device can't confirm it.`
+      : `Asked for ${names(assumed)}, but nothing here can confirm it.`);
   }
   if (denied.length) lines.push(`Skipped ${names(denied)}: ${reason(denied)}`);
-  if (unsupported.length) lines.push(`This TV can't ${names(unsupported)}: ${reason(unsupported)}`);
+  if (unsupported.length) lines.push(`${cannot(unsupported)} ${names(unsupported)}: ${reason(unsupported)}`);
   if (failed.length) lines.push(`Couldn't ${names(failed)}: ${reason(failed)}`);
-  if (skipped.length) lines.push(`This TV can't ${names(skipped)}, so I left it.`);
+  if (skipped.length) lines.push(`${cannot(skipped)} ${names(skipped)}, so I left it.`);
   if (outcome.unmet.length && !failed.length && !denied.length && !unsupported.length) {
     lines.push(`Still not where you asked: ${outcome.unmet.map((p) => p.path).join(", ")}.`);
   }
@@ -52,6 +55,39 @@ export function summarizeOutcome(outcome: PlanOutcome): string {
 export function outcomeLines(outcome: PlanOutcome): string[] {
   return outcome.outcomes.map((o) =>
     `${o.step.action.capabilityId}${args(o)} — ${o.status}${o.detail ? ` (${o.detail})` : ""}`);
+}
+
+/**
+ * Who the sentence is about.
+ *
+ * Everything here used to be the television, so "the TV" was safe to hard-code.
+ * CEC changed that: `ps5.power.on` is a step about a console, and "asked the TV
+ * to ps5.power.on" is both clumsy and wrong — the TV is the thing that *sent*
+ * the message. Returns undefined when one plan touched several devices, because
+ * a sentence with two subjects is worse than one with none.
+ */
+function subjectFor(outcomes: StepOutcome[]): string | undefined {
+  const devices = new Set(outcomes.map((o) => deviceOf(o.step.action.capabilityId)));
+  if (devices.size !== 1) return undefined;
+  const device = [...devices][0]!;
+  return device === "tv" ? "the TV" : `the ${device}`;
+}
+
+/** "This TV can't" is only true when the step was about the TV. */
+function cannot(outcomes: StepOutcome[]): string {
+  return subjectFor(outcomes) === "the TV" ? "This TV can't" : "I can't";
+}
+
+/**
+ * The device a capability id names — `ps5.power.on` → `ps5`.
+ *
+ * The domains that are the television itself (`tv.*`) and the ones that are not
+ * about a device at all (`content.*`) both answer "tv", because that is who the
+ * user is talking to.
+ */
+function deviceOf(capabilityId: string): string {
+  const prefix = capabilityId.split(".")[0] ?? "tv";
+  return prefix === "content" ? "tv" : prefix;
 }
 
 function names(outcomes: StepOutcome[]): string {
