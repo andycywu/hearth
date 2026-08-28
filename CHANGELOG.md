@@ -44,9 +44,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `discoverRoom(platform, { sources })` lets a host wire a transport in without
     core learning what a CEC bus is.
   - **No real CEC bus has run any of this.** The Android API is `@SystemApi`,
-    Tizen and webOS expose none, so an absent transport is the *normal* case. The
-    cheapest verification anyone can buy is a Raspberry Pi and `cec-ctl`, which
-    makes a Linux transport the next thing worth writing.
+    Tizen and webOS expose none, so an absent transport is the *normal* case.
+- **A Linux CEC transport over `cec-ctl`** (`createLinuxCecTransport`), which is
+  the only implementation of `CecTransport` a person can verify without a signing
+  agreement: a Raspberry Pi has `/dev/cec0` and `apt install v4l-utils`. It
+  follows the same shape as that adapter's audio backends — every shell call
+  through an injectable `Runner`, pure parsers testable without hardware. Two
+  operational facts are encoded because they cost time otherwise: an adapter must
+  **claim a logical address** before it can transmit at all (a fresh `/dev/cec0`
+  has none, and every `--to` fails with "Device has no logical address"), so the
+  first transmit configures once and `configure: false` exists for a box where
+  another daemon owns the adapter; and **CEC is slow**, so the runner waits 15
+  seconds rather than the 5 that is generous for `pactl`. A NACK is a failure and
+  not a device that happens to be off — nothing answered at that address.
+- **`tools/verify-cec.mjs`**, because the parsers are tested against fixtures
+  written from `cec-ctl`'s documentation rather than recorded from a device, and
+  the repo says which of those it is. On a machine with an adapter it scans,
+  reads power status, runs the discovery source, optionally wakes a device with
+  `--writes` and puts it back, and prints the raw output beside what the parser
+  made of it plus a transcript ready to paste in as a fixture. It reports how
+  many devices answer `<Give Device Power Status>` at all, since *only those can
+  ever report `verified`* for a power change. With no adapter it says which of
+  the three reasons applies and exits 0 — not owning a Pi is not a test failure.
 
 ### Fixed
 

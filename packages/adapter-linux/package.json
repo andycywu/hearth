@@ -19,6 +19,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@hearthkit/adapter-cec": "workspace:*",
     "@hearthkit/platform-api": "workspace:*"
   },
   "devDependencies": {
