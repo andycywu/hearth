@@ -19,7 +19,7 @@
     "@hearthkit/adapter-titan": "workspace:*",
     "@hearthkit/adapter-xumo": "workspace:*",
     "@hearthkit/llm-connectors": "workspace:*",
-    "esbuild": "^0.23.0"
+    "esbuild": "^0.28.2"
   },
   "license": "Apache-2.0"
 }
