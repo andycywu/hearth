@@ -35,7 +35,7 @@ Shipped and verified (see [`STATUS.md`](STATUS.md)): the agent loop, the HAL and
 five adapters under one contract test, tool registry with validation, the
 `TvResult` envelope, boot capability probing with capability withdrawal, voice,
 four renderers, declarative skills, packaging for Android TV / Tizen / webOS,
-**746 tests green**. Goal mode is verified on the Android TV emulator, not only
+**752 tests green**. Goal mode is verified on the Android TV emulator, not only
 in CI.
 
 The state and reasoning tier (M0, additive — nothing existing was modified):
@@ -103,7 +103,8 @@ Verification → World Model.
 ## P1 — the real living room
 
 - HDMI-CEC transport: device discovery, power, active-source, OSD names.
-  *Built and mock-tested (task 7); needs a platform transport and a real bus.*
+  *Built and mock-tested (task 7), with a `cec-ctl` implementation for Linux and
+  a one-line host hook. Needs a real bus — and on Android, a signed build.*
 - IR blaster profiles for devices with no back channel.
 - Real Android TV hardware bring-up (MTK / NVT boards).
 - Device discovery populating the Device Graph from CEC + manual registration.
@@ -293,7 +294,21 @@ Ordered. Each is independently shippable.
   real hardware does. 27 tests; the four honest answers are pinned by one goal
   against four buses. Design and rationale: [`cec.md`](cec.md).
 
-  It found three defects in code that was already green, all the same shape —
+  Then the `cec-ctl` transport for Linux (`createLinuxCecTransport` in
+  `adapter-linux`), because it is the only implementation a person can verify
+  without a signing agreement — a Raspberry Pi has `/dev/cec0` and `v4l-utils` —
+  and `tools/verify-cec.mjs` beside it: scan, topology, power status, an optional
+  wake-and-restore, and a transcript ready to paste back as a fixture.
+
+  And then the seam that makes it a *host* decision rather than a code change:
+  `bootRuntime({ …, transports: () => [createCecTransport(bus)] })`.
+  `DeviceTransport` (`core/src/devices/transport.ts`) is deliberately not
+  CEC-shaped — a transport offers discovery sources before the room is built,
+  then is handed the merged graph and asked what it can do with it, which is the
+  order IR, Wake-on-LAN and Matter will need too. `?cec=mock` in the dev harness
+  runs that exact path, so the harness cannot drift from the televisions.
+
+  It found **five** defects in code that was already green, all the same shape —
   correct for every device that had existed until now. **A read-back could verify
   against its own assumption**: the executor checked that the read succeeded, not
   that it *answered*, and every reader in this repo always answers. Over CEC a
@@ -302,13 +317,18 @@ Ordered. Each is independently shippable.
   port merged into one** — an AVR and the box plugged into it are both "on
   HDMI3", and `cecAddress` was named in the identity rule but never stored.
   **Two CEC devices could not coexist**, because core names a power tool after
-  its provider and the registry throws on a duplicate.
+  its provider and the registry throws on a duplicate. **A parent link could
+  point at a node that no longer existed**, once the parent merged into a
+  hand-registered one — so an Apple TV behind an AVR silently had no input port.
+  And **the agent said the television had done something another device did**:
+  "Asked the TV to `ps5.power.on`", when the TV is the thing that sent the
+  message.
 
-  **What is still true: no real CEC bus has run any of this.** The Android API is
-  `@SystemApi`, Tizen and webOS expose none, so `available()` returning false is
-  the normal case. The cheapest verification anyone can buy is a Raspberry Pi and
-  `cec-ctl` — which makes a Linux `CecTransport` the next thing worth writing,
-  and the first one an outside contributor could actually finish.
+  **What is still true: no real CEC bus has run any of this.** The parsers are
+  tested against output written from `cec-ctl`'s documentation, not recorded from
+  a device, and the code says so wherever a reader could mistake it for hardware
+  evidence. The Android API is `@SystemApi` and Tizen and webOS expose none, so
+  `available()` returning false stays the normal case.
 
 ### 8. Perception source interface with a mock camera — **done**
 

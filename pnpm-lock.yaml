@@ -153,6 +153,13 @@ importers:
       '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
+    devDependencies:
+      '@hearthkit/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
+      '@hearthkit/llm-connectors':
+        specifier: workspace:*
+        version: link:../llm-connectors
 
   packages/adapter-linux:
     dependencies:

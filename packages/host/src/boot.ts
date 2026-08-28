@@ -1,7 +1,8 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl,
   discoverRoom, deviceTreeText, describeFeatures, loadInstallId, RUNTIME_VERSION,
-  type PlannerContext,
+  attachTransports, transportSources,
+  type DeviceTransport, type PlannerContext,
 } from "@hearthkit/core";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
@@ -53,6 +54,21 @@ export interface HostDefinition {
    * sanctioned path.
    */
   provisionedKeys?: () => { llm?: string | undefined; modelPilot?: string | undefined };
+  /**
+   * Ways of reaching devices that are not the television — HDMI-CEC today, IR
+   * and Matter later.
+   *
+   * Built by the host rather than here, because whether a transport exists is a
+   * *host* question: the same Android build has CEC or does not depending on how
+   * it was signed, and no amount of code in this file changes that. A host with
+   * a bus supplies `createCecTransport(bus)` and changes nothing else — the
+   * room, the capabilities, the tools and the boot log all follow.
+   *
+   * A transport that throws is dropped with a note. A CEC adapter that is not
+   * there must never stop a television from booting, and not being there is the
+   * normal case.
+   */
+  transports?: () => DeviceTransport[] | Promise<DeviceTransport[]>;
   /** Where a full-screen report is written. Default: `#app`, else `document.body`. */
   reportRootId?: string;
   /** Element that shows a boot failure, when the page has one. Default `#status`. */
@@ -118,10 +134,20 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
     // `?timeout=90` when the model is slow: a local model on modest hardware can
     // take a minute a turn, and the 30s default makes that look broken.
     const turnTimeoutMs = turnTimeoutFromUrl();
-    // What is in the room: what storage remembers, plus what the TV can see.
-    // `?room=demo` seeds a console on HDMI2 so the multi-device scenario has
-    // something to plan for on a set with nothing plugged in.
-    const devices = await discoverRoom(platform);
+    // What is in the room: what storage remembers, what the TV can see, and
+    // whatever a transport can reach past it. `?room=demo` seeds a console on
+    // HDMI2 so the multi-device scenario has something to plan for on a set with
+    // nothing plugged in.
+    const transports = await resolveTransports(host);
+    const devices = await discoverRoom(platform, {
+      ...(transports.length ? { sources: transportSources(transports) } : {}),
+    });
+
+    // Then ask each transport what it can do *given what was found* — the answer
+    // depends on the merge, because capabilities have to be registered under the
+    // name the goal will use, and only the merged graph knows what that is.
+    const reach = await attachTransports(devices, transports);
+    for (const note of reach.notes) console.info(`[transport] ${note}`);
 
     // A random, resettable, device-generated id — never a hardware identifier —
     // carried only on ModelPilot calls, so the service can count installations
@@ -131,6 +157,8 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
 
     const agent = new Agent({
       platform, llm, confirm, devices,
+      ...(reach.capabilities.length ? { capabilities: reach.capabilities } : {}),
+      ...(reach.tools.length ? { tools: reach.tools } : {}),
       ...(modelPilot ? { planner: modelPilot, llmPlanning: true } : {}),
       ...(turnTimeoutMs ? { turnTimeoutMs } : {}),
     });
@@ -183,6 +211,22 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
     const status = document.getElementById(host.statusId ?? "status");
     if (status) status.textContent = message;
     return undefined;
+  }
+}
+
+/**
+ * The transports this host has, or none.
+ *
+ * Wrapped because a host builds them by reaching for a native bridge that an
+ * older host binary may not have: a newer bundle running on last month's APK
+ * must boot with no CEC rather than not boot at all.
+ */
+async function resolveTransports(host: HostDefinition): Promise<DeviceTransport[]> {
+  try {
+    return (await host.transports?.()) ?? [];
+  } catch (e) {
+    console.warn(`[transport] none available: ${(e as Error).message}`);
+    return [];
   }
 }
 

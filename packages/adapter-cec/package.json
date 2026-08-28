@@ -15,5 +15,9 @@
     "@hearthkit/core": "workspace:*",
     "@hearthkit/platform-api": "workspace:*"
   },
+  "devDependencies": {
+    "@hearthkit/adapter-web": "workspace:*",
+    "@hearthkit/llm-connectors": "workspace:*"
+  },
   "license": "Apache-2.0"
 }

@@ -125,7 +125,7 @@ discovered rather than declared; then ask 「我要打 PS5」), `?skills=weather
 (example skill), `?llm=http://127.0.0.1:11434/v1&model=llama3.2` (real model).
 
 ```bash
-pnpm test           # 746 tests
+pnpm test           # 752 tests
 pnpm bench          # agent-loop latency (p50/p95 per turn)
 ```
 
@@ -286,7 +286,7 @@ has no third-party dependencies at all.**
 | Runtime | **Node.js ≥ 20** for tooling; the agent itself runs in the TV's WebView | |
 | Package manager | **pnpm 9** workspaces + TypeScript project references | One repo, ~20 packages, real build ordering |
 | Bundler | **esbuild** — one ESM file per target, minified, with feature flags folded out | Fast, and its `define` is what removes optional code |
-| Tests | **Vitest** — 746 tests, including one that builds the bundle and weighs it | |
+| Tests | **Vitest** — 752 tests, including one that builds the bundle and weighs it | |
 | Lint | **ESLint 10** flat config with `typescript-eslint` | |
 | UI | Hand-written DOM / Canvas 2D. No framework, no CSS library | A framework would be larger than the agent |
 | Models | Any **OpenAI-compatible** HTTP endpoint — cloud gateway, or `llama.cpp` / Ollama on the TV | No vendor lock-in; see [on-device inference](docs/on-device-inference.md) |
@@ -305,7 +305,7 @@ on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 746 tests |
+| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 752 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
 | Goal mode on the Android TV emulator | ✅ device graph → plan → verify, through logcat |

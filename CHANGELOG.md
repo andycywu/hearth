@@ -87,6 +87,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   resolving 「我要打 PS5」 looks for the former. Registering capabilities under the
   address would produce a plan for a device the goal has never heard of — every
   step correct, the whole thing useless.
+- **`DeviceTransport`, and a host wires one in a line.** Reaching devices past
+  the television was six steps in the right order — build a source, pass it to
+  `discoverRoom`, scan again, join what was found to what the room calls things,
+  build capabilities, build tools — and the dev harness had all six inline. That
+  is exactly how three app hosts came to have three divergent boot sequences, the
+  fix for which was `@hearthkit/host`; repeating the mistake one layer up was not
+  interesting. So `bootRuntime({ …, transports: () => [createCecTransport(bus)] })`
+  is the whole integration, and `?cec=mock` in the harness runs the identical
+  path so the two cannot drift.
+  - The seam is deliberately **not CEC-shaped**: a transport offers discovery
+    sources *before* the room is built, then is handed the merged graph and asked
+    what it can now do — because the answer depends on what was found and on what
+    the merge decided to call it. IR, Wake-on-LAN and Matter need that same order.
+  - Whether a transport exists is a *host* question, not a runtime one: the same
+    Android build has CEC or does not depending on how it was signed. A transport
+    that throws is dropped with a note in the boot log, because a CEC adapter that
+    is not there must never stop a television from booting — and not being there
+    is the normal case.
+  - It costs **~0.7 KB** on every television that has no transport at all, which
+    is the honest price of the seam existing and is stated rather than rounded
+    away.
 
 ### Fixed
 
