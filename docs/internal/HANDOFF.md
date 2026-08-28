@@ -22,7 +22,7 @@ needs hardware nobody here has, and no amount of further code moves it:
 |---|---|
 | A retail Samsung TV | Tizen audio — `volume`/`mute` are unexercised code, that emulator has no audio API |
 | MTK / NVT boards | Phase 2 bring-up, the privileged controls, on-device model benchmarks |
-| A console + an AVR, or a Raspberry Pi | CEC against a real bus, multi-provider demotion, the parent-hop. A Linux `CecTransport` over `cec-ctl` is the cheapest way in — see [`../cec.md`](../cec.md) |
+| A Raspberry Pi (+ a console and an AVR for the full story) | CEC against a real bus. The transport is written; `node tools/verify-cec.mjs` is the whole task — see [`../cec.md`](../cec.md) |
 | A browser with a weak GPU | Blits as the default renderer |
 
 So the highest-value thing that can be done from a desk is **anything that makes
@@ -38,7 +38,7 @@ Run before every commit. CI runs the same thing:
 pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm bundle:all && pnpm check:size
 ```
 
-Currently: **724 tests**, 18 packages, clean lint.
+Currently: **742 tests**, 18 packages, clean lint.
 
 ## Conventions that are load-bearing
 

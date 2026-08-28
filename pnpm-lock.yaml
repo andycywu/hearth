@@ -153,6 +153,9 @@ importers:
 
   packages/adapter-linux:
     dependencies:
+      '@hearthkit/adapter-cec':
+        specifier: workspace:*
+        version: link:../adapter-cec
       '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api

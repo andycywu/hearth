@@ -19,7 +19,7 @@ through logcat. Packaging is verified for all three hosts (APK / signed `.wgt` /
 audio API on that image, webOS stubs audio and app management, and CEC, IR, an
 AVR, a console, a camera and a far-field microphone need a room rather than a TV.
 
-**724 tests green**, across 18 packages.
+**742 tests green**, across 18 packages.
 
 ## At a glance
 
@@ -43,7 +43,7 @@ AVR, a console, a camera and a far-field microphone need a room rather than a TV
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
 | CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 724 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 742 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
@@ -51,15 +51,15 @@ AVR, a console, a camera and a far-field microphone need a room rather than a TV
 | **webOS install run** | ✅ runs on the TV 26 Simulator; audio and app management are stubs there |
 | **Linux platform** | ✅ all three backends against real tooling — `pactl`/`wpctl` in CI, `amixer` on a real sound card |
 | **Tizen audio (volume, mute)** | ⛔ unexercised code — that emulator has no audio API at all |
-| **HDMI-CEC transport** | 🟡 `packages/adapter-cec` built and mock-tested — no real bus has ever run it, and the API is privileged on Android / absent on Tizen and webOS. [`cec.md`](cec.md) |
+| **HDMI-CEC** | 🟡 transport, discovery, verified power and a `cec-ctl` implementation for Linux — mock- and fixture-tested, **no real bus has run it**. `node tools/verify-cec.mjs` is how that changes. [`cec.md`](cec.md) |
 | **Real MTK/NVT device bring-up** | ⛔ needs hardware |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (724 tests)
+## Test coverage (742 tests)
 
 core 197 · ui 167 · llm-connectors 61 · skill-manifest 56 · modelpilot 46 ·
-adapter-aosp 28 · adapter-cec 27 · adapter-linux 24 · cli 21 · acceptance 20 ·
+adapter-linux 42 · adapter-aosp 28 · adapter-cec 27 · cli 21 · acceptance 20 ·
 perception-mock 14 · adapter-tizen 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 
@@ -93,12 +93,12 @@ Report.
 
 ## Remaining — needs external resources
 
-1. **A real HDMI-CEC bus (roadmap task 7).** The transport, the discovery source
-   and the mock bus are built and tested; what none of that proves is that any of
-   it works on hardware. The cheapest verification anyone can buy is a Raspberry
-   Pi and `cec-ctl` — a Linux `CecTransport` is the next thing worth writing, and
-   the first one an outside contributor could finish. Android's CEC API is
-   `@SystemApi`; Tizen and webOS expose none.
+1. **A real HDMI-CEC bus (roadmap task 7).** The transport, the discovery source,
+   the mock bus and a `cec-ctl` implementation for Linux are built and tested;
+   what none of that proves is that any of it works on hardware. A Raspberry Pi
+   with `/dev/cec0` and `v4l-utils` is the whole shopping list, and
+   `node tools/verify-cec.mjs` prints a transcript ready to paste back as a
+   fixture. Android's CEC API is `@SystemApi`; Tizen and webOS expose none.
 2. **Phase 2 device bring-up (critical path).** MTK + NVT boards (Tizen + AOSP),
    `?diag`, fill the capability matrix, obtain signing (partner on Tizen,
    platform on Android) for the gated controls.

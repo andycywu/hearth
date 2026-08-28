@@ -7,6 +7,6 @@
     "types": ["node"]
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../platform-api" }],
+  "references": [{ "path": "../platform-api" }, { "path": "../adapter-cec" }],
   "exclude": ["dist", "src/**/*.test.ts"]
 }

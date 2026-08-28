@@ -1,8 +1,10 @@
 # HDMI-CEC — the first transport past the television
 
-_Roadmap [task 7](roadmap.md#next-10-implementation-tasks). Package:
-[`packages/adapter-cec`](../packages/adapter-cec). Status: **built and tested
-against a mock bus; never run against a real one.**_
+_Roadmap [task 7](roadmap.md#next-10-implementation-tasks). Packages:
+[`packages/adapter-cec`](../packages/adapter-cec) (transport-agnostic) and the
+`cec-ctl` transport in [`packages/adapter-linux`](../packages/adapter-linux).
+Status: **built, and tested against a mock bus and recorded output; never run
+against a real one.**_
 
 Everything before this reached exactly one device. Volume, mute, input, apps —
 the television acting on itself through the HAL, where "did it work?" is answered
@@ -37,11 +39,11 @@ agent's model of the room goes wrong and stays wrong.
 
 ### Who can actually implement it
 
-| Host | API | Reachable? |
-|---|---|---|
-| Android TV | `HdmiControlManager` | **only with `HDMI_CEC`, which is `@SystemApi`** |
-| Linux | `/dev/cec0` (`cec-ctl`, libcec) | yes — a Raspberry Pi and an HDMI cable |
-| Tizen / webOS | no public CEC surface | no |
+| Host | API | Reachable? | Implemented |
+|---|---|---|---|
+| Android TV | `HdmiControlManager` | **only with `HDMI_CEC`, which is `@SystemApi`** | no |
+| Linux | `/dev/cec0` via `cec-ctl` | yes — a Raspberry Pi and an HDMI cable | **yes**, `createLinuxCecTransport` |
+| Tizen / webOS | no public CEC surface | no | no |
 
 That table is the finding, not a footnote. CEC sits behind the same privilege
 wall as input switching: on every platform whose image we do not own, a
@@ -157,15 +159,48 @@ no file under `core/src/{world,capabilities,policy}` was touched, and the planne
 change was a bug fix, not an accommodation. What CEC needed from core was three
 things core had already promised and not delivered.
 
+## The Linux transport, and how to check it
+
+[`packages/adapter-linux/src/cec.ts`](../packages/adapter-linux/src/cec.ts)
+implements `CecTransport` over `cec-ctl` (v4l-utils), following the same shape as
+that adapter's audio backends: every shell call goes through an injectable
+`Runner`, and the parsers are pure so they can be tested against real command
+output with no hardware.
+
+Two operational facts that cost time if you do not know them:
+
+- **An adapter must claim a logical address before it can transmit.** A fresh
+  `/dev/cec0` has none, and every `--to` transmit fails with "Device has no
+  logical address". The transport runs `cec-ctl --playback` once, lazily, before
+  its first transmit — and `configure: false` exists for a box where another
+  daemon already owns the adapter.
+- **CEC is slow.** A topology scan walks up to 15 addresses with a real timeout
+  on each. The 5-second runner that is generous for `pactl` is not enough; this
+  one waits 15.
+
+**The parsers are tested against fixtures written from `cec-ctl`'s documentation,
+not recorded from a device.** That is a weaker thing than it looks like, so the
+repo says which it is, and ships the way to fix it:
+
+```bash
+node tools/verify-cec.mjs             # read-only: scan, topology, power status
+node tools/verify-cec.mjs --writes    # also wake a device and put it back
+```
+
+It prints the raw `cec-ctl` output beside what the parser made of it, reports how
+many devices answer `<Give Device Power Status>` at all — *only those can ever
+report `verified`* — and ends with a transcript ready to paste into
+`cec.test.ts`. On a machine with no adapter it says so and exits 0, because not
+owning a Pi is not a test failure.
+
 ## What is left, and what needs hardware
 
+- **A real bus.** Every claim on this page is a claim about code, not about
+  hardware. The first real device will find something; every previous bring-up
+  has, and the ones it found were never the ones anyone predicted.
 - **An Android `CecTransport`** over `HdmiControlManager`, in the AOSP host's
-  native bridge. Needs a platform-signed build to be worth anything.
-- **A Linux `CecTransport`** over `cec-ctl` — the one that can be verified
-  without a partner agreement, and therefore the one to write next.
-- **A real bus.** Every claim on this page above the mock is a claim about code,
-  not about hardware. The first real device will find something; every previous
-  bring-up has.
+  native bridge. Needs a platform-signed build to be worth anything, so it is
+  behind the same wall as input switching.
 - **Multi-provider demotion** (`ps5.power.on` over CEC, then wake-on-LAN, then an
   IR blaster). The executor already tries fallbacks in order and withdraws a
   provider that answers `unsupported`; what is missing is a second transport to
