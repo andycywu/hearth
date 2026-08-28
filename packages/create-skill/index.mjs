@@ -116,7 +116,7 @@ Then register it with an agent:
   import { create${pascal}Tool } from "@hearthkit/${name}";
   const agent = new Agent({ platform, llm, tools: [create${pascal}Tool()] });
 
-Guide: https://github.com/andycywu/tv-ai-agent/blob/main/docs/skills.md
+Guide: https://github.com/andycywu/hearth/blob/main/docs/skills.md
 `);
 
 // --- templates -------------------------------------------------------------
@@ -312,7 +312,7 @@ describe("${toolName}", () => {
 function readme() {
   return `# @hearthkit/${name}
 
-A [TV AI Agent](https://github.com/andycywu/tv-ai-agent) skill. One tool,
+A [Hearth](https://github.com/andycywu/hearth) skill. One tool,
 \`${toolName}\`, that runs unchanged on Android TV, Tizen, webOS and in the
 browser harness${http ? " — it only needs `fetch`" : " — it needs no device capability at all"}.
 
@@ -343,6 +343,6 @@ ${http ? "5. `ENDPOINT` — point it at your API.\n" : ""}
 Throw plain sentences on failure: the message is fed back to the model, so it can
 recover instead of the turn dying.
 
-Full guide: [docs/skills.md](https://github.com/andycywu/tv-ai-agent/blob/main/docs/skills.md)
+Full guide: [docs/skills.md](https://github.com/andycywu/hearth/blob/main/docs/skills.md)
 `;
 }

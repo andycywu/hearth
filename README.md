@@ -1,6 +1,6 @@
 # Hearth
 
-[![CI](https://github.com/andycywu/tv-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/andycywu/tv-ai-agent/actions/workflows/ci.yml)
+[![CI](https://github.com/andycywu/hearth/actions/workflows/ci.yml/badge.svg)](https://github.com/andycywu/hearth/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-informational)](.nvmrc)
 
@@ -13,7 +13,7 @@ It plans against a model of the room rather than mapping commands, and it
 `verified`, `unverified`, `unsupported` or `failed`, and the difference is the
 point.
 
-### ▶ [Try it in your browser](https://andycywu.github.io/tv-ai-agent/) — no install, no API key, no TV
+### ▶ [Try it in your browser](https://andycywu.github.io/hearth/) — no install, no API key, no TV
 
 The demo is the real runtime driving a mock TV. Type *"set volume to 30"*,
 *"open Netflix"*, *"音量調到 30"*.

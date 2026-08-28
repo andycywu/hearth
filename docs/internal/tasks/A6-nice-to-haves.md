@@ -5,7 +5,7 @@ Small, independent improvements. Pick any; each should keep the green gate.
 ## A6.1 — README status badges
 Add CI + license badges to the top of `README.md`:
 ```md
-[![CI](https://github.com/andycywu/tv-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/andycywu/tv-ai-agent/actions/workflows/ci.yml)
+[![CI](https://github.com/andycywu/hearth/actions/workflows/ci.yml/badge.svg)](https://github.com/andycywu/hearth/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 ```
 *Acceptance:* badges render on GitHub.

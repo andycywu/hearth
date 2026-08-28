@@ -101,3 +101,29 @@ That review is a prerequisite, not a formality.
   rename was mechanical.
 - The npm scope and GitHub org still have to be *claimed*. Until they are, the
   names are only reserved by intent.
+
+### Update, 2026-08-28 — the repository moved
+
+The deferred half of this decision is done: `andycywu/tv-ai-agent` is now
+`andycywu/hearth`, and the URLs this ADR deliberately left alone have been
+rewritten in `README.md`, the dev harness, `CHANGELOG.md`, the `create-skill`
+template and the SBOM's vendor field. `repository`, `homepage` and `bugs` are
+declared in the root `package.json` for the first time, so the link exists in
+metadata and not only in prose.
+
+`hearth` rather than `hearthkit` for the repository: `Hearth` is the product and
+the README's title, while `@hearthkit/*` is the package namespace. One is what it
+is called; the other is where its code is published.
+
+Two things this costs, both accepted:
+
+- **The GitHub Pages demo URL changed** to `andycywu.github.io/hearth/`. GitHub
+  redirects a renamed repository's own URLs, but not its Pages site, so the old
+  demo link is dead rather than forwarded. It was the README's headline
+  call-to-action, which is why it was worth doing before anyone links to it.
+- **Git remotes elsewhere keep working** — GitHub redirects those — but any
+  clone still pointing at the old name should be updated with
+  `git remote set-url origin https://github.com/andycywu/hearth.git`, because a
+  redirect is a courtesy and not a contract.
+
+The npm scope and a GitHub organisation are still unclaimed.

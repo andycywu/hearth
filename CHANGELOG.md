@@ -622,4 +622,4 @@ The core as it stood on 2026-07-27, before device bring-up.
   a partner/platform certificate (Tizen) or system signature (Android); the
   open-source build degrades gracefully via `has()`.
 
-[0.1.0]: https://github.com/andycywu/tv-ai-agent/releases/tag/v0.1.0
+[0.1.0]: https://github.com/andycywu/hearth/releases/tag/v0.1.0
