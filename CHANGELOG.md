@@ -67,11 +67,50 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ever report `verified`* for a power change. With no adapter it says which of
   the three reasons applies and exits 0 — not owning a Pi is not a test failure.
 
+- **`?cec=mock` in the dev harness**, so the living-room story is visible in a
+  browser rather than only in tests: a console, an AVR and a streaming box behind
+  that AVR, *discovered* rather than declared, and 「我要打 PS5」 then wakes the
+  console over the bus, verifies it with a power-status read-back and switches
+  the TV to the port the graph says it is on. It is named `mock` out loud,
+  because a demo quietly pretending to be hardware would be the exact dishonesty
+  this runtime exists to refuse. The AVR in it never answers
+  `<Give Device Power Status>`, so the `unverified` answer is reachable too.
+- **`AgentOptions.capabilities`** — the extension point `tools` was missing a
+  half of. A tool is what the *model* may ask for; a capability is what the
+  *planner* may reason about, with its preconditions, risk level and
+  verification. A transport that registered only tools would be invisible to goal
+  mode, and one that registered only capabilities would produce a plan nothing
+  can execute.
+- **`cecTargets(graph, found)`** joins what CEC saw to what the room already
+  believes, keyed by the **Device Graph node id** rather than the CEC address. A
+  console someone registered by hand is `ps5`; CEC knows it as `2.0.0.0`; a skill
+  resolving 「我要打 PS5」 looks for the former. Registering capabilities under the
+  address would produce a plan for a device the goal has never heard of — every
+  step correct, the whole thing useless.
+
 ### Fixed
 
-Three defects in code that was already green, all found by CEC being the first
+Five defects in code that was already green, all found by CEC being the first
 thing that reaches past the television — and all correct for every device that
 had existed until now:
+
+- **A parent link could point at a node that no longer existed.** The CEC source
+  named a device's parent by the id *it* would have given it, and the graph then
+  merged that parent into a node someone had registered by hand under a different
+  id — leaving the child pointing at nothing. `inputPortFor` walks that chain to
+  answer "which input shows this device", so an Apple TV behind an AVR silently
+  had no port. Parents are now named by a strong key (`parentCecAddress`) and
+  resolved by `DeviceGraph.linkParents()` after a discovery pass, when every node
+  has settled. An unresolvable link stays pending rather than being written as a
+  dangling id: the parent may be a switch that does not speak CEC, and it may
+  also just be next in the list.
+- **The agent told you the TV had done something another device did.** "Asked the
+  TV to `ps5.power.on`" was safe to hard-code while every capability was the
+  television acting on itself; the TV is the thing that *sent* the message. The
+  outcome summary now names the device the steps are actually about, and says
+  "I can't" rather than "This TV can't" when the step was not about the TV. A
+  plan touching several devices gets a sentence with no subject rather than a
+  wrong one.
 
 - **A read-back could verify against its own assumption.** The executor's
   `read_back` branch checked that the verifying read *succeeded*, not that it

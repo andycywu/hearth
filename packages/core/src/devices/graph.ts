@@ -10,6 +10,8 @@ import type { DeviceNode, DeviceObservation, DeviceType, DiscoverySource } from 
  */
 export class DeviceGraph {
   private nodes = new Map<string, DeviceNode>();
+  /** Child id → the CEC address of its parent, until `linkParents()` resolves it. */
+  private pendingParents = new Map<string, string>();
   private readonly now: () => number;
 
   constructor(opts: { now?: () => number } = {}) {
@@ -61,7 +63,37 @@ export class DeviceGraph {
     if (cecAddress !== undefined) merged.cecAddress = cecAddress;
 
     this.nodes.set(id, merged);
+    if (obs.parentCecAddress) this.pendingParents.set(id, obs.parentCecAddress);
     return merged;
+  }
+
+  /**
+   * Resolve parent links that were expressed as a CEC address.
+   *
+   * Run after a discovery pass rather than during one: the node a child points
+   * at may not have been observed yet, and — the case this exists for — the node
+   * it points at may end up merged into one that was already there under a
+   * different id. Resolving per observation would bake in whichever id happened
+   * to exist at that moment.
+   *
+   * A link that still resolves to nothing stays pending rather than being
+   * dropped or written as a dangling id: the parent may be a switch that does
+   * not speak CEC, and it may also just be next in the list.
+   */
+  linkParents(): number {
+    let linked = 0;
+    for (const [childId, address] of this.pendingParents) {
+      const parent = [...this.nodes.values()].find((d) => d.cecAddress === address);
+      const child = this.nodes.get(childId);
+      // Never point a node at itself: a device that reports its own address as
+      // its parent would make `inputPortFor` loop, and the seen-set that guards
+      // that would then answer "no port" for a device that has one.
+      if (!parent || !child || parent.id === childId) continue;
+      child.parentId = parent.id;
+      this.pendingParents.delete(childId);
+      linked++;
+    }
+    return linked;
   }
 
   get(id: string): DeviceNode | undefined {
@@ -180,6 +212,9 @@ export async function runDiscovery(
       found++;
     }
   }
+  // After everything is folded in, and not before: a parent named by its CEC
+  // address may itself have merged into a node someone registered by hand.
+  graph.linkParents();
   return { found, failed };
 }
 

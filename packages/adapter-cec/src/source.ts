@@ -47,7 +47,7 @@ export function createCecSource(transport: CecTransport): DiscoverySource {
 
         const type = deviceTypeFor(device);
         const parentAddress = parentPhysical(device.physical);
-        const parent = parentAddress ? byPhysical.get(parentAddress) : undefined;
+        const parentOnBus = parentAddress ? byPhysical.get(parentAddress) : undefined;
 
         observations.push({
           id: deviceIdFor(device),
@@ -58,11 +58,17 @@ export function createCecSource(transport: CecTransport): DiscoverySource {
           source: "hdmi_cec",
           cecAddress: device.physical ?? String(device.logical),
           ...(device.vendorId ? { vendor: device.vendorId } : {}),
+          // Named by the parent's *address*, not by the id this source would
+          // give it. The graph resolves it after everything is folded in,
+          // because the parent may merge into a node someone registered by hand
+          // — and a `parentId` written now would then point at nothing, which
+          // breaks the walk that answers "which input shows this device".
+          //
           // Only when the parent is on the bus too. A device reporting 2.1.0.0
           // with nothing at 2.0.0.0 is telling us there is a switch or an AVR in
           // the path that does not speak CEC — real, and not something to invent
           // a node for.
-          ...(parent ? { parentId: deviceIdFor(parent) } : {}),
+          ...(parentOnBus ? { parentCecAddress: parentAddress } : {}),
         });
       }
       return observations;

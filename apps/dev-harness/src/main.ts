@@ -14,11 +14,15 @@ import {
 import { createWeatherTool } from "@hearthkit/skills-example";
 import { createScriptedSource, occupancyScript } from "@hearthkit/perception-mock";
 import {
+  createCecSource, createCecTools, createCecCapabilities, cecTargets,
+  createMockCecBus, MOCK_LIVING_ROOM,
+} from "@hearthkit/adapter-cec";
+import {
   createModelPilotClient, createModelPilotPlanner, resolveModelPilotConfig, offReason,
 } from "@hearthkit/modelpilot";
 import { loadBundledSkills, loadInstalledSkills } from "@hearthkit/skill-manifest";
 import weatherManifest from "@hearthkit/skill-manifest/examples/open-meteo-weather.json";
-import type { Tool } from "@hearthkit/core";
+import type { Capability, Tool } from "@hearthkit/core";
 
 declare global {
   interface Window {
@@ -93,7 +97,38 @@ async function boot(): Promise<void> {
   // know where anything is. Shared with the device hosts, because four slightly
   // different copies of this is how an emulator ends up with a room a TV does not
   // have.
-  const devices = await discoverRoom(platform, { room: params.get("room") === "empty" ? "empty" : "demo" });
+  // `?cec=mock` puts a CEC bus behind the room: a console, an AVR and a
+  // streaming box behind that AVR, discovered rather than declared. It is the
+  // only way to see the living-room story in a browser, since a real bus needs
+  // `/dev/cec0` and a Raspberry Pi — and it is a *mock*, said out loud in the
+  // flag name, because a demo that quietly pretended to be hardware would be the
+  // exact dishonesty this runtime exists to refuse.
+  //
+  // Two of the three mock devices misbehave the way real ones do, so the demo
+  // shows all three answers rather than a happy path: the console verifies, the
+  // AVR never answers `<Give Device Power Status>` and comes back `unverified`.
+  const cecBus = params.get("cec") === "mock"
+    ? createMockCecBus(MOCK_LIVING_ROOM.map((d) => (
+        d.logical === 5 ? { ...d, answersPowerStatus: false } : { ...d }
+      )))
+    : undefined;
+
+  const devices = await discoverRoom(platform, {
+    room: params.get("room") === "empty" ? "empty" : "demo",
+    ...(cecBus ? { sources: [createCecSource(cecBus)] } : {}),
+  });
+
+  // Capabilities for whatever CEC found *and* the room already holds, keyed by
+  // the graph's node id rather than the CEC address — that is what a skill
+  // resolves to when someone says 「我要打 PS5」.
+  const cecTools: Tool[] = [];
+  const cecCapabilities: Capability[] = [];
+  if (cecBus) {
+    const targets = cecTargets(devices, await cecBus.scan());
+    cecTools.push(...await createCecTools(cecBus, targets));
+    cecCapabilities.push(...targets.flatMap((t) => createCecCapabilities(t.deviceId)));
+    console.info(`[cec] ${targets.length} device(s) reachable: ${targets.map((t) => t.deviceId).join(", ") || "none"}`);
+  }
 
   // `?devices` prints the room the same way `?diag` prints the capabilities.
   if (params.has("devices")) {
@@ -152,7 +187,8 @@ async function boot(): Promise<void> {
   const agent = new Agent({
     platform,
     llm,
-    tools: skills,
+    tools: [...skills, ...cecTools],
+    ...(cecCapabilities.length ? { capabilities: cecCapabilities } : {}),
     devices,
     world: sharedWorld,
     ...(planner ? { planner, llmPlanning: true } : {}),

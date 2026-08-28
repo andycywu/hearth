@@ -223,9 +223,11 @@ describe("the Linux CEC transport", () => {
 
     const observations = await source.discover();
     // The television is left to the platform source; the AVR and what is behind
-    // it come through with the topology intact.
+    // it come through with the topology intact. The parent is named by its CEC
+    // address rather than by a node id, because the node it becomes may be one
+    // someone registered by hand under a different id.
     expect(observations.map((o) => o.id)).toEqual(["cec-3-0-0-0", "cec-3-1-0-0"]);
-    expect(observations[1]?.parentId).toBe("cec-3-0-0-0");
+    expect(observations[1]?.parentCecAddress).toBe("3.0.0.0");
     expect(observations[0]?.name).toBe("Denon AVR");
   });
 

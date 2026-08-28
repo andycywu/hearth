@@ -7,7 +7,7 @@ export {
 } from "./addresses.js";
 export { createCecSource } from "./source.js";
 export {
-  createCecCapabilities, createCecTools, cecHandlers, toolSuffix,
+  createCecCapabilities, createCecTools, cecHandlers, cecTargets, toolSuffix,
   type CecCapabilityOptions,
 } from "./capabilities.js";
 export {

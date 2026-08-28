@@ -60,6 +60,9 @@ importers:
 
   apps/dev-harness:
     dependencies:
+      '@hearthkit/adapter-cec':
+        specifier: workspace:*
+        version: link:../../packages/adapter-cec
       '@hearthkit/adapter-web':
         specifier: workspace:*
         version: link:../../packages/adapter-web
