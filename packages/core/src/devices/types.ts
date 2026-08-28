@@ -40,6 +40,15 @@ export interface DeviceNode {
   discoveredBy: DiscoverySourceId[];
   confidence: number;
   lastSeen: number;
+  /**
+   * The CEC physical address (`"3.1.0.0"`), when a source knew it.
+   *
+   * Stored rather than merely observed because it is the only identity key that
+   * distinguishes two devices sharing one of the TV's HDMI ports — an AVR at
+   * `3.0.0.0` and whatever is plugged into it at `3.1.0.0` are both "on HDMI3",
+   * and without this they merge into one node.
+   */
+  cecAddress?: string;
 }
 
 /** What a discovery source contributes: a claim, never the truth. */

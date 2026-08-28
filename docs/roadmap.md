@@ -35,7 +35,7 @@ Shipped and verified (see [`STATUS.md`](STATUS.md)): the agent loop, the HAL and
 five adapters under one contract test, tool registry with validation, the
 `TvResult` envelope, boot capability probing with capability withdrawal, voice,
 four renderers, declarative skills, packaging for Android TV / Tizen / webOS,
-**696 tests green**. Goal mode is verified on the Android TV emulator, not only
+**724 tests green**. Goal mode is verified on the Android TV emulator, not only
 in CI.
 
 The state and reasoning tier (M0, additive — nothing existing was modified):
@@ -103,6 +103,7 @@ Verification → World Model.
 ## P1 — the real living room
 
 - HDMI-CEC transport: device discovery, power, active-source, OSD names.
+  *Built and mock-tested (task 7); needs a platform transport and a real bus.*
 - IR blaster profiles for devices with no back channel.
 - Real Android TV hardware bring-up (MTK / NVT boards).
 - Device discovery populating the Device Graph from CEC + manual registration.
@@ -271,7 +272,7 @@ Ordered. Each is independently shippable.
   platform source merged into it — `PlayStation 5 [ps5] — HDMI2 · 100% · manual`
   beside `AOSP TV on x86 [tv] — built in · 100% · manual+platform`.
 
-### 7. HDMI-CEC discovery and control adapter
+### 7. HDMI-CEC discovery and control adapter — **software done; hardware pending**
 
 - **Goal** — first real transport beyond the HAL: enumerate CEC devices, read
   power state, wake, set active source.
@@ -284,6 +285,30 @@ Ordered. Each is independently shippable.
 - **Risk** — high: CEC is advertised far more often than it works, and Android's
   CEC APIs are privileged on most builds.
 - **Complexity** — L, hardware-gated.
+- **Outcome so far** — [`packages/adapter-cec`](../packages/adapter-cec): a
+  message-shaped `CecTransport` (six methods, each named after the CEC message it
+  sends), an `hdmi_cec` discovery source that derives the HDMI port *and the
+  parent hop* from the physical address, power capabilities verified by a
+  `<Give Device Power Status>` read-back, and a mock bus that misbehaves the way
+  real hardware does. 27 tests; the four honest answers are pinned by one goal
+  against four buses. Design and rationale: [`cec.md`](cec.md).
+
+  It found three defects in code that was already green, all the same shape —
+  correct for every device that had existed until now. **A read-back could verify
+  against its own assumption**: the executor checked that the read succeeded, not
+  that it *answered*, and every reader in this repo always answers. Over CEC a
+  silent-but-successful read is ordinary, and the result would have been a
+  confident `verified` for a console that never woke. **Two devices on one HDMI
+  port merged into one** — an AVR and the box plugged into it are both "on
+  HDMI3", and `cecAddress` was named in the identity rule but never stored.
+  **Two CEC devices could not coexist**, because core names a power tool after
+  its provider and the registry throws on a duplicate.
+
+  **What is still true: no real CEC bus has run any of this.** The Android API is
+  `@SystemApi`, Tizen and webOS expose none, so `available()` returning false is
+  the normal case. The cheapest verification anyone can buy is a Raspberry Pi and
+  `cec-ctl` — which makes a Linux `CecTransport` the next thing worth writing,
+  and the first one an outside contributor could actually finish.
 
 ### 8. Perception source interface with a mock camera — **done**
 

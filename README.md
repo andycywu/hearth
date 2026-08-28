@@ -123,7 +123,7 @@ Useful flags: `?render=canvas`, `?diag` (capability report), `?skills=weather`
 (example skill), `?llm=http://127.0.0.1:11434/v1&model=llama3.2` (real model).
 
 ```bash
-pnpm test           # 696 tests
+pnpm test           # 724 tests
 pnpm bench          # agent-loop latency (p50/p95 per turn)
 ```
 
@@ -284,7 +284,7 @@ has no third-party dependencies at all.**
 | Runtime | **Node.js ≥ 20** for tooling; the agent itself runs in the TV's WebView | |
 | Package manager | **pnpm 9** workspaces + TypeScript project references | One repo, ~20 packages, real build ordering |
 | Bundler | **esbuild** — one ESM file per target, minified, with feature flags folded out | Fast, and its `define` is what removes optional code |
-| Tests | **Vitest** — 696 tests, including one that builds the bundle and weighs it | |
+| Tests | **Vitest** — 724 tests, including one that builds the bundle and weighs it | |
 | Lint | **ESLint 10** flat config with `typescript-eslint` | |
 | UI | Hand-written DOM / Canvas 2D. No framework, no CSS library | A framework would be larger than the agent |
 | Models | Any **OpenAI-compatible** HTTP endpoint — cloud gateway, or `llama.cpp` / Ollama on the TV | No vendor lock-in; see [on-device inference](docs/on-device-inference.md) |
@@ -303,7 +303,7 @@ on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 696 tests |
+| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 724 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
 | Goal mode on the Android TV emulator | ✅ device graph → plan → verify, through logcat |
@@ -312,7 +312,8 @@ on retail TV hardware yet.**
 | webOS | ⚠️ runs on the TV 26 simulator; audio and app management are stubs there, so unverified |
 | Retail MTK / NVT hardware | ⛔ not yet |
 | Privileged controls (input switch, standby) | ⛔ by design — needs vendor signing |
-| Anything with a second device in it (CEC, IR, AVR, console, camera) | ⛔ needs a room, not just a TV |
+| HDMI-CEC — reaching past the TV to a console | 🟡 transport, discovery and verified power built and mock-tested; **no real bus has run it** |
+| Anything else with a second device in it (IR, AVR, camera) | ⛔ needs a room, not just a TV |
 
 ### The finding that shaped this project
 
@@ -339,7 +340,7 @@ hardware.
 - [On-device inference](docs/on-device-inference.md) · [Architecture](docs/architecture.md) · [Project status](docs/STATUS.md) · [What still needs a real TV](docs/HARDWARE_VERIFICATION.md)
 - Bring-up: [POC plan (no vendor signing)](docs/POC.md) · [emulator setup](docs/EMULATOR_SETUP.md) · [checklist](docs/BRINGUP_CHECKLIST.md)
 - [ModelPilot integration](docs/modelpilot-integration.md) · [counting installs without watching living rooms](docs/service-metrics.md) — planning through a remote decision engine, device control and verification staying local
-- Living-room agent design: [world model](docs/world-model.md) · [capability graph](docs/capability-graph.md) · [device graph](docs/device-graph.md) · [planner & verification](docs/agent-planner.md) · [tools & adapters](docs/tool-adapter-design.md) · [policy & safety](docs/policy-and-safety.md)
+- Living-room agent design: [HDMI-CEC](docs/cec.md) · [world model](docs/world-model.md) · [capability graph](docs/capability-graph.md) · [device graph](docs/device-graph.md) · [planner & verification](docs/agent-planner.md) · [tools & adapters](docs/tool-adapter-design.md) · [policy & safety](docs/policy-and-safety.md)
 - [Security review](docs/SECURITY_REVIEW.md) · [Releasing](docs/RELEASING.md) · [Roadmap](docs/roadmap.md) · [platform bring-up plan](docs/DEVELOPMENT_PLAN.md)
 - Contributing: [**the Hearth Report**](docs/platform/capability-matrix.md) (what TVs can actually do) · [ten ways in](docs/good-first-issues.md) · [naming & namespaces](docs/adr/0003-name-and-namespace.md)
 

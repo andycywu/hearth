@@ -1,0 +1,19 @@
+{
+  "name": "@hearthkit/adapter-cec",
+  "version": "0.2.0",
+  "description": "HDMI-CEC transport: device discovery and power control past the television, with a mock bus that misbehaves the way real ones do.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@hearthkit/core": "workspace:*",
+    "@hearthkit/platform-api": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

@@ -13,17 +13,16 @@ blocked on physical objects).
 
 ## Where the work is
 
-**The software roadmap is nearly finished.** Nine of the
-[ten implementation tasks](../roadmap.md#next-10-implementation-tasks) are done;
-only **task 7, HDMI-CEC**, remains, and it is the one that opens P1 — the living
-room with a second device in it. Everything else outstanding needs hardware
-nobody here has, and no amount of further code moves it:
+**The software roadmap is finished.** All ten
+[implementation tasks](../roadmap.md#next-10-implementation-tasks) have landed —
+task 7, HDMI-CEC, as far as a mock bus can take it. Everything still outstanding
+needs hardware nobody here has, and no amount of further code moves it:
 
 | Blocked on | Items |
 |---|---|
 | A retail Samsung TV | Tizen audio — `volume`/`mute` are unexercised code, that emulator has no audio API |
 | MTK / NVT boards | Phase 2 bring-up, the privileged controls, on-device model benchmarks |
-| A console + an AVR | CEC end-to-end, multi-provider demotion, the parent-hop |
+| A console + an AVR, or a Raspberry Pi | CEC against a real bus, multi-provider demotion, the parent-hop. A Linux `CecTransport` over `cec-ctl` is the cheapest way in — see [`../cec.md`](../cec.md) |
 | A browser with a weak GPU | Blits as the default renderer |
 
 So the highest-value thing that can be done from a desk is **anything that makes
@@ -39,7 +38,7 @@ Run before every commit. CI runs the same thing:
 pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm bundle:all && pnpm check:size
 ```
 
-Currently: **696 tests**, 17 packages, clean lint over 156 files.
+Currently: **724 tests**, 18 packages, clean lint.
 
 ## Conventions that are load-bearing
 
