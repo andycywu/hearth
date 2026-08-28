@@ -123,7 +123,7 @@ Run against a matrix of {MTK, NVT} × {AOSP, Tizen}. See `docs/platform/`.
   activity, event wiring isolated from rendering. Runnable today via the dev
   harness.
 - ✅ 2D single-surface **canvas renderer** (`mountAgentCanvas`) — no DOM reflow.
-- ✅ **Lightning 3 / Blits (WebGL)** demo (`apps/blits-demo`, standalone) reusing
+- ✅ **Lightning 3 / Blits (WebGL)** demo (`examples/blits-demo`, standalone) reusing
   the same agent-event wiring — the low-end-GPU production path. Next: promote it
   into `packages/ui` as the default renderer with DOM fallback.
 - ✅ Optional `VoicePipeline` HAL implemented in the web adapter via the Web

@@ -70,7 +70,7 @@ const workspaceDirs = ["packages", "apps"].flatMap((d) => {
     ? readdirSync(p, { withFileTypes: true }).filter((e) => e.isDirectory())
         .map((e) => `${d}/${e.name}`)
     : [];
-}).filter((d) => existsSync(join(root, d, "package.json")) && d !== "apps/blits-demo");
+}).filter((d) => existsSync(join(root, d, "package.json")) && d !== "examples/blits-demo");
 const missingFromLock = workspaceDirs.filter((d) => !lock.includes(`${d}:`));
 record("Core", "lockfile covers every workspace package",
   missingFromLock.length === 0 ? OK : FAIL,

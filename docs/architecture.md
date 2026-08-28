@@ -203,6 +203,22 @@ downloaded, parsed and held in memory on every launch:
 | default | 94.5 KB | What a set ships with — the above plus ModelPilot and the avatar |
 | `--full` | 120.5 KB | Adds `?diag`, the offline scripted brain, the on-screen keyboard and `?demo`. The bench build |
 
+The installable package, measured rather than assumed — tizen-core and
+`ares-package` on the default profile:
+
+| Package | Size | What is in it |
+|---|---|---|
+| `tizen-app.wgt` | 92.6 KB | runtime 97 KB + icon 24 KB, zipped |
+| `tv.aiagent.harness.ipk` | 41.9 KB | the same runtime, gzipped, with a 130×130 icon |
+
+Two things that looked like wins and were not. `.manifest.tmp` is 48% of the
+`.wgt`'s *uncompressed* content, and deleting it before packing changes the
+signed package by **zero bytes** — `tz pack` regenerates it, and the zip
+swallowed it anyway. An uncompressed byte count is not an install size. And the
+four files with "report" in the name are not four copies of anything: the device
+tree, the plan summary and the markdown document are different jobs, and the
+markdown one *composes* the other two rather than repeating them.
+
 Guards are written inline against the `define`d identifier — see
 [`packages/core/src/features.ts`](../packages/core/src/features.ts) for the exact
 form and why the readable-looking alternative silently removes nothing.

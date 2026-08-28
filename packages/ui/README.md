@@ -69,8 +69,8 @@ path below.
 
 ## Lightning 3 / Blits renderer (low-end MTK/NVT)
 On very low-end GPUs a DOM-heavy UI can drop frames, so the WebGL renderer lives
-in `apps/blits-demo` and consumes `createAgentViewModel` from this package —
-`apps/blits-demo/src/index.js` maps the state onto Blits reactive properties and
+in `examples/blits-demo` and consumes `createAgentViewModel` from this package —
+`examples/blits-demo/src/index.js` maps the state onto Blits reactive properties and
 that is all the integration there is.
 
 It stays a separate app **on purpose**: `@lightningjs/blits` and Vite must not
@@ -80,7 +80,7 @@ outside the pnpm workspace and CI. Shared *logic*, not shared deps.
 
 ```bash
 pnpm build                                  # produces the dist/ the demo aliases
-cd apps/blits-demo && npm install && npm run dev
+cd examples/blits-demo && npm install && npm run dev
 ```
 
 Making Blits the default renderer with a DOM fallback is Group C in

@@ -185,5 +185,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Build the WebGL demo
-        working-directory: apps/blits-demo
+        working-directory: examples/blits-demo
         run: npm ci && npm run build

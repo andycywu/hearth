@@ -15,7 +15,7 @@ the view layer differs.
 pnpm -w build            # from the repo root
 
 # 2. Install and run this demo separately
-cd apps/blits-demo
+cd examples/blits-demo
 npm install
 npm run dev              # http://localhost:5173  (Vite)
 npm run build            # production WebGL bundle in dist/

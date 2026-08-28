@@ -98,7 +98,7 @@ is worth posting.
 
 **Labels:** `ui`, `help wanted`
 
-`apps/blits-demo` is a Lightning 3 / Blits WebGL renderer wired to the same
+`examples/blits-demo` is a Lightning 3 / Blits WebGL renderer wired to the same
 agent events. It has never been promoted into `packages/ui` as the default with
 a DOM fallback, because that needs GPU testing on a low-end TV — which is
 exactly what a contributor with a cheap Android TV box can do and we cannot.

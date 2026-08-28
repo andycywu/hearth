@@ -21,7 +21,7 @@ per-OS differences. See `README.md`.
   `llm-connectors`, `ui`, `skills-example`, `acceptance` (cross-target parity
   test).
 - App hosts: `apps/tizen-app` (.wgt), `apps/aosp-app` (WebView + Kotlin bridge),
-  `apps/webos-app` (.ipk), `apps/dev-harness` (browser), `apps/blits-demo`
+  `apps/webos-app` (.ipk), `apps/dev-harness` (browser), `examples/blits-demo`
   (standalone Lightning 3 / Blits WebGL — **not** in the workspace).
 - CI: build → typecheck → lint → test → license → bundle → size. Release workflow
   on `v*` tags. Dependabot, SBOM, security review, WebView hardening all in place.
@@ -82,7 +82,7 @@ notes record what changed and what was deliberately left for later.
 
 - [x] **A2. Promote Blits to a first-class UI renderer.** *Done.* Extracted the
   duplicated agent-event wiring into `createAgentViewModel` in `@hearthkit/ui`
-  (10 unit tests); the DOM overlay, the 2D canvas and `apps/blits-demo` all
+  (10 unit tests); the DOM overlay, the 2D canvas and `examples/blits-demo` all
   consume it, so the renderers differ only in `draw`. Blits/Vite stay out of
   `packages/*` — the demo keeps its own install. `npm run build` in the demo is
   green. *Rendering/perf verification still needs a browser (Group C / C1).*
@@ -114,7 +114,7 @@ notes record what changed and what was deliberately left for later.
   repo layout and dev-harness flags; `pnpm bench` (`tools/bench.mjs`) reporting
   p50/p95 per-turn harness latency; Japanese (`ja`) added to the offline brain
   with a `{0}`-template phrase table; a non-blocking CI job that builds
-  `apps/blits-demo`.
+  `examples/blits-demo`.
 
 ### GROUP B — needs emulator or real hardware (Phase 2 bring-up) ← **start here**
 
@@ -215,8 +215,8 @@ the install step:
   committed; `local.properties` with `sdk.dir=…` is git-ignored, add it if Gradle
   can't find the SDK, and `JAVA_HOME=<Android Studio>/jbr` works as the JDK) and
   the Blits demo.
-- `apps/blits-demo` is intentionally **outside** the pnpm workspace; install it
-  separately (`cd apps/blits-demo && npm install`). CI builds it in a separate
+- `examples/blits-demo` is intentionally **outside** the pnpm workspace; install it
+  separately (`cd examples/blits-demo && npm install`). CI builds it in a separate
   non-blocking job.
 - `apps/tizen-app/Debug/` is **live packaging output** — `tz build`/`tz pack` write
   there, so `pnpm package:tizen` rewrites its contents (including a binary `.wgt`)

@@ -31,7 +31,7 @@ The scripted brain and system prompt handle en/zh. If needed, add more locales:
 
 ## A6.5 — CI: build the Blits demo (optional)
 Add a **separate, non-blocking** CI job that runs
-`cd apps/blits-demo && npm ci && npm run build` so the WebGL demo can't silently
+`cd examples/blits-demo && npm ci && npm run build` so the WebGL demo can't silently
 rot. Keep it out of the main `build-test` job (different toolchain).
 
 ## Verify

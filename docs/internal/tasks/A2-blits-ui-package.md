@@ -2,7 +2,7 @@
 
 ## Why
 Three renderers (`mountAgentOverlay` DOM, `mountAgentCanvas` 2D, the Blits WebGL
-`apps/blits-demo`) each duplicate the same agent-event → view-state wiring.
+`examples/blits-demo`) each duplicate the same agent-event → view-state wiring.
 Extract that wiring into one tested, framework-agnostic **view-model** in
 `packages/ui`, then have all three consume it. This "promotes" Blits to a
 first-class citizen without pulling Vite/Blits into the main workspace/CI.
@@ -21,7 +21,7 @@ This is pure (no DOM) → unit-testable with a fake Agent/EventBus.
 - **Edit:** `packages/ui/src/overlay.ts`, `packages/ui/src/canvas.ts` to use the
   view-model instead of inline subscriptions.
 - **Edit:** `packages/ui/src/index.ts` to export it.
-- **Edit:** `apps/blits-demo/src/index.js` to import `createAgentViewModel` (via
+- **Edit:** `examples/blits-demo/src/index.js` to import `createAgentViewModel` (via
   the alias to `@hearthkit/ui` — add it to `vite.config.js` `resolve.alias`
   pointing at `packages/ui/dist/index.js`).
 
@@ -64,7 +64,7 @@ This is pure (no DOM) → unit-testable with a fake Agent/EventBus.
    ```ts
    export { createAgentViewModel, type AgentViewModel, type AgentViewState } from "./view-model.js";
    ```
-4. Update `apps/blits-demo`:
+4. Update `examples/blits-demo`:
    - `vite.config.js`: add `"@hearthkit/ui": pkg("ui")` to `resolve.alias`.
    - `src/index.js`: build the agent, then
      `const vm = createAgentViewModel(agent); vm.subscribe(s => { this.reply = s.reply; this.activity = s.activity; });`
@@ -78,7 +78,7 @@ This is pure (no DOM) → unit-testable with a fake Agent/EventBus.
 ## Acceptance
 - `packages/ui` builds; new tests green; `mountAgentOverlay`/`mountAgentCanvas`
   behave exactly as before (dev harness `?render=canvas` still works).
-- `apps/blits-demo` builds (`cd apps/blits-demo && npm install && npm run build`)
+- `examples/blits-demo` builds (`cd examples/blits-demo && npm install && npm run build`)
   using the shared view-model.
 - Main green gate passes. Blits stays out of the pnpm workspace/CI.
 
@@ -86,10 +86,10 @@ This is pure (no DOM) → unit-testable with a fake Agent/EventBus.
 ```bash
 pnpm build && pnpm test           # ui tests incl. view-model
 pnpm bundle:dev                    # dev harness still bundles
-cd apps/blits-demo && npm install && npm run build   # WebGL demo still builds
+cd examples/blits-demo && npm install && npm run build   # WebGL demo still builds
 ```
 
 ## Notes
 - Do **not** add `@lightningjs/blits` or `vite` to any `packages/*` — they must
-  stay only in `apps/blits-demo`. The point is shared *logic*, not shared deps.
+  stay only in `examples/blits-demo`. The point is shared *logic*, not shared deps.
 - Full WebGL rendering/perf verification is Group C (needs a browser).
