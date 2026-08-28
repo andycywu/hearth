@@ -280,12 +280,12 @@ has no third-party dependencies at all.**
 
 | | What | Why |
 |---|---|---|
-| Language | **TypeScript 5** (strict), targeting **ES2020** | ES2020 is the conservative baseline that TV WebViews actually support |
+| Language | **TypeScript 6** (strict), targeting **ES2020** | ES2020 is the conservative baseline that TV WebViews actually support |
 | Runtime | **Node.js ≥ 20** for tooling; the agent itself runs in the TV's WebView | |
 | Package manager | **pnpm 9** workspaces + TypeScript project references | One repo, ~20 packages, real build ordering |
 | Bundler | **esbuild** — one ESM file per target, minified, with feature flags folded out | Fast, and its `define` is what removes optional code |
 | Tests | **Vitest** — 696 tests, including one that builds the bundle and weighs it | |
-| Lint | **ESLint 9** flat config with `typescript-eslint` | |
+| Lint | **ESLint 10** flat config with `typescript-eslint` | |
 | UI | Hand-written DOM / Canvas 2D. No framework, no CSS library | A framework would be larger than the agent |
 | Models | Any **OpenAI-compatible** HTTP endpoint — cloud gateway, or `llama.cpp` / Ollama on the TV | No vendor lock-in; see [on-device inference](docs/on-device-inference.md) |
 | Android host | **Kotlin** + WebView bridge, Gradle. Keys in the Android Keystore (AES-GCM) | |

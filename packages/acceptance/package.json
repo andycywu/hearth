@@ -10,16 +10,16 @@
     "typecheck": "echo \"acceptance: test-only package\" && exit 0"
   },
   "devDependencies": {
-    "@hearthkit/core": "workspace:*",
-    "@hearthkit/platform-api": "workspace:*",
-    "@hearthkit/adapter-web": "workspace:*",
-    "@hearthkit/adapter-tizen": "workspace:*",
     "@hearthkit/adapter-aosp": "workspace:*",
-    "@hearthkit/adapter-webos": "workspace:*",
     "@hearthkit/adapter-titan": "workspace:*",
+    "@hearthkit/adapter-tizen": "workspace:*",
+    "@hearthkit/adapter-web": "workspace:*",
+    "@hearthkit/adapter-webos": "workspace:*",
     "@hearthkit/adapter-xumo": "workspace:*",
+    "@hearthkit/core": "workspace:*",
     "@hearthkit/llm-connectors": "workspace:*",
-    "esbuild": "^0.23.0"
+    "@hearthkit/platform-api": "workspace:*",
+    "esbuild": "^0.28.2"
   },
   "license": "Apache-2.0"
 }
