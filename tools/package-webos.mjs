@@ -71,7 +71,30 @@ function fail(msg) {
 }
 
 // 1. The runtime bundle the app loads.
-run("bundling runtime → apps/webos-app/main.js", process.execPath, [join(root, "tools", "bundle.mjs"), "webos"], root);
+/**
+ * Build-profile flags, handed straight to `tools/bundle.mjs`.
+ *
+ * Without this, `--full` had nowhere to go on Tizen and webOS: the packager
+ * always bundled the default profile, so a bring-up package came out with no
+ * `?diag` and no `?demo` — the two things bring-up is for. Android could pass
+ * them because it bundles separately; these two do it for you.
+ *
+ *   node tools/package-tizen.mjs --full
+ *   node tools/package-webos.mjs --with diag,demo
+ */
+function bundleFlags() {
+  const out = [];
+  if (args.includes("--full")) out.push("--full");
+  for (const name of ["--with", "--without"]) {
+    args.forEach((a, i) => {
+      if (a === name && args[i + 1]) out.push(name, args[i + 1]);
+    });
+  }
+  return out;
+}
+
+run("bundling runtime → apps/webos-app/main.js", process.execPath,
+    [join(root, "tools", "bundle.mjs"), "webos", ...bundleFlags()], root);
 
 // 2. appinfo.json references icon.png; without it the app has no launcher tile.
 if (!existsSync(join(appDir, "icon.png"))) {

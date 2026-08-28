@@ -97,12 +97,14 @@ so that a regression to "verified" fails rather than reading as an improvement.
   Titan OS and Xumo stubs — all held to one shared contract test
 - **Any OpenAI-compatible model** — cloud gateway or `localhost` on the TV
 - **Three renderers** over one tested view-model: DOM overlay, 2D canvas, and
-  Lightning 3 / Blits WebGL for low-end GPUs
+  Lightning 3 / Blits WebGL for low-end GPUs (`examples/blits-demo`)
 - **Works with no model at all** — an offline scripted brain runs the whole stack
-  in CI and in the demo above
+  in CI and in the demo above. It is a keyword matcher, not a model, so a
+  television only gets it if you ask for it (`--with offline`)
 - **Bring-up kit**: an on-device capability probe (`?diag`), a device tree
   (`?devices`), goal mode (`?plan`), one-command packaging for all three OSes,
-  and an automated on-device acceptance run
+  and an automated on-device acceptance run — all in the `--full` build, so a
+  shipped television does not carry them
 
 ## Quick start
 
@@ -121,7 +123,7 @@ Useful flags: `?render=canvas`, `?diag` (capability report), `?skills=weather`
 (example skill), `?llm=http://127.0.0.1:11434/v1&model=llama3.2` (real model).
 
 ```bash
-pnpm test           # 620 tests
+pnpm test           # 696 tests
 pnpm bench          # agent-loop latency (p50/p95 per turn)
 ```
 
@@ -183,15 +185,47 @@ Full guide: [**docs/skills.md**](docs/skills.md) · runnable examples:
 
 ## Put it on a TV
 
+### How big is it
+
+A television is not a laptop. The bundle is parsed by a WebView the set shipped
+with, on a launcher's memory budget, every single launch — so the default build
+contains what a working TV needs and **nothing else**. Everything optional is
+removed at build time, not skipped at runtime.
+
+| Build | Runtime | What it has |
+|---|---|---|
+| `--without modelpilot --without avatar` | **74 KB** | Agent loop, world model, capability graph, device graph, planner, policy, one adapter |
+| *default* | **95 KB** | The above, plus the ModelPilot planner and the animated face |
+| `--full` | **121 KB** | Adds `?diag`, the offline brain, the on-screen keyboard and `?demo`. **Use this for bring-up** |
+
+Installable packages, measured: **`.wgt` 92.6 KB**, **`.ipk` 41.9 KB**.
+Zero runtime dependencies — nothing is fetched at install or at boot.
+
 ```bash
-cd apps/aosp-app && ./gradlew :app:assembleDebug   # Android TV  → .apk
-pnpm package:tizen                                  # Tizen       → signed .wgt
-pnpm package:webos                                  # webOS       → .ipk
+node tools/bundle.mjs aosp                 # default
+node tools/bundle.mjs aosp --with diag     # add one feature
+node tools/bundle.mjs aosp --full          # everything (bring-up / demos)
 ```
 
-Then watch it work. `?demo` runs an eight-command script — volume, an app query,
-then the same intents in Chinese and Japanese — against the offline brain, so no
-model is needed:
+### Build and install
+
+```bash
+# Android TV — bundle, then build the .apk
+pnpm bundle:bringup && cd apps/aosp-app && ./gradlew :app:assembleDebug
+
+# Tizen and webOS bundle themselves; pass the profile through
+node tools/package-tizen.mjs --full     # → signed .wgt
+node tools/package-webos.mjs --full     # → .ipk
+```
+
+Drop `--full` (or use `pnpm package:tizen` / `pnpm package:webos`) for a normal,
+smaller build once bring-up is done.
+
+### Then watch it work
+
+`?demo` runs an eight-command script — volume, an app query, then the same
+intents in Chinese and Japanese — against the offline brain, so no model is
+needed. Both `?demo` and `?diag` live in the `--full` build:
 
 ```bash
 node tools/mock-llm-server.mjs &            # the offline brain over HTTP
@@ -205,7 +239,7 @@ you paste straight into
 
 ```bash
 adb shell am start -n tv.aiagent.harness/.MainActivity -e start 'index.html?diag\&writes'
-node tools/device-acceptance.mjs      # runs the CI acceptance script on the device
+node tools/device-acceptance.mjs         # runs the CI acceptance script on the device
 node tools/device-acceptance-tizen.mjs   # the same run, on a Tizen TV or board
 ```
 
@@ -219,14 +253,18 @@ acceptance script reproduces the CI tool sequence exactly. Navigation works with
 ```
    your skills  ─┐
                  ├─▶  @hearthkit/core  ──▶  @hearthkit/platform-api (HAL)
-   built-in tools┘     agent loop, tools,          │
-                       memory, events              │ implemented by
-                                                   ▼
-                         adapter-aosp · adapter-tizen · adapter-webos · adapter-web
-                         adapter-linux · adapter-titan (stub) · adapter-xumo (stub)
-                                                   │
-                                                   ▼
+   built-in tools┘     world model, capability          │
+                       graph, device graph,             │ implemented by
+                       planner, policy, agent loop      ▼
+                              ▲              adapter-aosp · adapter-tizen · adapter-webos
+                              │              adapter-web · adapter-linux
+                              │              adapter-titan (stub) · adapter-xumo (stub)
+                       @hearthkit/host                  │
+                       one boot sequence                │
+                              │                         │
+                              ▼                         ▼
                           apps/aosp-app (.apk) · tizen-app (.wgt) · webos-app (.ipk)
+                          ~15 lines each: which adapter, and what differs
 ```
 
 The core never touches `tizen.*`, an Android bridge or `webOS.*` — that boundary
@@ -235,6 +273,29 @@ the HAL, implementing it in *every* adapter, and adding it to the contract test.
 See [ADR-0001](docs/adr/0001-web-based-cross-platform.md) for why web-based, and
 [`docs/extending.md`](docs/extending.md) for how to extend it.
 
+### Tech stack
+
+Deliberately small. Everything below is a build-time tool; **the runtime itself
+has no third-party dependencies at all.**
+
+| | What | Why |
+|---|---|---|
+| Language | **TypeScript 5** (strict), targeting **ES2020** | ES2020 is the conservative baseline that TV WebViews actually support |
+| Runtime | **Node.js ≥ 20** for tooling; the agent itself runs in the TV's WebView | |
+| Package manager | **pnpm 9** workspaces + TypeScript project references | One repo, ~20 packages, real build ordering |
+| Bundler | **esbuild** — one ESM file per target, minified, with feature flags folded out | Fast, and its `define` is what removes optional code |
+| Tests | **Vitest** — 696 tests, including one that builds the bundle and weighs it | |
+| Lint | **ESLint 9** flat config with `typescript-eslint` | |
+| UI | Hand-written DOM / Canvas 2D. No framework, no CSS library | A framework would be larger than the agent |
+| Models | Any **OpenAI-compatible** HTTP endpoint — cloud gateway, or `llama.cpp` / Ollama on the TV | No vendor lock-in; see [on-device inference](docs/on-device-inference.md) |
+| Android host | **Kotlin** + WebView bridge, Gradle. Keys in the Android Keystore (AES-GCM) | |
+| Tizen host | Tizen web app (`.wgt`), packaged with **tizen-core (`tz`)** | |
+| webOS host | webOS web app (`.ipk`), packaged with **`ares-package`** | |
+
+No React, no Vue, no state library, no HTTP client, no polyfills, no analytics
+SDK. That is not minimalism for its own sake — it is why the whole runtime fits
+in 95 KB and installs on a set with a four-year-old browser engine.
+
 ## Status
 
 Honest version: **the runtime works and is verified on emulators; it has not run
@@ -242,7 +303,7 @@ on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 620 tests |
+| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 696 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
 | Goal mode on the Android TV emulator | ✅ device graph → plan → verify, through logcat |
@@ -294,7 +355,7 @@ Other ways in, roughly by effort:
 
 | | Needs a TV? |
 |---|---|
-| A device report — `node tools/device-report.mjs`, then paste | yes, any TV |
+| A device report — build with `--full`, then `node tools/device-report.mjs` and paste | yes, any TV |
 | A skill, as [code](docs/skills.md) or as a [JSON manifest](packages/skill-manifest) | no |
 | A scenario — a goal worth planning that we have not written | no |
 | A renderer, a language, a docs fix | no |
@@ -306,5 +367,58 @@ accept. [`docs/good-first-issues.md`](docs/good-first-issues.md) has ten concret
 places to start, five of which need no hardware. Internal working notes live in
 [`docs/internal/`](docs/internal/).
 
-Licensed under [Apache-2.0](LICENSE) — permissive, with an explicit patent grant,
-chosen so chipset and OEM partners can adopt it safely.
+## Licence, trademarks and third-party software
+
+**This project** is licensed under [**Apache-2.0**](LICENSE) — permissive, with
+an explicit patent grant, chosen so chipset makers and OEMs can adopt it safely.
+Copyright remains with the contributors; see [`NOTICE`](NOTICE). Contributions
+are accepted under the same licence, by the act of opening a pull request. There
+is no CLA.
+
+**What ships to a device.** Nothing but our own code. The runtime has **no
+third-party runtime dependencies** — no framework, no HTTP client, no polyfills —
+so an installed bundle contains no code owned by anyone else, and there is
+nothing to audit or attribute at install time.
+
+**Build-time tools** are the only third-party software involved, all under
+permissive licences, all replaceable:
+
+| Tool | Licence | Owner |
+|---|---|---|
+| TypeScript | Apache-2.0 | Microsoft |
+| esbuild | MIT | Evan Wallace |
+| Vitest | MIT | VoidZero / Vitest contributors |
+| ESLint · typescript-eslint | MIT | OpenJS Foundation · typescript-eslint |
+| pnpm | MIT | pnpm contributors |
+| Node.js | MIT | OpenJS Foundation |
+| Lightning 3 / Blits *(`examples/` only)* | Apache-2.0 | Metrological / Comcast |
+
+`pnpm license:check` fails the build on any GPL / AGPL / SSPL / non-commercial
+dependency, and `pnpm sbom` writes a CycloneDX SBOM of everything installed.
+Both run in CI.
+
+**Vendor SDKs are not redistributed here.** Building for a television needs
+software we do not and cannot ship:
+
+- **LG webOSTV.js** — required at runtime on webOS. Download it from LG and place
+  it yourself; the app says so plainly if it is missing. We call LG's
+  `WebOSServiceBridge` directly where we can, precisely to avoid bundling it.
+- **Tizen Studio / tizen-core, and a Samsung certificate** — needed to sign a
+  `.wgt`. A retail Samsung TV rejects a generic Tizen certificate.
+- **Android SDK / Gradle**, and **LG's webOS CLI** — build tools, installed by you.
+
+**Trademarks.** Android and Google TV are trademarks of Google LLC. Tizen is a
+trademark of the Linux Foundation; Samsung is a trademark of Samsung Electronics.
+webOS and LG are trademarks of LG Electronics. Netflix, YouTube, PlayStation and
+any other product names are trademarks of their respective owners. They are used
+here only to say what this software interoperates with.
+
+**This project is not affiliated with, endorsed by, or sponsored by any TV
+manufacturer, chipset vendor or platform owner.** "Hearth" and `@hearthkit` are
+the project's own names — see
+[ADR-0003](docs/adr/0003-name-and-namespace.md) — and are deliberately tied to no
+vendor.
+
+**No warranty.** Apache-2.0 section 7 applies: this software controls real
+appliances, has not yet run on retail hardware, and is provided as-is. Read
+[Status](#status) before putting it in front of anyone.
