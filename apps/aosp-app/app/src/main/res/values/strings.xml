@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TV AI Agent</string>
-    <string name="accessibility_service_description">Lets the TV AI Agent navigate the on-screen UI (home, back, and directional focus) on your behalf. No data leaves the device through this service.</string>
+    <string name="app_name">Hearth</string>
+    <string name="accessibility_service_description">Lets Hearth navigate the on-screen UI (home, back, and directional focus) on your behalf. No data leaves the device through this service.</string>
 </resources>

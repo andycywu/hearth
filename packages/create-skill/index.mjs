@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Scaffold a TV AI Agent skill.
+ * Scaffold a Hearth skill.
  *
  *   npm create hearth-skill my-skill        # or: pnpm new:skill my-skill
  *   npm create hearth-skill my-skill --http # variant that calls an HTTP API
@@ -78,7 +78,7 @@ write("package.json", JSON.stringify({
   name: `@hearthkit/${name}`,
   version: "0.1.0",
   private: true,
-  description: `A TV AI Agent skill: ${toolName}.`,
+  description: `A Hearth skill: ${toolName}.`,
   type: "module",
   main: "dist/index.js",
   types: "dist/index.d.ts",

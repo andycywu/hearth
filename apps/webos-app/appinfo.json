@@ -1,10 +1,10 @@
 {
   "id": "tv.aiagent.harness",
   "version": "0.1.0",
-  "vendor": "TV AI Agent",
+  "vendor": "Hearth",
   "type": "web",
   "main": "index.html",
-  "title": "TV AI Agent",
+  "title": "Hearth",
   "icon": "icon.png",
   "largeIcon": "icon.png",
   "iconColor": "#05060a",

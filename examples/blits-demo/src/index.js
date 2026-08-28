@@ -18,7 +18,7 @@ const DEMO = ["set volume to 30", "make it louder", "open Netflix", "現在音�
 const App = Blits.Application({
   template: `
     <Element w="1920" h="1080" color="#05060a">
-      <Text content="TV AI Agent · Blits (WebGL)" x="80" y="80" size="40" color="#8aa0d0" />
+      <Text content="Hearth · Blits (WebGL)" x="80" y="80" size="40" color="#8aa0d0" />
       <Text content="$reply" x="80" y="840" size="56" color="#e8eefc" />
       <Text content="$activity" x="80" y="940" size="30" color="#7f8aa3" />
       <Text content="$hint" x="80" y="1000" size="24" color="#4a5570" />

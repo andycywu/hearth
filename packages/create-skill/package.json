@@ -1,7 +1,7 @@
 {
   "name": "create-hearth-skill",
   "version": "0.1.0",
-  "description": "Scaffold a TV AI Agent skill: a tool, a test with fetch mocked, and the two lines that register it. `npm create hearth-skill my-skill`.",
+  "description": "Scaffold a Hearth skill: a tool, a test with fetch mocked, and the two lines that register it. `npm create hearth-skill my-skill`.",
   "type": "module",
   "sideEffects": false,
   "bin": {
