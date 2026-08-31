@@ -22,7 +22,7 @@
     "@hearthkit/platform-api": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^26.4.0"
   },
   "license": "Apache-2.0"
 }
