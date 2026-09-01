@@ -19,7 +19,7 @@ through logcat. Packaging is verified for all three hosts (APK / signed `.wgt` /
 audio API on that image, webOS stubs audio and app management, and CEC, IR, an
 AVR, a console, a camera and a far-field microphone need a room rather than a TV.
 
-**774 tests green**, across 18 packages.
+**775 tests green**, across 18 packages.
 
 ## At a glance
 
@@ -29,7 +29,7 @@ AVR, a console, a camera and a far-field microphone need a room rather than a TV
 | World Model · Capability Graph · Device Graph · planner · verification · policy | ✅ done, wired into the agent loop |
 | Goal mode (`agent.pursue`, `pursueSkill`, `pursueIntent`) | ✅ done, beside the chat path and sharing its world, policy and confirm gate |
 | LLM planner (model proposes, graph validates) | ✅ done — five rejections run before anything executes |
-| ModelPilot planner (remote model router) | 🟡 speaks the service's real API — `off`/`shadow`/`enforce`, `shadow` by default, `off` with no key — and posts the local verdict back to `/v1/feedback`. **Never run against production**, and per-device keys/quota are unsolved |
+| ModelPilot planner (remote model router) | ✅ **run against production 2026-09-01** — 12/12 plans parsed, p50 2.9s, ~$0.00017 each, shadow agreed with the deterministic planner, and an enforce pass posted a verdict the service accepted. One tenant, one provider, a mock television; per-device keys and quota still unsolved |
 | Planning cost meter (`agent.planning`) | ✅ done — the four P0 scenarios plan for **zero tokens**, 1.7 ms average |
 | Perception boundary + mock camera | ✅ done — no grant no sensor, raw capture stripped, revocation beats `stop()` |
 | Platform HAL + adapters (web, Tizen, AOSP, webOS, Linux) | ✅ 5 implemented, one shared contract test |
@@ -58,7 +58,7 @@ AVR, a console, a camera and a far-field microphone need a room rather than a TV
 
 ## Test coverage (752 tests)
 
-core 197 · ui 167 · llm-connectors 61 · modelpilot 68 · skill-manifest 56 ·
+core 197 · ui 167 · llm-connectors 61 · modelpilot 69 · skill-manifest 56 ·
 adapter-linux 42 · adapter-cec 37 · adapter-aosp 28 · cli 21 · acceptance 20 ·
 perception-mock 14 · adapter-tizen 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
@@ -111,17 +111,16 @@ Report.
 5. **On-device model benchmark.** Model size vs. RAM/latency on real silicon;
    finalise the cloud/on-device routing policy. The known floor so far: 1.5B
    drives single tools but cannot chain them.
-6. **ModelPilot against the real service.** The client speaks the API ModelPilot
-   actually has — `POST /v1/chat/completions` with `model: "auto"` — instead of
-   the decision-engine API the first version assumed and no mock ever
-   contradicted, and the local verifier's verdict now goes back to
-   `POST /v1/feedback`, which is the input ModelPilot's own primary metric was
-   missing. What is still needed is a live tenant: a provider credential
-   configured on the ModelPilot side, one `shadow` run on real hardware, and a
-   decision about keys and quota (Free is 1000 requests a month **per tenant**,
-   and the install id does not participate in that count, so one key across a
-   fleet is one household spending everyone's month).
-   [`modelpilot-integration.md`](modelpilot-integration.md),
+6. **ModelPilot on a device, and at more than one tenant.** The integration has
+   run against production and the numbers are recorded in
+   [`modelpilot-integration.md`](modelpilot-integration.md#measured-against-the-live-service)
+   — but on a laptop, against a mock television, with one provider configured.
+   Three things are still open, and only the first is code:
+   the 429 wall and candidate fallback are unexercised; every latency number
+   needs retaking on MTK/NVT, where a WebView, a bridge and a weak radio all add
+   to it; and **keys and quota are a shipping blocker** (Free is 1000 requests a
+   month *per tenant*, and the install id does not participate in that count, so
+   one key across a fleet is one household spending everyone's month).
    [ADR-0004 amendment](adr/0004-modelpilot-boundary.md).
 7. **npm publish.** Waiting on the `@hearthkit` npm organisation.
 

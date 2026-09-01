@@ -373,7 +373,7 @@ describe("configuration", () => {
     const config = resolveModelPilotConfig({ env: { MODELPILOT_API_KEY: KEY } });
     expect(config.mode).toBe("shadow");
     expect(config.baseUrl).toBe("https://modelpilot.andycywu.workers.dev");
-    expect(config.timeoutMs).toBe(5000);
+    expect(config.timeoutMs).toBe(8000);
     expect(config.maxTaskBudget).toBe(0.05);
   });
 

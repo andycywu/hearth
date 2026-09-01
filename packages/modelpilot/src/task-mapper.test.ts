@@ -59,7 +59,22 @@ describe("request mapping", () => {
     const req = buildCompletionRequest({ goal, world, devices, capabilities });
 
     expect(Object.keys(req.metadata).sort()).toEqual(["latency_priority", "max_cost", "quality_threshold"]);
-    expect(Object.keys(req).sort()).toEqual(["messages", "metadata", "model"]);
+    expect(Object.keys(req).sort()).toEqual(["messages", "metadata", "model", "reasoning_effort"]);
+  });
+
+  it("asks for a decision rather than a deliberation", () => {
+    const { world, devices, capabilities } = room();
+    // Measured, not assumed: the first live call spent 704 of 748 completion
+    // tokens reasoning about a four-field answer and took 20.3s. With this it
+    // took 4.4s, cost a tenth as much, and answered slightly better. On a
+    // television 20s is not a latency, it is a bug report.
+    expect(buildCompletionRequest({ goal, world, devices, capabilities }).reasoning_effort)
+      .toBe("minimal");
+
+    // And it can be left off entirely, for a catalogue whose models would
+    // reject an unrecognised field.
+    const bare = buildCompletionRequest({ goal, world, devices, capabilities, reasoningEffort: null });
+    expect("reasoning_effort" in bare).toBe(false);
   });
 
   it("asks for a model that can actually emit strict JSON", () => {
