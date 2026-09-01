@@ -113,8 +113,8 @@ Three different things are now three different things:
 | did the *television* do it | the local read-back | `verified` / `unverified` / `unsupported` / `failed` |
 | does *ModelPilot* count it successful | `POST /v1/feedback` | the CST denominator |
 
-The third is downstream of the second, which is the next commit: the local
-verifier's verdict is the honest input ModelPilot's primary metric is missing.
+The third is downstream of the second — see
+[Closing the loop](#closing-the-loop-the-television-is-modelpilots-verifier).
 
 ## The three modes
 
@@ -155,6 +155,46 @@ planner.
 `enforceScope: "unmeasurable"` narrows enforce to the goals the deterministic
 planner cannot close — "a bit quieter" then costs no tokens, no latency and no
 network. Default is `"all"`.
+
+## Closing the loop: the television is ModelPilot's verifier
+
+ModelPilot's primary metric is Cost Per Successful Task, and it deliberately does
+not count a completed API call as a successful task until something confirms the
+outcome. On a television, **this runtime is that something**, and a better one
+than user feedback: it read the device back.
+
+One line at the host wires it:
+
+```ts
+agent.events.on("plan:end", ({ outcome }) => planner.report(outcome));
+```
+
+`report` is safe to hand every plan the agent finishes — one from another
+planner, or from any mode but enforce, is not in the ledger and is ignored. It
+never rejects: a verdict that does not arrive changes nothing on the television,
+so it is worth one telemetry line and no retry.
+
+### What is reported, and what is deliberately not
+
+| Outcome | Posted | Why |
+|---|---|---|
+| every step `verified` / `satisfied` | `success: true` | the read-back agreed — the only unambiguous yes |
+| any step `failed` | `success: false` | **the row this whole integration exists to produce**: an answer the router billed for that did not work on real hardware |
+| the answer was unusable (no steps, a rejection) | `success: false` | a plan failing the schema, or naming a capability this device lacks, is the answer's fault — and the one thing CST would otherwise never hear |
+| any step `unverified` | *nothing* | nothing here can confirm it; reporting either way launders a guess into somebody's primary metric |
+| any step `unsupported` | *nothing* | a fact about this television, not about the answer |
+| any step `denied` | *nothing* | local policy stopped it before it ran. Our rule, not their answer |
+| `ask_user` / `no_op` | *nothing* | an engine asking for a human is the system working, and there is nothing to verify |
+| **shadow mode, always** | *nothing* | the *local* plan ran. Reporting its outcome as ModelPilot's would be telling the service a TV did what its answer said, when its answer was never executed |
+
+The asymmetry is the point, and it is the same one the four honest step statuses
+are built on. A metric is only worth something if its denominator is honest, and
+a runtime that reported its own uncertainty — in either direction — would be
+quietly making CST worthless. How often this runtime has nothing to say is itself
+recorded (`local_final_verification: "not_run"`), because that number matters too.
+
+`score` is accepted by the endpoint and deliberately not sent: a made-up number
+is noise in someone else's denominator.
 
 ## Environment variables
 
@@ -255,8 +295,15 @@ be settled before a fleet is switched on.
 
 ## Telemetry
 
-One record per call, built from named fields and passed through
-`sanitizeTelemetry` before it reaches a sink: `local_workflow_id`,
+Two records per ModelPilot call: one when the answer arrives, one when the
+television has finished with it, joined by `local_workflow_id` and
+`modelpilot_request_id`. They cannot be one record, because the call is over long
+before the device is — the second carries `status: "outcome"`,
+`local_action_result` (the step statuses, in order) and
+`local_final_verification`.
+
+Both are built from named fields and passed through `sanitizeTelemetry` before
+they reach a sink: `local_workflow_id`,
 `modelpilot_request_id`, `selected_model`, `fallback_count`, `mode`, `task_type`,
 `status`, `latency_ms`, `actual_cost`, `baseline_cost`, `evaluation_status`,
 `local_action_result`, `local_final_verification`, `fallback_reason`,
@@ -342,10 +389,11 @@ set `window.__MODELPILOT_API_KEY__` before the bundle loads and launch with
    so this integration is unaffected — but the chat path's LLM connector does
    stream, so ModelPilot cannot be dropped in as the agent's conversational
    endpoint without a non-streaming switch.
-5. **`/v1/feedback` is not wired up yet.** It is the natural home for the local
-   verifier's verdict and the missing input to ModelPilot's own primary metric.
-   Until it is, `evaluation_status` stays `unverified` for every call this
-   runtime ever makes.
+5. **The feedback loop has never run against the real service.** It is wired
+   (`planner.report`, one line at the host) and verified end to end against the
+   mock in both directions, but `/v1/feedback` returns 404 for a request the
+   service does not recognise, and only a live tenant will show whether the
+   verdicts land.
 6. **Cost is measured, but only against scripted intents.** `PlanningMeter`
    counts every plan by source, and `pnpm bench` reports it: **the four P0
    scenarios plan for 100% zero tokens** on the mock adapter — the deterministic

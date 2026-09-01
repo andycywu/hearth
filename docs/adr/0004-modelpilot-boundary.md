@@ -182,15 +182,29 @@ and three things underneath it.
   two-diagnoses-in-one-line version. The controller is now asked instead of the
   error being inspected.
 
-### What this makes possible, and is the next step
+### 7. The television is ModelPilot's verifier, and says nothing when unsure
 
 `POST /v1/feedback` takes `{ request_id, success, score? }`, and ModelPilot's own
 documentation says a completed API call is not a successful task until a verifier
 confirms the outcome. **This runtime is that verifier**, and a better one than
-user feedback: `verified` → `success: true`, `failed` → `success: false`,
-`unverified` / `unsupported` → not reported at all, because they must not enter
-the CST denominator either way. That is the reason the local read-back keeps the
-last word in both directions, not just one.
+user feedback: it read the device back.
+
+`verified` → `success: true`. `failed` → `success: false` — the row the whole
+integration exists to produce, an answer the router billed for that did not work
+on real hardware. `unverified`, `unsupported`, policy-`denied`, `ask_user`, and
+**every shadow-mode plan** → nothing is posted at all.
+
+That last group is the decision, not an omission. A metric is only worth anything
+if its denominator is honest, and a runtime that reported its own uncertainty in
+either direction would be quietly making CST worthless. The same rule that makes
+this runtime refuse to say `verified` about a television it cannot read makes it
+refuse to say `success` about an answer it cannot judge. How often that happens
+is recorded (`local_final_verification: "not_run"`), because the size of the gap
+is a fact worth having.
+
+Wiring is one line at the host — `agent.events.on("plan:end", ({ outcome }) =>
+planner.report(outcome))` — and a failed report is telemetry, never a device
+problem.
 
 ### What is unresolved and blocks a fleet
 

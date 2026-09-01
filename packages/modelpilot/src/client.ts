@@ -85,6 +85,7 @@ export interface ModelPilotClientOptions {
 const DEFAULT_PATHS = {
   completions: "/v1/chat/completions",
   models: "/v1/models",
+  feedback: "/v1/feedback",
 };
 
 export interface CallOptions {
@@ -92,11 +93,36 @@ export interface CallOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * A verdict on an earlier completion, posted to `/v1/feedback`.
+ *
+ * ModelPilot's primary metric is Cost Per Successful Task, and it deliberately
+ * refuses to count a completed API call as a successful task until something
+ * confirms the outcome. On a television, **this runtime is that something** —
+ * and a better verifier than user feedback, because it read the device back.
+ *
+ * `score` is optional and deliberately usually omitted: a made-up number is
+ * noise in someone else's denominator.
+ */
+export interface OutcomeReport {
+  success: boolean;
+  score?: number;
+  comment?: string;
+}
+
 export interface ModelPilotClient {
   /** One routed completion. The answer is a *proposal*, never a result. */
   complete(request: CompletionRequest, opts?: CallOptions): Promise<ModelPilotAnswer>;
   /** The catalogue, for a bring-up screen that wants to show what is routable. */
   listModels(opts?: CallOptions): Promise<unknown>;
+  /**
+   * Tell ModelPilot whether the television actually did it.
+   *
+   * The one call in this client that is not on the path to a device operation,
+   * so a caller must be free to let it fail: the planner reports it as telemetry
+   * and carries on.
+   */
+  reportOutcome(requestId: string, report: OutcomeReport, opts?: CallOptions): Promise<void>;
 }
 
 export function createModelPilotClient(opts: ModelPilotClientOptions): ModelPilotClient {
@@ -199,6 +225,15 @@ export function createModelPilotClient(opts: ModelPilotClientOptions): ModelPilo
     },
     listModels: async (callOpts) =>
       (await call("GET", paths.models, undefined, callOpts)).json,
+
+    reportOutcome: async (requestId, report, callOpts) => {
+      await call("POST", paths.feedback, {
+        request_id: requestId,
+        success: report.success,
+        ...(report.score !== undefined ? { score: report.score } : {}),
+        ...(report.comment ? { comment: report.comment } : {}),
+      }, callOpts);
+    },
   };
 }
 

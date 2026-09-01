@@ -28,6 +28,10 @@ MODELPILOT_MODE=shadow|enforce
       │
       ▼
   ModelPilot already has: a timestamp, a request id, a selected model, a cost
+      │
+      ▼
+  enforce only, once the television has finished:
+  POST /v1/feedback { request_id, success }   ← did the answer actually work
 ```
 
 From those, entirely server-side and with no new endpoint:
@@ -40,11 +44,23 @@ From those, entirely server-side and with no new endpoint:
 | Who is in shadow vs enforce? | `x-hearth-mode` |
 | Which customer or OEM? | the API key the call was made with |
 | What does it cost us per install? | `actual_cost` per install |
+| **Does a given model's answer actually work on a TV?** | `/v1/feedback` success rate grouped by `selected_model` |
 
-**There is no analytics client, no event queue, no second endpoint, and nothing
-to disable** — because there is nothing extra being sent. That is the property
-worth protecting: it is what lets the runtime stay honestly free and offline while
-the service still has a business.
+**There is no analytics client, no event queue and nothing to disable** — because
+there is nothing extra being sent. That is the property worth protecting: it is
+what lets the runtime stay honestly free and offline while the service still has
+a business.
+
+One call does not come from the runtime's own work: `POST /v1/feedback`, in
+enforce mode, once the television has finished with a plan. It is worth being
+precise about why that is not a hole in the rule. It carries a request id the
+service issued and one boolean, it exists only for calls the host already opted
+into, it is the mechanism ModelPilot's own primary metric is defined in terms of
+— and it is *silent* whenever this runtime cannot be certain, which is often. It
+is the answer to "did the thing you billed me for work", not a report on a
+household. See
+[modelpilot-integration.md](modelpilot-integration.md#closing-the-loop-the-television-is-modelpilots-verifier)
+for the full table of what is and is not said.
 
 ## What the install id is, and is not
 

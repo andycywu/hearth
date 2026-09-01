@@ -1,7 +1,8 @@
 import {
   buildStep, callable, GoalPlanner, validateArgs,
   type Capability, type CapabilityGraph, type DeviceGraph, type Goal, type Plan,
-  type PlanRejection, type PlanStep, type Planner, type PolicyEngine, type WorldModel,
+  type PlanOutcome, type PlanRejection, type PlanStep, type Planner, type PolicyEngine,
+  type StepStatus, type WorldModel,
 } from "@hearthkit/core";
 import type { ModelPilotAnswer, ModelPilotClient } from "./client.js";
 import { ModelPilotError } from "./errors.js";
@@ -27,9 +28,9 @@ import { createTelemetryLogger, type ModelPilotTelemetry, type TelemetrySink } f
  *  - **off** — never calls. The local planner answers, as before.
  *  - **shadow** (default) — calls, records the suggestion, the request id and
  *    the model that answered, compares it with the local plan, and **executes
- *    the local one**. Device
- *    behaviour is byte-identical to `off`; the only difference is a telemetry
- *    record and a network call.
+ *    the local one**. Device behaviour is byte-identical to `off`; the only
+ *    difference is a telemetry record and a network call. Nothing is reported
+ *    to `/v1/feedback` either, because the answer was never run.
  *  - **enforce** — the returned plan is what runs, after local validation and
  *    with local policy still deciding whether each step may happen.
  *
@@ -49,6 +50,13 @@ import { createTelemetryLogger, type ModelPilotTelemetry, type TelemetrySink } f
  * used to treat it as "the answer is unusable" — which made enforce mode refuse
  * every answer it ever received. Usability is `parseActionPlan`'s call; whether
  * the television did it is the local read-back's.
+ *
+ * **And what closes the loop**: `report(outcome)`. ModelPilot refuses to count a
+ * completed call as a successful task until a verifier confirms the outcome, and
+ * on a television this runtime is the only thing that can — it read the device
+ * back. `verified` becomes `success: true`, `failed` becomes `success: false`,
+ * and everything ambiguous is **not reported at all**, because an honest metric
+ * is worth more to the service than a complete one. See `verdictFor`.
  */
 
 export interface ModelPilotPlannerOptions {
@@ -112,14 +120,101 @@ export interface ShadowRecord {
 export interface ModelPilotPlanner extends Planner {
   /** Shadow-mode suggestions, newest last. Bounded; nothing is persisted. */
   readonly shadow: readonly ShadowRecord[];
+  /**
+   * Hand back what the television actually did with a plan this planner
+   * produced, so it can reach `/v1/feedback`.
+   *
+   * Safe to call for every plan: one produced by any other planner, or in any
+   * mode but enforce, is not in the ledger and is silently ignored. Never
+   * rejects — a failed report is telemetry, not a device problem.
+   *
+   * Wire it once, at the host: `agent.events.on("plan:end", ({ outcome }) =>
+   * planner.report(outcome))`.
+   */
+  report(outcome: PlanOutcome): Promise<void>;
 }
 
 const MAX_SHADOW_RECORDS = 20;
+
+/**
+ * How many answered plans to keep waiting for a verdict.
+ *
+ * Bounded because this runs on a television for months: a plan whose outcome
+ * never arrives — the host never wired `report`, or the agent was torn down
+ * mid-plan — must not accumulate. Twenty is far more than the one or two a
+ * household has in flight, and the oldest is dropped rather than reported.
+ */
+const MAX_PENDING_VERDICTS = 20;
+
+/** A plan ModelPilot produced, waiting to find out what the television did. */
+interface PendingVerdict {
+  workflowId: string;
+  requestId: string;
+  selectedModel?: string;
+  taskType: string;
+}
+
+/**
+ * What to tell ModelPilot about a plan of its own that has now run — or that
+ * nothing may be said, which is a legitimate and frequent answer.
+ *
+ * The rules, and why each is what it is:
+ *
+ * | outcome | reported | because |
+ * |---|---|---|
+ * | every step `verified` / `satisfied` | `success: true` | the read-back agreed. This is the only unambiguous yes. |
+ * | any step `failed` | `success: false` | it was attempted and the device did not end up in the expected state. The most valuable row in the table: an answer the router billed for, that did not work on real hardware. |
+ * | the answer was unusable (no steps, a rejection) | `success: false` | a plan that fails the schema or names a capability this device lacks is the answer's fault, and it is the one thing CST would otherwise never hear about. |
+ * | any step `unverified` | **nothing** | nothing on this device can confirm it. Reporting either way would launder a guess into somebody's primary metric. |
+ * | any step `unsupported` | **nothing** | the capability existed in the graph and the adapter refused at run time. That is a fact about this television, not about the answer. |
+ * | any step `denied` | **nothing** | local policy stopped it before it ran. Our rule, not their answer. |
+ * | `ask_user` / `no_op` — no steps, no rejections | **nothing** | an engine deciding it needs a human is the system working, and there is nothing to verify. |
+ *
+ * The asymmetry is the point. ModelPilot's metric is only worth anything if the
+ * denominator is honest, and a runtime that reported its uncertainty as a
+ * success — or as a failure — would be quietly making it worthless.
+ */
+export function verdictFor(outcome: PlanOutcome): { success: boolean; comment: string } | undefined {
+  const statuses = outcome.outcomes.map((o) => o.status);
+  const has = (status: StepStatus): boolean => statuses.includes(status);
+
+  if (!statuses.length) {
+    // No steps ran. Either the answer was thrown out — which is a real failure
+    // and the service should hear about it — or it asked for a human, which is
+    // not a failure and has nothing to verify.
+    const rejections = outcome.plan.rejections ?? [];
+    if (!rejections.length) return undefined;
+    return { success: false, comment: `plan rejected locally: ${rejections[0]?.reason ?? "unusable"}` };
+  }
+
+  if (has("failed")) {
+    return { success: false, comment: `local verification failed: ${describeStatuses(statuses)}` };
+  }
+  if (has("unverified") || has("unsupported") || has("denied")) return undefined;
+
+  // A plan whose every step was optional-and-not-possible ran nothing, so there
+  // is nothing to have verified. `every` alone would have called that a success,
+  // which is the same collapse the four step statuses exist to prevent.
+  if (statuses.every((s) => s === "skipped")) return undefined;
+
+  if (statuses.every((s) => s === "verified" || s === "satisfied" || s === "skipped")) {
+    return { success: true, comment: `locally verified: ${describeStatuses(statuses)}` };
+  }
+  return undefined;
+}
+
+function describeStatuses(statuses: StepStatus[]): string {
+  return statuses.join(",");
+}
 
 export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPilotPlanner {
   const now = opts.now ?? (() => Date.now());
   const log = createTelemetryLogger(opts.telemetry);
   const shadow: ShadowRecord[] = [];
+  // Only enforce-mode plans go in here. A shadow run executes the *local* plan,
+  // so reporting its outcome as ModelPilot's would be telling the service a TV
+  // did what its answer said when its answer was never run.
+  const pending = new Map<string, PendingVerdict>();
   let counter = 0;
   const nextWorkflowId = opts.workflowId ?? (() => `wf-${now().toString(36)}-${++counter}`);
   const local = opts.local ?? new GoalPlanner({ graph: opts.graph, world: opts.world });
@@ -215,6 +310,8 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
       ...cost(result),
     });
 
+    remember(`plan-mp-${workflowId}`, workflowId, result, taskType);
+
     return {
       id: `plan-mp-${workflowId}`,
       goal,
@@ -253,6 +350,9 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
   }
 
   function refused(goal: Goal, workflowId: string, result: ModelPilotAnswer, why: string): Plan {
+    // An unusable answer is still an answer ModelPilot billed for, and a
+    // rejection is the one verdict its own telemetry can never derive.
+    remember(`plan-mp-refused-${workflowId}`, workflowId, result, taskTypeOf(goal));
     return {
       id: `plan-mp-refused-${workflowId}`,
       goal,
@@ -270,12 +370,83 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
     };
   }
 
+  /** Note a plan whose outcome is worth posting back, oldest dropped first. */
+  function remember(
+    planId: string, workflowId: string, result: ModelPilotAnswer, taskType: string,
+  ): void {
+    if (!result.requestId) return;      // nothing to post it against
+    pending.set(planId, {
+      workflowId, requestId: result.requestId, taskType,
+      ...(result.selectedModel ? { selectedModel: result.selectedModel } : {}),
+    });
+    while (pending.size > MAX_PENDING_VERDICTS) {
+      const oldest = pending.keys().next().value;
+      if (oldest === undefined) break;
+      pending.delete(oldest);
+    }
+  }
+
+  async function report(outcome: PlanOutcome): Promise<void> {
+    const entry = pending.get(outcome.plan.id);
+    // Not ours, or already reported. Both are ordinary: a host wires this to
+    // every plan the agent finishes, and most of them are local.
+    if (!entry) return;
+    pending.delete(outcome.plan.id);
+
+    const verdict = verdictFor(outcome);
+    const local = {
+      local_workflow_id: entry.workflowId,
+      modelpilot_request_id: entry.requestId,
+      ...(entry.selectedModel ? { selected_model: entry.selectedModel } : {}),
+      mode: opts.mode, task_type: entry.taskType,
+      local_action_result: outcome.outcomes.map((o) => `${o.step.action.capabilityId}:${o.status}`),
+    } as const;
+
+    if (!verdict) {
+      // The honest gap, recorded so it is countable: how often this runtime
+      // cannot tell ModelPilot anything is itself a number worth having.
+      log({
+        ...local, status: "outcome", local_final_verification: "not_run",
+        fallback_reason: "nothing certain enough to report",
+      });
+      return;
+    }
+
+    try {
+      await opts.client?.reportOutcome(
+        entry.requestId,
+        { success: verdict.success, comment: verdict.comment },
+        opts.signal ? { signal: opts.signal } : {},
+      );
+      log({
+        ...local, status: "outcome",
+        local_final_verification: verdict.success ? "passed" : "failed",
+      });
+    } catch (err) {
+      // A verdict that does not arrive changes nothing on the television. It is
+      // worth exactly one telemetry line and no retry: the next plan matters
+      // more than this bookkeeping.
+      const error = err instanceof ModelPilotError ? `${err.kind}: ${err.message}` : String(err);
+      log({
+        ...local, status: "outcome",
+        local_final_verification: verdict.success ? "passed" : "failed",
+        fallback_reason: `feedback not delivered — ${error}`,
+      });
+    }
+  }
+
   return {
     plan,
+    report,
     get shadow() {
       return shadow;
     },
   };
+}
+
+/** The same label `plan()` uses, so the two telemetry rows join on more than an id. */
+function taskTypeOf(goal: Goal): string {
+  return goal.id;
 }
 
 /**
