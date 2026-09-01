@@ -121,6 +121,29 @@ export interface CompletionRequest {
     latency_priority: number;
     max_cost: number;
   };
+  /**
+   * Passed through to the provider, not read by the router — and the single
+   * biggest thing measured against the live service.
+   *
+   * The first real call took **20.3 seconds** and spent 704 of its 748
+   * completion tokens on reasoning, for a plan that is four fields long. With
+   * `minimal` the same request answered in **4.4 seconds** with zero reasoning
+   * tokens, one tenth of the cost, and a slightly *better* answer. On a
+   * television the first of those numbers is not a latency, it is a bug report.
+   *
+   * A planner step wants a decision, not a deliberation. The reasoning that
+   * matters here is not the model's: preconditions, verification and fallbacks
+   * come from the local Capability Graph, and the model is being asked to pick
+   * one action out of seven and name a target that is listed in front of it.
+   *
+   * **What it costs to be wrong**: the OpenAI-compatible path forwards the body
+   * verbatim, so a provider that does not recognise the field answers 400 and
+   * this runtime falls back to the local planner and records why. The Anthropic
+   * and Gemini paths build their own request bodies from a fixed field list, so
+   * there it is dropped rather than rejected. Set it to `undefined` to omit it
+   * entirely if a deployment's catalogue points at a model that objects.
+   */
+  reasoning_effort?: string;
 }
 
 /**
@@ -147,6 +170,15 @@ const DEFAULT_QUALITY_THRESHOLD = 0.85;
 /** A television is a latency-sensitive place. Weight, not deadline. */
 const DEFAULT_LATENCY_PRIORITY = 0.7;
 
+/**
+ * `minimal`, because a plan step is a decision and not an essay.
+ *
+ * Measured against the live service: 20.3s and 704 reasoning tokens without it,
+ * 4.4s and zero with it, for the same four-field answer. See
+ * `CompletionRequest.reasoning_effort` for what it costs to be wrong.
+ */
+const DEFAULT_REASONING_EFFORT = "minimal";
+
 /** The keys a TV action plan must carry. Also the local parser's contract. */
 export const REQUIRED_KEYS = ["action", "target", "parameters", "expected_state", "risk"] as const;
 
@@ -163,6 +195,11 @@ export interface BuildRequestOptions {
   maxTaskBudget?: number;
   qualityThreshold?: number;
   latencyPriority?: number;
+  /**
+   * Defaults to `"minimal"`. Pass `null` to send no reasoning control at all,
+   * for a catalogue whose models would reject the field.
+   */
+  reasoningEffort?: string | null;
 }
 
 /**
@@ -170,27 +207,40 @@ export interface BuildRequestOptions {
  *
  * Two things about the wording are not cosmetic:
  *
- * 1. **"JSON" in the system message decides the routing.** The service profiles
- *    the task by scanning the joined message text in a fixed order, and
- *    `structured_extraction` matches on "json" before `reasoning` or `planning`
- *    can match on "plan". That is the profile we want — the models with a
- *    structured-extraction strength are the ones that reliably emit a strict
- *    object — but it is a coupling to someone else's regex list, so it is
- *    written down here rather than discovered later.
- * 2. **The room summary goes in the user message, once.** It is the minimised
+ * 1. **The wording of this prompt picks the route, and it is easy to get wrong.**
+ *    The service profiles the task by scanning the joined message text against a
+ *    keyword list in a fixed order, first match wins. The intended profile is
+ *    `structured_extraction`, which matches on "json" — but this prompt said
+ *    "room summary" twice, and `summarization` matches on "summary" *earlier* in
+ *    that list. Every live request was profiled as a summarisation job until the
+ *    routing_reason on a real response said so out loud. Hence "room state":
+ *    same meaning, and it does not collide.
+ *
+ *    A goal or an utterance can still contain any of those words, and nothing
+ *    can be done about that. What is avoidable is our own boilerplate steering
+ *    the router, and this is the note that keeps it avoided.
+ * 2. **The room state goes in the user message, once.** It is the minimised
  *    allowlist and nothing else, and keeping it in one field keeps "what
  *    crossed the boundary" answerable by looking at one string.
  */
 export function buildCompletionRequest(opts: BuildRequestOptions): CompletionRequest {
   const summary = minimiseRoomState(opts.world, opts.devices, opts.capabilities);
+  const effort = opts.reasoningEffort === undefined ? DEFAULT_REASONING_EFFORT : opts.reasoningEffort;
 
   const system = [
     "You are planning one step for an AI agent embedded in a television.",
     "Return a single JSON object with exactly these keys:",
     `${REQUIRED_KEYS.join(", ")}.`,
     "`action` must be one of: set_input, set_volume, play_content, pause, power, ask_user, no_op.",
-    "`target` is \"tv\" or a device id from the room summary.",
-    "Use only capability ids listed in the room summary. Never invent a device or a capability.",
+    "`target` is \"tv\" or a device id from the room state.",
+    // Constrained because the first real model to see this prompt answered with
+    // a sentence — "Switching to HDMI2 may not turn the PS5 on if it is powered
+    // off…" — which is a perfectly sensible thing to say and not one of three
+    // values. The parser rejected it, correctly, and the prompt was the bug: it
+    // pinned the vocabulary for `action` and `target` and left `risk` open.
+    "`risk` must be one of: low, medium, high.",
+    "`parameters` and `expected_state` must both be JSON objects.",
+    "Use only capability ids listed in the room state. Never invent a device or a capability.",
     "Choose ask_user when the request is ambiguous, and no_op when nothing needs doing.",
     "Answer with the JSON object and nothing else.",
   ].join("\n");
@@ -217,6 +267,7 @@ export function buildCompletionRequest(opts: BuildRequestOptions): CompletionReq
       latency_priority: opts.latencyPriority ?? DEFAULT_LATENCY_PRIORITY,
       max_cost: opts.maxTaskBudget ?? 0.05,
     },
+    ...(effort === null ? {} : { reasoning_effort: effort }),
   };
 }
 

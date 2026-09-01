@@ -64,7 +64,7 @@ export interface ModelPilotClientOptions {
   /** Service origin. `/v1/chat/completions` is appended. */
   baseUrl: string;
   apiKey: string;
-  /** Per-call budget. Also the AbortController deadline. Default 5000ms. */
+  /** Per-call budget. Also the AbortController deadline. Default 8000ms. */
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
   /** Override when a deployment's paths differ. */
@@ -127,7 +127,7 @@ export interface ModelPilotClient {
 
 export function createModelPilotClient(opts: ModelPilotClientOptions): ModelPilotClient {
   const doFetch = opts.fetchImpl ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
-  const timeoutMs = opts.timeoutMs ?? 5000;
+  const timeoutMs = opts.timeoutMs ?? 8000;
   const paths = { ...DEFAULT_PATHS, ...opts.paths };
   const now = opts.now ?? (() => Date.now());
   const base = opts.baseUrl.replace(/\/+$/, "");

@@ -34,10 +34,27 @@ export interface ResolveOptions {
 
 export const PRODUCTION_BASE_URL = "https://modelpilot.andycywu.workers.dev";
 
+/**
+ * `timeoutMs` is 8000 because 5000 was a round number and this one is a
+ * measurement.
+ *
+ * Twelve live plans against the production service: min 2449ms, p50 2864ms,
+ * p90 3161ms, max 3272ms — comfortably inside 5s. But the *first* call of a
+ * process repeatedly ran longer and two of them crossed 5000ms, which is a cold
+ * Worker plus a cold provider connection, and a household's first request of the
+ * evening is exactly that call. 8000 is about 2.5× p90: enough headroom for the
+ * cold one, still short enough that falling back to the local planner beats
+ * waiting.
+ *
+ * None of those numbers were taken on TV silicon, where a WebView, a bridge and
+ * a weak radio all add to them. Expect to raise it again on a real device, and
+ * measure rather than guess — `packages/modelpilot/scripts/latency-sample.mjs`
+ * is what produced these.
+ */
 const DEFAULTS = {
   mode: "shadow" as ModelPilotMode,
   baseUrl: PRODUCTION_BASE_URL,
-  timeoutMs: 5000,
+  timeoutMs: 8000,
   maxTaskBudget: 0.05,
 };
 

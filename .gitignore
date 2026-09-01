@@ -62,3 +62,6 @@ apps/tizen-app/*.wgt
 apps/tizen-app/Debug/
 apps/tizen-app/Release/
 apps/tizen-app/.buildResult/
+
+# VS Code Local History — file snapshots, not source.
+.history/

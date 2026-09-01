@@ -156,6 +156,79 @@ planner.
 planner cannot close — "a bit quieter" then costs no tokens, no latency and no
 network. Default is `"all"`.
 
+## Measured against the live service
+
+Run 2026-09-01 against the production Worker, with one OpenAI provider
+credential configured on the tenant. The television is the mock web adapter, so
+what this establishes is the ModelPilot half: the call goes out, a real model
+answers, the strict parser accepts it, and the local verdict reaches
+`/v1/feedback`. It establishes nothing about hardware.
+
+| | |
+|---|---|
+| Plans sampled | 12, across four goals including one in Chinese |
+| Parsed | **12 / 12** |
+| Latency | min 2449ms · **p50 2864ms** · p90 3161ms · max 3272ms |
+| Cost | **~$0.00017 per plan** · baseline (priciest eligible candidate) ~$0.0015 |
+| Routed to | `openai-mini`, every time |
+| Shadow agreement | `same` — the model independently chose the plan the deterministic planner had already built |
+| Enforce | plan ran, read-back `verified`, `/v1/feedback` accepted |
+
+[`scripts/latency-sample.mjs`](../packages/modelpilot/scripts/latency-sample.mjs)
+produced the table; [`scripts/live-check.mjs`](../packages/modelpilot/scripts/live-check.mjs)
+runs one shadow or enforce pass end to end. Both read the key from the
+environment and print neither it nor the room state.
+
+```bash
+# .env.local holds MODELPILOT_API_KEY — .env* is gitignored
+node --env-file=.env.local packages/modelpilot/scripts/live-check.mjs
+node --env-file=.env.local packages/modelpilot/scripts/latency-sample.mjs 3
+```
+
+### Three things the first live call found, none of which a mock could
+
+1. **`risk` came back as a sentence.** The model answered `"risk": "Switching to
+   HDMI2 may not turn the PS5 on if it is powered off; the switch could fail if
+   HDMI2 is unavailable or the TV is restricted/locked."` — sensible, useful, and
+   not one of `low|medium|high`. The parser rejected the whole plan, correctly,
+   and **the prompt was the bug**: it pinned the vocabulary for `action` and
+   `target` and left `risk` open. The mock had always answered `"low"`, so
+   nothing had ever disagreed with us.
+
+2. **The routing was being decided by a word we did not mean.** The response's
+   own `routing_reason` read *"highest policy-adjusted score for
+   **summarization**"*. The service profiles a task by scanning the message text
+   against a keyword list in a fixed order, and this prompt said "room summary"
+   twice — `summarization` matches on "summary" earlier in that list than
+   `structured_extraction` matches on "json". Renaming it to "room state" fixed
+   the route. Nothing failed while it was wrong; it quietly optimised for the
+   wrong thing, which is the kind of defect that survives a long time.
+
+3. **20.3 seconds per plan.** `gpt-5-mini` is a reasoning model, and it spent
+   **704 of 748 completion tokens reasoning** about a four-field answer. Adding
+   `reasoning_effort: "minimal"` — forwarded verbatim by the OpenAI-compatible
+   path, dropped by the Anthropic and Gemini paths, so it is safe to send —
+   brought the same request to 4.4s with zero reasoning tokens, **a tenth of the
+   cost**, and a marginally better answer. A plan step is a decision, not an
+   essay: the reasoning that matters is the Capability Graph's, and the model is
+   picking one action out of seven with the options in front of it.
+
+The default timeout moved from 5000ms to **8000ms** on the back of this. 5000
+was a round number; 8000 is about 2.5× the measured p90, chosen because the
+*first* call of a process repeatedly ran long — a cold Worker plus a cold
+provider connection, which is exactly a household's first request of the evening.
+
+### And one thing to watch
+
+On the ambiguous goal — *"put the news on"*, with no news app in the capability
+list — the model answered `ask_user` on three sampled runs and
+`set_input(hdmi2)` on a fourth. Both are valid plans and only one is a good one.
+Nothing here is broken: `ask_user` is the right answer, the fourth was locally
+valid so it ran, and on a real television `tv.input.switch` is medium-risk and
+meets the confirmation gate before anything happens. It is recorded because it is
+the argument for `shadow`: run it long enough to see the distribution before
+letting it steer.
+
 ## Closing the loop: the television is ModelPilot's verifier
 
 ModelPilot's primary metric is Cost Per Successful Task, and it deliberately does
@@ -203,7 +276,7 @@ is noise in someone else's denominator.
 | `MODELPILOT_API_KEY` | — | **Environment, host global, or the Android keystore. Never the launch URL.** No key ⇒ mode `off`. |
 | `MODELPILOT_MODE` | `shadow` | `off` \| `shadow` \| `enforce` |
 | `MODELPILOT_BASE_URL` | `https://modelpilot.andycywu.workers.dev` | origin; `/v1/chat/completions` is appended. Point at `tools/mock-modelpilot-server.mjs` for testing |
-| `MODELPILOT_TIMEOUT_MS` | `5000` | per call, and the abort deadline. The service takes a latency *weight*, not a deadline, so this is the only one |
+| `MODELPILOT_TIMEOUT_MS` | `8000` | per call, and the abort deadline. The service takes a latency *weight*, not a deadline, so this is the only one. 8000 is measured, not chosen — see [Measured against the live service](#measured-against-the-live-service) |
 | `MODELPILOT_MAX_COST` | `0.05` | USD, sent as `metadata.max_cost` |
 
 On a device host, the same values as globals: `__MODELPILOT_API_KEY__`,
@@ -370,10 +443,12 @@ set `window.__MODELPILOT_API_KEY__` before the bundle loads and launch with
 
 ## Unresolved risks
 
-1. **Nothing here has run against the production service** — only against the
-   mock, which is now at least a mock of the right protocol. The shapes are read
-   off the deployed Worker; what is untested is a live tenant: provider
-   credentials, plan limits, and the 429 wall.
+1. **One tenant, one provider, twelve plans, and a mock television.** The
+   integration has now run against production — see [Measured against the live
+   service](#measured-against-the-live-service) — which is the difference between
+   "should work" and "worked twelve times". Still untested: the 429 wall, a
+   second provider in the catalogue, fallback between candidates, and every one
+   of these numbers on TV silicon rather than a laptop.
 2. **Provisioning and quota are unsolved, and they are a shipping blocker.**
    ModelPilot is BYOK: a tenant configures the provider credentials the router
    draws on, so a device is only as capable as its tenant is configured. The Free
@@ -389,11 +464,12 @@ set `window.__MODELPILOT_API_KEY__` before the bundle loads and launch with
    so this integration is unaffected — but the chat path's LLM connector does
    stream, so ModelPilot cannot be dropped in as the agent's conversational
    endpoint without a non-streaming switch.
-5. **The feedback loop has never run against the real service.** It is wired
-   (`planner.report`, one line at the host) and verified end to end against the
-   mock in both directions, but `/v1/feedback` returns 404 for a request the
-   service does not recognise, and only a live tenant will show whether the
-   verdicts land.
+5. **The feedback loop has run once, in one direction.** A live enforce pass
+   posted a `success: true` verdict that the production service accepted — and
+   since `/v1/feedback` answers 404 for a request it does not recognise, an
+   accepted post is real evidence. What has not happened against production is
+   the failure direction: a plan the television refuses or fails, because a mock
+   TV does what it is told.
 6. **Cost is measured, but only against scripted intents.** `PlanningMeter`
    counts every plan by source, and `pnpm bench` reports it: **the four P0
    scenarios plan for 100% zero tokens** on the mock adapter — the deterministic
