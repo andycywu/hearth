@@ -218,6 +218,40 @@ was a round number; 8000 is about 2.5× the measured p90, chosen because the
 *first* call of a process repeatedly ran long — a cold Worker plus a cold
 provider connection, which is exactly a household's first request of the evening.
 
+### Candidate fallback, exercised
+
+The router builds `[chosen, ...alternatives]` and walks it, moving to the next
+candidate only when a failure is **retryable** — 429, 5xx or a network error — or
+when the credential is "not configured". A 401 from a bad key does the opposite:
+it breaks the loop. So an invalid credential cannot be used to test this, which
+is worth knowing before someone tries.
+
+What can: the service keeps a `mock` provider that throws a retryable error when
+the last message contains `[fail:<model id>]`. Rank that model first — profile
+the task as summarisation, which is one of its strengths, and drop
+`quality_threshold` below its 0.8 — and then make it fail.
+
+| Request | Result |
+|---|---|
+| `quality_threshold: 0.7`, summarisation-shaped | `selected_model: mock-fast`, `fallback_count: 0` |
+| same, plus `[fail:mock-fast]` | `selected_model: openai-mini`, **`fallback_count: 2`** |
+| `model: "mock-fast"` pinned, plus `[fail:mock-fast]` | **HTTP 502** `All eligible providers failed: Forced mock failure` |
+
+Three things this settled:
+
+1. **The 0.85 default threshold is doing exactly what it claims.** At 0.7 the
+   catalogue's stand-in model wins the score outright and answers with an echo of
+   the prompt. At 0.85 it is not eligible at all. That is no longer an argument,
+   it is a measurement.
+2. **A total routing failure is a 5xx**, so this runtime classifies it `server`,
+   falls back to the local plan and records why — which is the correct handling
+   and now a tested path rather than an assumed one.
+3. **A client cannot see *which* candidates failed, only how many.**
+   `fallback_count: 2` means two candidates failed before one answered, and the
+   response says nothing about who they were. For this runtime's telemetry the
+   count is enough; for debugging a household it would not be, and the chain
+   lives server-side in the tenant's own routing activity.
+
 ### And one thing to watch
 
 On the ambiguous goal — *"put the news on"*, with no news app in the capability
