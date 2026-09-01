@@ -1,7 +1,7 @@
 import type { CapabilityGraph, DeviceGraph, Goal, WorldModel } from "@hearthkit/core";
 
 /**
- * Turning a TV planning job into a ModelPilot TaskRequest — and, mostly, into
+ * Turning a TV planning job into a ModelPilot request — and, mostly, into
  * *less* than the agent knows.
  *
  * The World Model is designed to accumulate: sources, confidences, timestamps,
@@ -84,101 +84,139 @@ export function minimiseRoomState(
   };
 }
 
-// --- TaskRequest ------------------------------------------------------------
+// --- The request -----------------------------------------------------------
 
-export interface TaskRequest {
-  task: { instruction: string; context: string };
-  strategy: string;
-  requirements: {
-    intelligence: string;
-    capabilities: string[];
-    qualitySla: number;
-    maxCost: number;
-    maxLatencyMs: number;
-    privacy: string;
-    risk: string;
-    approvalMode: string;
-    dataPolicy: {
-      sensitivity: string;
-      retentionRequirement: string;
-      trainingUse: string;
-      toolEgress: string;
-      humanReview: string;
-    };
+/**
+ * ModelPilot's request shape is OpenAI's, because ModelPilot *is* an
+ * OpenAI-compatible endpoint.
+ *
+ * This replaced a bespoke `TaskRequest` — `strategy`, `requirements`,
+ * `economics`, `verification`, `dataPolicy` — that was written against a
+ * decision-engine API the service does not have. Nothing read any of those
+ * fields. They are gone rather than kept as decoration, because a declaration
+ * no one enforces reads like a guarantee and is not one.
+ *
+ * **Where the privacy boundary actually lives**: `minimiseRoomState` above, and
+ * the tests that pin it. An allowlist that cannot pass a new world path by
+ * default is a mechanism; `dataPolicy: { retentionRequirement: "zero" }` in a
+ * body the server ignores was a sentence. The server-side half — retention,
+ * training use, tool egress — has to be implemented in ModelPilot before it can
+ * be claimed anywhere.
+ *
+ * **`stream` is never set.** The service answers `stream: true` with HTTP 400
+ * ("Streaming is not enabled in the Free-first release"), so a planner that
+ * streamed would fail every call. Planning wants one JSON object anyway.
+ */
+export interface CompletionRequest {
+  /** `"auto"` is the entire routing trigger; a model id pins one instead. */
+  model: string;
+  messages: { role: "system" | "user"; content: string }[];
+  /**
+   * The only routing knobs the service reads (`profileRequest`). Everything
+   * else about the decision — task type, complexity, token estimate — it infers
+   * from the messages.
+   */
+  metadata: {
+    quality_threshold: number;
+    latency_priority: number;
+    max_cost: number;
   };
-  economics: { maxTaskBudget: number; currency: string };
-  verification: { type: string; requiredKeys: string[] };
 }
+
+/**
+ * 0.85, and the number is load-bearing.
+ *
+ * A router optimises for score, and price is part of that score, so the cheapest
+ * *eligible* candidate wins more often than not. A television needs a model that
+ * can emit a strict JSON object on demand — a weaker one does not fail loudly,
+ * it answers with prose — so the threshold has to exclude the weak end of
+ * whatever catalogue the service is carrying, rather than trusting the ranking
+ * to prefer capability over cost.
+ *
+ * The failure it buys is the good one: when nothing qualifies, the service
+ * answers `422 No eligible configured model satisfies this request policy`,
+ * which names a real configuration problem. The alternative is a cheap model
+ * returning something plausible and unusable, which costs a round trip and looks
+ * like the runtime's fault.
+ *
+ * The strict parser is the second line of defence: a plausible non-plan never
+ * becomes a device operation. This is the first.
+ */
+const DEFAULT_QUALITY_THRESHOLD = 0.85;
+
+/** A television is a latency-sensitive place. Weight, not deadline. */
+const DEFAULT_LATENCY_PRIORITY = 0.7;
 
 /** The keys a TV action plan must carry. Also the local parser's contract. */
 export const REQUIRED_KEYS = ["action", "target", "parameters", "expected_state", "risk"] as const;
 
-export interface BuildTaskOptions {
+export interface BuildRequestOptions {
   goal: Goal;
   world: WorldModel;
   devices: DeviceGraph;
   capabilities: CapabilityGraph;
   /** The user's own words, when the goal has them. Never conversation history. */
   utterance?: string;
+  /** Defaults to `"auto"`, which is what makes ModelPilot route at all. */
+  model?: string;
+  /** USD, sent as `metadata.max_cost`. */
   maxTaskBudget?: number;
-  maxLatencyMs?: number;
+  qualityThreshold?: number;
+  latencyPriority?: number;
 }
 
 /**
- * One planning step as a ModelPilot task.
+ * One planning step as a chat completion.
  *
- * `toolEgress: "denied"` is not decoration: nothing ModelPilot does may reach
- * this television. It returns a *plan*, the local executor decides whether to
- * run it, and the local verifier decides whether it worked.
+ * Two things about the wording are not cosmetic:
+ *
+ * 1. **"JSON" in the system message decides the routing.** The service profiles
+ *    the task by scanning the joined message text in a fixed order, and
+ *    `structured_extraction` matches on "json" before `reasoning` or `planning`
+ *    can match on "plan". That is the profile we want — the models with a
+ *    structured-extraction strength are the ones that reliably emit a strict
+ *    object — but it is a coupling to someone else's regex list, so it is
+ *    written down here rather than discovered later.
+ * 2. **The room summary goes in the user message, once.** It is the minimised
+ *    allowlist and nothing else, and keeping it in one field keeps "what
+ *    crossed the boundary" answerable by looking at one string.
  */
-export function buildTaskRequest(opts: BuildTaskOptions): TaskRequest {
+export function buildCompletionRequest(opts: BuildRequestOptions): CompletionRequest {
   const summary = minimiseRoomState(opts.world, opts.devices, opts.capabilities);
-  const goalLine = describeGoal(opts.goal);
+
+  const system = [
+    "You are planning one step for an AI agent embedded in a television.",
+    "Return a single JSON object with exactly these keys:",
+    `${REQUIRED_KEYS.join(", ")}.`,
+    "`action` must be one of: set_input, set_volume, play_content, pause, power, ask_user, no_op.",
+    "`target` is \"tv\" or a device id from the room summary.",
+    "Use only capability ids listed in the room summary. Never invent a device or a capability.",
+    "Choose ask_user when the request is ambiguous, and no_op when nothing needs doing.",
+    "Answer with the JSON object and nothing else.",
+  ].join("\n");
+
+  const user = [
+    `Goal: ${describeGoal(opts.goal)}`,
+    // Only when it adds something: a goal built *from* the utterance already
+    // carries it, and sending the same sentence twice is both wasteful and one
+    // more copy of a household's words than necessary.
+    ...(opts.utterance && opts.utterance !== opts.goal.intent
+      ? [`The user said: ${opts.utterance}`]
+      : []),
+    `Room: ${JSON.stringify(summary)}`,
+  ].join("\n");
 
   return {
-    task: {
-      instruction: [
-        "You are planning one step for an AI agent embedded in a television.",
-        "Return a single JSON object with exactly these keys:",
-        `${REQUIRED_KEYS.join(", ")}.`,
-        "`action` must be one of: set_input, set_volume, play_content, pause, power, ask_user, no_op.",
-        "`target` is \"tv\" or a device id from the room summary.",
-        "Use only capability ids listed in the summary. Never invent a device or a capability.",
-        "Choose ask_user when the request is ambiguous, and no_op when nothing needs doing.",
-        "",
-        `Goal: ${goalLine}`,
-        // Only when it adds something: a goal built *from* the utterance already
-        // carries it, and sending the same sentence twice is both wasteful and
-        // one more copy of a household's words than necessary.
-        ...(opts.utterance && opts.utterance !== opts.goal.intent
-          ? [`The user said: ${opts.utterance}`]
-          : []),
-      ].join("\n"),
-      // Minimised, and serialised here so it is obvious at the call site exactly
-      // what crosses the boundary.
-      context: JSON.stringify(summary),
+    model: opts.model ?? "auto",
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    metadata: {
+      quality_threshold: opts.qualityThreshold ?? DEFAULT_QUALITY_THRESHOLD,
+      latency_priority: opts.latencyPriority ?? DEFAULT_LATENCY_PRIORITY,
+      max_cost: opts.maxTaskBudget ?? 0.05,
     },
-    strategy: "plan_execute_verify",
-    requirements: {
-      intelligence: "reasoning",
-      capabilities: ["planning", "tv_control"],
-      qualitySla: 0.9,
-      maxCost: opts.maxTaskBudget ?? 0.05,
-      maxLatencyMs: opts.maxLatencyMs ?? 5000,
-      privacy: "no_training",
-      risk: "medium",
-      approvalMode: "high_risk",
-      dataPolicy: {
-        sensitivity: "confidential",
-        retentionRequirement: "zero",
-        trainingUse: "prohibited",
-        // The engine may reason; it may not reach anything in this house.
-        toolEgress: "denied",
-        humanReview: "allowed",
-      },
-    },
-    economics: { maxTaskBudget: opts.maxTaskBudget ?? 0.05, currency: "USD" },
-    verification: { type: "json_schema", requiredKeys: [...REQUIRED_KEYS] },
   };
 }
 

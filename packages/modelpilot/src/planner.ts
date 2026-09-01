@@ -3,11 +3,11 @@ import {
   type Capability, type CapabilityGraph, type DeviceGraph, type Goal, type Plan,
   type PlanRejection, type PlanStep, type Planner, type PolicyEngine, type WorldModel,
 } from "@hearthkit/core";
-import { isVerified, type ModelPilotClient, type ModelPilotTaskResult } from "./client.js";
+import type { ModelPilotAnswer, ModelPilotClient } from "./client.js";
 import { ModelPilotError } from "./errors.js";
 import type { ModelPilotMode } from "./config.js";
 import { parseActionPlan, type TvActionPlan } from "./action-plan.js";
-import { buildTaskRequest } from "./task-mapper.js";
+import { buildCompletionRequest } from "./task-mapper.js";
 import { createTelemetryLogger, type ModelPilotTelemetry, type TelemetrySink } from "./telemetry.js";
 
 /**
@@ -20,26 +20,35 @@ import { createTelemetryLogger, type ModelPilotTelemetry, type TelemetrySink } f
  * the preconditions, the expected effects, the verification and the fallback
  * providers all still come from this device's Capability Graph. A remote engine
  * cannot weaken a check it is not asked to write, cannot name a capability this
- * TV does not have, and cannot mark its own work as verified.
+ * TV does not have, and has no way to report its own answer as done.
  *
  * The modes:
  *
  *  - **off** — never calls. The local planner answers, as before.
- *  - **shadow** (default) — calls, records the suggestion and the trajectory id,
- *    compares it with the local plan, and **executes the local one**. Device
+ *  - **shadow** (default) — calls, records the suggestion, the request id and
+ *    the model that answered, compares it with the local plan, and **executes
+ *    the local one**. Device
  *    behaviour is byte-identical to `off`; the only difference is a telemetry
  *    record and a network call.
  *  - **enforce** — the returned plan is what runs, after local validation and
  *    with local policy still deciding whether each step may happen.
  *
  * Fallback, stated rather than implied: when ModelPilot is *unavailable*
- * (timeout, unreachable, 5xx, unauthorised, not configured) enforce mode falls
- * back to the local planner and records why. When ModelPilot is *reached* and
- * answers something unusable — a malformed plan, or a task it reports as
- * unverified — that is not an availability problem and there is no quiet
- * fallback: the plan comes back empty with the reason attached, which sends the
- * agent to recovery or to the user. Policy is never bypassed either way, because
- * policy runs in the executor, below both planners.
+ * (timeout, unreachable, 5xx, unauthorised, out of quota, not configured)
+ * enforce mode falls back to the local planner and records why. When ModelPilot
+ * is *reached* and answers something unusable — a plan that fails the schema, or
+ * one naming a capability this device does not have — that is not an
+ * availability problem and there is no quiet fallback: the plan comes back empty
+ * with the reason attached, which sends the agent to recovery or to the user.
+ * Policy is never bypassed either way, because policy runs in the executor,
+ * below both planners.
+ *
+ * **What is deliberately not a gate**: `modelpilot.evaluation_status`. It is the
+ * service's Cost-Per-Successful-Task bookkeeping, it reads `unverified` on every
+ * fresh completion until a verifier posts to `/v1/feedback`, and this planner
+ * used to treat it as "the answer is unusable" — which made enforce mode refuse
+ * every answer it ever received. Usability is `parseActionPlan`'s call; whether
+ * the television did it is the local read-back's.
  */
 
 export interface ModelPilotPlannerOptions {
@@ -60,9 +69,13 @@ export interface ModelPilotPlannerOptions {
    * question a product decision is actually made on.
    */
   meter?: { recordCost(usd: number): void };
-  /** Ceiling handed to ModelPilot and echoed in telemetry. */
+  /**
+   * Ceiling sent as `metadata.max_cost`, in USD, and echoed in telemetry.
+   *
+   * There is no latency ceiling to send: the service takes a latency *weight*,
+   * not a deadline. The deadline is the client's `timeoutMs`.
+   */
   maxTaskBudget?: number;
-  maxLatencyMs?: number;
   /**
    * `local` (default) plans locally when ModelPilot is unavailable; `refuse`
    * returns an empty plan instead. A kiosk that must not act without the engine
@@ -88,8 +101,8 @@ export interface ModelPilotPlannerOptions {
 /** What the last call produced, for a host that wants to show or store it. */
 export interface ShadowRecord {
   workflowId: string;
-  taskId?: string;
-  trajectoryId?: string;
+  requestId?: string;
+  selectedModel?: string;
   suggestion?: TvActionPlan;
   agreement: NonNullable<ModelPilotTelemetry["shadow_agreement"]>;
   localSteps: string[];
@@ -136,16 +149,15 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
       }
     }
 
-    const request = buildTaskRequest({
+    const request = buildCompletionRequest({
       goal, world: opts.world, devices: opts.devices, capabilities: opts.graph,
       ...(goal.intent ? { utterance: goal.intent } : {}),
       ...(opts.maxTaskBudget !== undefined ? { maxTaskBudget: opts.maxTaskBudget } : {}),
-      ...(opts.maxLatencyMs !== undefined ? { maxLatencyMs: opts.maxLatencyMs } : {}),
     });
 
-    let result: ModelPilotTaskResult;
+    let result: ModelPilotAnswer;
     try {
-      result = await opts.client.executeVerifiedTask(
+      result = await opts.client.complete(
         request,
         opts.signal ? { signal: opts.signal } : {},
       );
@@ -158,31 +170,16 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
 
     if (result.actualCost !== undefined) opts.meter?.recordCost(result.actualCost);
 
-    // Reached, but ModelPilot itself is not satisfied. No device operation, and
-    // no substituting our own plan for the answer we asked it to stand behind.
-    if (!isVerified(result)) {
-      log({
-        local_workflow_id: workflowId,
-        ...ids(result),
-        mode: opts.mode, task_type: taskType, status: "unverified",
-        latency_ms: result.latencyMs,
-        ...(result.actualCost !== undefined ? { actual_cost: result.actualCost } : {}),
-        verification_result: result.status ?? "unknown",
-        ...(result.missing.length ? { missing_fields: result.missing } : {}),
-      });
-      if (opts.mode === "shadow") return withWorkflow(await local.plan(goal), workflowId);
-      return refused(goal, workflowId, result, `ModelPilot reported the task ${result.status ?? "unverified"}`);
-    }
-
+    // Reached and answered. From here the only question is whether the *answer*
+    // is one this device can act on, which is the parser's call and nobody
+    // else's.
     const parsed = parseActionPlan(result.output);
     if (!parsed.ok) {
       log({
         local_workflow_id: workflowId,
         ...ids(result),
         mode: opts.mode, task_type: taskType, status: "unusable_output",
-        latency_ms: result.latencyMs,
-        ...(result.actualCost !== undefined ? { actual_cost: result.actualCost } : {}),
-        verification_result: result.status ?? "unknown",
+        ...cost(result),
       });
       if (opts.mode === "shadow") return withWorkflow(await local.plan(goal), workflowId);
       return refused(goal, workflowId, result, `the plan did not validate: ${parsed.errors.join("; ")}`);
@@ -197,18 +194,15 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
       const agreement = compare(localSteps, remoteSteps);
       record(shadow, {
         workflowId, suggestion: parsed.plan, agreement, localSteps, remoteSteps,
-        ...(result.taskId ? { taskId: result.taskId } : {}),
-        ...(result.trajectoryId ? { trajectoryId: result.trajectoryId } : {}),
+        ...(result.requestId ? { requestId: result.requestId } : {}),
+        ...(result.selectedModel ? { selectedModel: result.selectedModel } : {}),
       });
       log({
         local_workflow_id: workflowId,
         ...ids(result),
         mode: "shadow", task_type: taskType, status: "ok",
-        latency_ms: result.latencyMs,
-        ...(result.actualCost !== undefined ? { actual_cost: result.actualCost } : {}),
-        verification_result: result.status ?? "verified",
+        ...cost(result),
         shadow_agreement: agreement,
-        ...(result.missing.length ? { missing_fields: result.missing } : {}),
       });
       // The whole point of shadow: the device does exactly what it did before.
       return withWorkflow(localPlan, workflowId);
@@ -218,10 +212,7 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
       local_workflow_id: workflowId,
       ...ids(result),
       mode: "enforce", task_type: taskType, status: "ok",
-      latency_ms: result.latencyMs,
-      ...(result.actualCost !== undefined ? { actual_cost: result.actualCost } : {}),
-      verification_result: result.status ?? "verified",
-      ...(result.missing.length ? { missing_fields: result.missing } : {}),
+      ...cost(result),
     });
 
     return {
@@ -232,7 +223,7 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
       source: "remote",
       ...(rejections.length ? { rejections } : {}),
       rationale: [
-        `modelpilot(${result.taskId ?? "no task id"})`,
+        describeAnswer(result),
         parsed.plan.action,
         parsed.plan.reason ?? "",
       ].filter(Boolean).join(" · "),
@@ -247,9 +238,9 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
       local_workflow_id: workflowId, mode: opts.mode, task_type: taskType, status: "error",
       fallback_reason: reason,
     });
-    // `unusable_output` and `unverified` never arrive here — they are handled
-    // above, where the answer is known — so everything at this point is an
-    // availability problem, and falling back is a decision the host made.
+    // `unusable_output` never arrives here — it is handled above, where the
+    // answer is known — so everything at this point is an availability problem,
+    // and falling back is a decision the host made.
     if (opts.mode === "shadow" || (opts.onUnavailable ?? "local") === "local") {
       return withWorkflow(await local.plan(goal), workflowId, reason);
     }
@@ -261,7 +252,7 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
     };
   }
 
-  function refused(goal: Goal, workflowId: string, result: ModelPilotTaskResult, why: string): Plan {
+  function refused(goal: Goal, workflowId: string, result: ModelPilotAnswer, why: string): Plan {
     return {
       id: `plan-mp-refused-${workflowId}`,
       goal,
@@ -271,8 +262,10 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
       rejections: [{ capabilityId: "modelpilot", reason: why }],
       rationale: [
         why,
-        `task=${result.taskId ?? "unknown"}`,
-        `trajectory=${result.trajectoryId ?? "unknown"}`,
+        // The one id that can be looked up afterwards — and the one
+        // `/v1/feedback` takes.
+        `request=${result.requestId ?? "unknown"}`,
+        `model=${result.selectedModel ?? "unknown"}`,
       ].join(" · "),
     };
   }
@@ -396,11 +389,41 @@ function withWorkflow(plan: Plan, workflowId: string, fallbackReason?: string): 
   };
 }
 
-function ids(result: ModelPilotTaskResult): Partial<ModelPilotTelemetry> {
+function ids(result: ModelPilotAnswer): Partial<ModelPilotTelemetry> {
   return {
-    ...(result.taskId ? { modelpilot_task_id: result.taskId } : {}),
-    ...(result.trajectoryId ? { trajectory_id: result.trajectoryId } : {}),
+    ...(result.requestId ? { modelpilot_request_id: result.requestId } : {}),
+    ...(result.selectedModel ? { selected_model: result.selectedModel } : {}),
   };
+}
+
+/**
+ * The numbers, in one place, so the three log sites cannot drift apart.
+ *
+ * `baseline_cost` is the service's claim about what the priciest eligible
+ * candidate would have cost. Recording it beside `actual_cost` is what turns
+ * "routing saves money" from a slogan into a subtractable pair.
+ */
+function cost(result: ModelPilotAnswer): Partial<ModelPilotTelemetry> {
+  return {
+    latency_ms: result.latencyMs,
+    ...(result.actualCost !== undefined ? { actual_cost: result.actualCost } : {}),
+    ...(result.baselineCost !== undefined ? { baseline_cost: result.baselineCost } : {}),
+    ...(result.fallbackCount !== undefined ? { fallback_count: result.fallbackCount } : {}),
+    ...(result.evaluationStatus ? { evaluation_status: result.evaluationStatus } : {}),
+    ...(result.missing.length ? { missing_fields: result.missing } : {}),
+  };
+}
+
+/**
+ * Which call produced this plan, and which model answered.
+ *
+ * Both halves are needed on a bring-up screen: the request id is what
+ * `/v1/feedback` and the tenant dashboard take, and the model is the answer to
+ * "why was this plan good/bad/expensive" more often than anything else.
+ */
+function describeAnswer(result: ModelPilotAnswer): string {
+  const via = result.selectedModel ? ` via ${result.selectedModel}` : "";
+  return `modelpilot(${result.requestId ?? "no request id"}${via})`;
 }
 
 function record(list: ShadowRecord[], entry: ShadowRecord): void {
