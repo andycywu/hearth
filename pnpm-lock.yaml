@@ -60,6 +60,9 @@ importers:
 
   apps/dev-harness:
     dependencies:
+      '@hearthkit/adapter-cec':
+        specifier: workspace:*
+        version: link:../../packages/adapter-cec
       '@hearthkit/adapter-web':
         specifier: workspace:*
         version: link:../../packages/adapter-web
@@ -142,8 +145,27 @@ importers:
         specifier: workspace:*
         version: link:../platform-api
 
+  packages/adapter-cec:
+    dependencies:
+      '@hearthkit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@hearthkit/platform-api':
+        specifier: workspace:*
+        version: link:../platform-api
+    devDependencies:
+      '@hearthkit/adapter-web':
+        specifier: workspace:*
+        version: link:../adapter-web
+      '@hearthkit/llm-connectors':
+        specifier: workspace:*
+        version: link:../llm-connectors
+
   packages/adapter-linux:
     dependencies:
+      '@hearthkit/adapter-cec':
+        specifier: workspace:*
+        version: link:../adapter-cec
       '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api

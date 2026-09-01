@@ -104,6 +104,11 @@ export function createStoredSource(storage: KeyValueStore, key = KEY): Discovery
         ...(node.vendor ? { vendor: node.vendor } : {}),
         ...(node.model ? { model: node.model } : {}),
         ...(node.parentId ? { parentId: node.parentId } : {}),
+        // Without this the room forgets, on every boot, which of two devices
+        // sharing an HDMI port is which — the node keeps its CEC address but the
+        // observation rebuilt from it would not carry the key that tells them
+        // apart.
+        ...(node.cecAddress ? { cecAddress: node.cecAddress } : {}),
       }));
     },
   };

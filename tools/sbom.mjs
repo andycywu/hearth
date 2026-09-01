@@ -18,7 +18,7 @@ const bom = {
   version: 1,
   metadata: {
     timestamp: new Date().toISOString(),
-    tools: [{ vendor: "hearth", name: "tools/sbom.mjs", version: "0.1.0" }],
+    tools: [{ vendor: "hearth", name: "tools/sbom.mjs", version: "0.2.0" }],
     component: {
       type: "application",
       name: rootPkg.name,

@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/platform-api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Platform abstraction layer (HAL) — capability interfaces the agent uses to control a TV, independent of AOSP/Tizen or MTK/NVT.",
   "type": "module",
   "sideEffects": false,

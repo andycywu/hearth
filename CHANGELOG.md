@@ -8,6 +8,217 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **HDMI-CEC, the first transport past the television** (`packages/adapter-cec`,
+  [docs/cec.md](docs/cec.md), roadmap task 7). Everything until now reached
+  exactly one device, where "did it work?" is answered by asking the object that
+  just did it. A console on HDMI2 has its own power state, its own name, and its
+  own ways of ignoring you — so it is the first real test of the claim this
+  runtime is built on.
+  - A **message-shaped `CecTransport`**: six methods, each named after the CEC
+    message it sends. `wake()` resolving means the *bus accepted*
+    `<Set Stream Path>` and nothing more; an interface that called itself
+    `turnOn(): Promise<void>` would invite exactly the reading this project
+    exists to refuse.
+  - An **`hdmi_cec` discovery source** that derives the HDMI port *and the parent
+    hop* from the physical address — `3.1.0.0` is on port 1 of the device at
+    `3.0.0.0`, which is how an AVR with a console behind it announces itself, and
+    it is the `parentId` the Device Graph has had a field for since before
+    anything could fill it. Devices are identified by physical address, not
+    logical: logical addresses are reallocated when devices come and go, and a
+    console that is address 4 today can be 8 tomorrow. The logical address is
+    used for the type only where the spec is unambiguous (0 is a TV, 5 is an
+    audio system) — a playback device stays `unknown`, because a console, a
+    Blu-ray player and a streaming stick all take a playback slot and which one
+    depends on who plugged in first.
+  - **Power that can finally be verified.** `<Give Device Power Status>` is the
+    first read that can speak for a device other than the TV, so the writes
+    verify by read-back against it. The four outcomes then come from the
+    hardware: the console says `on` → `verified`; it woke and never answers →
+    `unverified`; the bus accepted the message and it stayed asleep → `failed`;
+    there is no CEC here → `unsupported`, withdrawn, never offered again. One
+    goal, one plan, four buses, all four pinned by name.
+  - **A mock bus that misbehaves on purpose**, following `perception-mock`: a
+    device that never answers the power question, one that accepts
+    `<Set Stream Path>` and stays in standby, and a platform with no bus at all.
+    A mock that only behaves well is a mock that agrees with you.
+  - `discoverRoom(platform, { sources })` lets a host wire a transport in without
+    core learning what a CEC bus is.
+  - **No real CEC bus has run any of this.** The Android API is `@SystemApi`,
+    Tizen and webOS expose none, so an absent transport is the *normal* case.
+- **A Linux CEC transport over `cec-ctl`** (`createLinuxCecTransport`), which is
+  the only implementation of `CecTransport` a person can verify without a signing
+  agreement: a Raspberry Pi has `/dev/cec0` and `apt install v4l-utils`. It
+  follows the same shape as that adapter's audio backends — every shell call
+  through an injectable `Runner`, pure parsers testable without hardware. Two
+  operational facts are encoded because they cost time otherwise: an adapter must
+  **claim a logical address** before it can transmit at all (a fresh `/dev/cec0`
+  has none, and every `--to` fails with "Device has no logical address"), so the
+  first transmit configures once and `configure: false` exists for a box where
+  another daemon owns the adapter; and **CEC is slow**, so the runner waits 15
+  seconds rather than the 5 that is generous for `pactl`. A NACK is a failure and
+  not a device that happens to be off — nothing answered at that address.
+- **`tools/verify-cec.mjs`**, because the parsers are tested against fixtures
+  written from `cec-ctl`'s documentation rather than recorded from a device, and
+  the repo says which of those it is. On a machine with an adapter it scans,
+  reads power status, runs the discovery source, optionally wakes a device with
+  `--writes` and puts it back, and prints the raw output beside what the parser
+  made of it plus a transcript ready to paste in as a fixture. It reports how
+  many devices answer `<Give Device Power Status>` at all, since *only those can
+  ever report `verified`* for a power change. With no adapter it says which of
+  the three reasons applies and exits 0 — not owning a Pi is not a test failure.
+
+- **`?cec=mock` in the dev harness**, so the living-room story is visible in a
+  browser rather than only in tests: a console, an AVR and a streaming box behind
+  that AVR, *discovered* rather than declared, and 「我要打 PS5」 then wakes the
+  console over the bus, verifies it with a power-status read-back and switches
+  the TV to the port the graph says it is on. It is named `mock` out loud,
+  because a demo quietly pretending to be hardware would be the exact dishonesty
+  this runtime exists to refuse. The AVR in it never answers
+  `<Give Device Power Status>`, so the `unverified` answer is reachable too.
+- **`AgentOptions.capabilities`** — the extension point `tools` was missing a
+  half of. A tool is what the *model* may ask for; a capability is what the
+  *planner* may reason about, with its preconditions, risk level and
+  verification. A transport that registered only tools would be invisible to goal
+  mode, and one that registered only capabilities would produce a plan nothing
+  can execute.
+- **`cecTargets(graph, found)`** joins what CEC saw to what the room already
+  believes, keyed by the **Device Graph node id** rather than the CEC address. A
+  console someone registered by hand is `ps5`; CEC knows it as `2.0.0.0`; a skill
+  resolving 「我要打 PS5」 looks for the former. Registering capabilities under the
+  address would produce a plan for a device the goal has never heard of — every
+  step correct, the whole thing useless.
+- **`DeviceTransport`, and a host wires one in a line.** Reaching devices past
+  the television was six steps in the right order — build a source, pass it to
+  `discoverRoom`, scan again, join what was found to what the room calls things,
+  build capabilities, build tools — and the dev harness had all six inline. That
+  is exactly how three app hosts came to have three divergent boot sequences, the
+  fix for which was `@hearthkit/host`; repeating the mistake one layer up was not
+  interesting. So `bootRuntime({ …, transports: () => [createCecTransport(bus)] })`
+  is the whole integration, and `?cec=mock` in the harness runs the identical
+  path so the two cannot drift.
+  - The seam is deliberately **not CEC-shaped**: a transport offers discovery
+    sources *before* the room is built, then is handed the merged graph and asked
+    what it can now do — because the answer depends on what was found and on what
+    the merge decided to call it. IR, Wake-on-LAN and Matter need that same order.
+  - Whether a transport exists is a *host* question, not a runtime one: the same
+    Android build has CEC or does not depending on how it was signed. A transport
+    that throws is dropped with a note in the boot log, because a CEC adapter that
+    is not there must never stop a television from booting — and not being there
+    is the normal case.
+  - It costs **~0.7 KB** on every television that has no transport at all, which
+    is the honest price of the seam existing and is stated rather than rounded
+    away.
+
+### Fixed
+
+Five defects in code that was already green, all found by CEC being the first
+thing that reaches past the television — and all correct for every device that
+had existed until now:
+
+- **A parent link could point at a node that no longer existed.** The CEC source
+  named a device's parent by the id *it* would have given it, and the graph then
+  merged that parent into a node someone had registered by hand under a different
+  id — leaving the child pointing at nothing. `inputPortFor` walks that chain to
+  answer "which input shows this device", so an Apple TV behind an AVR silently
+  had no port. Parents are now named by a strong key (`parentCecAddress`) and
+  resolved by `DeviceGraph.linkParents()` after a discovery pass, when every node
+  has settled. An unresolvable link stays pending rather than being written as a
+  dangling id: the parent may be a switch that does not speak CEC, and it may
+  also just be next in the list.
+- **The agent told you the TV had done something another device did.** "Asked the
+  TV to `ps5.power.on`" was safe to hard-code while every capability was the
+  television acting on itself; the TV is the thing that *sent* the message. The
+  outcome summary now names the device the steps are actually about, and says
+  "I can't" rather than "This TV can't" when the step was not about the TV. A
+  plan touching several devices gets a sentence with no subject rather than a
+  wrong one.
+
+- **A read-back could verify against its own assumption.** The executor's
+  `read_back` branch checked that the verifying read *succeeded*, not that it
+  *answered*, while the step's optimistic write was already sitting on that path.
+  Every reader in this repo always answers — a TV that reports its volume at all
+  reports a number — so the case had never arisen. Over CEC, a device that
+  acknowledges `<Give Device Power Status>` and says nothing is ordinary, and the
+  result would have been a confident `verified` for a console that never woke:
+  the worst answer this system can give. It now checks the backing source,
+  exactly as `state` verification already did.
+- **Two devices on one HDMI port merged into one.** Device identity fell back to
+  the HDMI port, and an AVR at `3.0.0.0` and the box plugged into it at
+  `3.1.0.0` are both "on HDMI3" — so the room silently lost a device. The
+  identity rule already named the CEC address; nothing stored it. `DeviceNode`
+  now carries `cecAddress`, `match()` uses it ahead of the port, and the stored
+  source carries it back through persistence so the room does not re-merge them
+  on every boot.
+- **Two CEC devices could not coexist.** Core names a device-power tool after its
+  *provider*, so a second CEC device also wanted to be `cec_power_on`, and the
+  registry throws on a duplicate name — a boot crash in any living room with a
+  console and a set-top box. Tool names are per device now.
+
+## [0.2.0] - 2026-08-28
+
+The living-room tier: the runtime stopped being a chat loop with tools attached
+and became an agent with a model of the room, a plan, a policy and a read-back.
+It also acquired a name — **Hearth** — and a size budget.
+
+### Added
+
+- **The project is called Hearth, and its namespaces are `hearthkit`.**
+  `tv-ai-agent` was a description, not a name: it could not be searched for and
+  it generated no vocabulary for the ideas here. Every globally-unique namespace
+  is `hearthkit` (the only candidate free on npm, GitHub and the domain at once);
+  the repository is `andycywu/hearth`, because *Hearth* is the product and
+  `@hearthkit/*` is where its packages live. Storage prefixes changed from
+  `tv-ai-agent` to `hearth`, which breaks continuity once — history, installed
+  skills and the saved device graph under the old prefix become invisible.
+  Pre-release is the only moment that is free. Deliberately **not** renamed: the
+  Android / Tizen / webOS application ids, because an app id is an installed
+  identity and changing it invalidates every documented `adb` line.
+  [ADR-0003](docs/adr/0003-name-and-namespace.md) records the availability checks
+  and the runners-up. The GitHub Pages demo URL is now
+  `andycywu.github.io/hearth/`; GitHub redirects a renamed repo's own URLs but
+  **not** its Pages site, so the old link is dead rather than forwarded.
+- **Build profiles — optional code is removed at build time, not skipped at
+  runtime** (`core/src/features.ts`, `tools/bundle.mjs`). A television parses the
+  whole bundle on every single launch, on a launcher's memory budget, so "ship it
+  and branch around it" is not free there. `--full` / `--with` / `--without` fold
+  six features out through `esbuild` `define`, taking everything they import with
+  them — measured on the ModelPilot planner: 17.4 KB → 0.1 KB. Three profiles:
+  **74 KB** minimal, **95 KB** default, **121 KB** `--full` (adds `?diag`, the
+  offline brain, the keyboard and `?demo` — **use it for bring-up**). Installable
+  packages, measured rather than estimated: `.wgt` 92.6 KB, `.ipk` 41.9 KB.
+  `bundle-features.test.ts` builds the real entry and weighs it, so a regression
+  is a failing test rather than a fatter download.
+- **`@hearthkit/host` — one boot sequence for all four hosts**, replacing four
+  copies that had drifted apart in the ways copies do. A fifth host now
+  implements an adapter, not a boot.
+- **Planning cost is counted** (`core/src/planner/meter.ts`). Every plan carries a
+  `source` — `deterministic`, `model`, `remote`, or `local-fallback` for a remote
+  engine that was asked and could not answer — and `agent.planning` counts them
+  beside chat turns, which are never free. The ratio between the two decides
+  whether goal mode is a product or a demo, and it had never been measured.
+  First result, from `pnpm bench`: **the four P0 scenarios plan for 100% zero
+  tokens**, 1.7 ms average, no model call at all. Counters are local and read by
+  `pnpm bench` and the device report; they are sent nowhere.
+- **`tools/device-report.mjs` — one command turns a television into a pasteable
+  report.** It launches the app in goal mode, runs the capability probe with
+  writes, puts the four P0 scenarios through the planner, and writes a finished
+  markdown section into `docs/platform/reports/`. The formatting happens *on the
+  device*, by the same code every host ships, so a report taken by hand from a
+  WebView console — `(await window.__hearthReport({allowWrites: true})).markdown`
+  — is byte-identical to one the tool collects. A platform with no `adb` is not a
+  second-class contributor. The section that earns it is the one no adapter can
+  produce about itself: **did anything accept a command and then do nothing?**
+- **Install identity and service metrics** (`core/src/identity.ts`,
+  [`docs/service-metrics.md`](docs/service-metrics.md)). A service business has to
+  know how many devices use it; this repo had already promised the runtime does
+  not phone home. Both hold, because ModelPilot is the only egress and a host
+  opts into it with a credential: three headers ride along on calls that were
+  already happening (`x-hearth-install`, `x-hearth-runtime`, `x-hearth-mode`) and
+  the rest is derived server-side. No analytics client, no event queue, no second
+  endpoint. In `off` mode no signal exists at all. The id is random, generated on
+  the device, stored locally and resettable — not the Android ID, not a serial,
+  not a MAC, not an advertising id; two identical televisions in the same shop
+  get different ids and a test asserts it.
 - **A Living Room agent runtime under the chat loop.** The agent kept no state
   between tool calls, could not describe the room it was in, and reported every
   action as a success whether or not the TV did it. Six additive modules in
@@ -237,6 +448,59 @@ Voice on AOSP, which didn't work at all on a device despite passing every test:
   window but never closed it; the engine now holds one pending utterance and
   speaks it on init. A failed init releases it, so the avatar can't get stuck
   mid-sentence.
+
+### Build, CI and dependencies
+
+- **TypeScript 6.0.3, ESLint 10.9.1, typescript-eslint 8.68, esbuild 0.28** —
+  verified rather than trusted, because two are major versions and one is the
+  tool the whole size story rests on. esbuild was re-measured: **97.3 / 94.5 /
+  97.2 KB, byte-identical to 0.23**. ESLint was checked to be actually linting
+  rather than quietly finding nothing (`--format json` → 156 files, 0 problems),
+  which is the failure mode a config-discovery change in a major produces.
+  GitHub Actions bumped to current majors; `action-gh-release` only runs on a
+  tag, so this release is its first exercise.
+- **`tools/secrets-check.mjs`** — a credential tripwire over changed files,
+  wired into CI.
+- **`check:size` now bundles the targets it checks.** A webos budget was added
+  while `bundle:all` still built only tizen and aosp, so the check was looking
+  for a bundle nobody had built.
+- **The pipewire CI leg waits for the daemon it is about to use.** It waited on
+  WirePlumber and then called `pactl`, whose socket belongs to a third daemon —
+  so whether the null sink existed came down to a race, which is why the fix
+  looked like a fix and then like a regression. Readiness is a property of the
+  thing you are about to use, not of the thing that happens to be nearby.
+- **`tools/mock-modelpilot-server.mjs` exits after 15 idle minutes**
+  (`--idle <seconds>`). Five abandoned instances, days old, once made the
+  repository directory itself un-renameable — each holds a working-directory
+  handle on the repo root. A fixture that outlives its test is not harmless.
+
+### Documentation
+
+- **The README says what this is and what it is not**, on the first screen:
+  an experimental open runtime and a testbed, not a TV OS, a launcher or a
+  content product, and affiliated with nobody. The finding that shaped it is
+  stated rather than buried — on every OS whose image we do not own, the flagship
+  scenario is **refused**, because input switching needs a platform signature on
+  Android and a partner certificate on Tizen and webOS.
+- **[The Hearth Report](docs/platform/capability-matrix.md) is promoted from an
+  internal note to the project's main output.** No company can buy twenty
+  televisions across five firmware generations, and no amount of further software
+  produces that table — only people with different TVs in different living rooms
+  can. So the highest-value contribution here needs no code: run `?diag` on a
+  television nobody here owns and paste what it said.
+- **CONTRIBUTING gains support tiers, a refusal list and a review promise** —
+  what will not be accepted (content search, telemetry, vendor blobs, guessed
+  platform APIs, anything widening the perception boundary), because a short firm
+  list attracts the right people and saves an argument.
+- **[`HARDWARE_VERIFICATION.md`](docs/HARDWARE_VERIFICATION.md) covers the room,
+  not just the TV** — grouped by what you would have to physically obtain, since
+  "needs hardware" on its own is not actionable.
+- **STATUS, the roadmap and the internal handoff were rewritten against the
+  code.** All three had drifted: two different wrong test counts, no mention of
+  ModelPilot, `@hearthkit/host`, build profiles or the device report, and a
+  handoff still describing a `tv-ai-agent` repo with 163 tests. A project whose
+  entire premise is not claiming things it hasn't verified cannot ship a stale
+  status page.
 
 ## [0.1.0] - 2026-08-05
 
@@ -622,4 +886,5 @@ The core as it stood on 2026-07-27, before device bring-up.
   a partner/platform certificate (Tizen) or system signature (Android); the
   open-source build degrades gracefully via `has()`.
 
+[0.2.0]: https://github.com/andycywu/hearth/releases/tag/v0.2.0
 [0.1.0]: https://github.com/andycywu/hearth/releases/tag/v0.1.0

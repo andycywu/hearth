@@ -249,6 +249,17 @@ export class PlanExecutor {
       if (!reader?.tool) return "unverified";
       const read = await this.invoke(reader, {});
       if (!read.ok) return "unverified"; // could not look; do not claim failure
+      // The same rule as `state` below, and for the same reason: our own
+      // optimistic write is sitting on this path already, so a reader that
+      // *succeeded without answering* would leave the assumption standing and be
+      // read as agreement. Every reader in this repo used to always answer — a
+      // TV that reports its volume at all reports a number — so the case never
+      // arose until HDMI-CEC, where a device acknowledging
+      // `<Give Device Power Status>` and saying nothing is ordinary behaviour.
+      // The wrong answer here is the worst one this system can give: a confident
+      // `verified` for a console that never woke up.
+      const backing = this.opts.world.get(v.predicate.path)?.source;
+      if (backing === undefined || backing === "assumed" || backing === "inferred") return "unverified";
       return evaluate(this.opts.world, v.predicate) === "true" ? "verified" : "failed";
     }
 

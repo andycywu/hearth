@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/perception-mock",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scripted perception sources — occupancy, ambient light, noise — with no camera and no CV model. Proves the perception path end to end.",
   "type": "module",
   "sideEffects": false,

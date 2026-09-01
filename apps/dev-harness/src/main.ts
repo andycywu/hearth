@@ -1,7 +1,7 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, summarizeOutcome,
-  discoverRoom, deviceTreeText, WorldModel,
-  type LlmClient, type PlannerContext,
+  discoverRoom, deviceTreeText, WorldModel, attachTransports, transportSources,
+  type DeviceTransport, type LlmClient, type PlannerContext,
 } from "@hearthkit/core";
 import { createWebAdapter } from "@hearthkit/adapter-web";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@hearthkit/llm-connectors";
 import { createWeatherTool } from "@hearthkit/skills-example";
 import { createScriptedSource, occupancyScript } from "@hearthkit/perception-mock";
+import { createCecTransport, createMockCecBus, MOCK_LIVING_ROOM } from "@hearthkit/adapter-cec";
 import {
   createModelPilotClient, createModelPilotPlanner, resolveModelPilotConfig, offReason,
 } from "@hearthkit/modelpilot";
@@ -93,7 +94,31 @@ async function boot(): Promise<void> {
   // know where anything is. Shared with the device hosts, because four slightly
   // different copies of this is how an emulator ends up with a room a TV does not
   // have.
-  const devices = await discoverRoom(platform, { room: params.get("room") === "empty" ? "empty" : "demo" });
+  // `?cec=mock` puts a CEC bus behind the room: a console, an AVR and a
+  // streaming box behind that AVR, discovered rather than declared. It is the
+  // only way to see the living-room story in a browser, since a real bus needs
+  // `/dev/cec0` and a Raspberry Pi — and it is a *mock*, said out loud in the
+  // flag name, because a demo that quietly pretended to be hardware would be the
+  // exact dishonesty this runtime exists to refuse.
+  //
+  // Two of the three mock devices misbehave the way real ones do, so the demo
+  // shows all three answers rather than a happy path: the console verifies, the
+  // AVR never answers `<Give Device Power Status>` and comes back `unverified`.
+  const transports: DeviceTransport[] = params.get("cec") === "mock"
+    ? [createCecTransport(createMockCecBus(MOCK_LIVING_ROOM.map((d) => (
+        d.logical === 5 ? { ...d, answersPowerStatus: false } : { ...d }
+      ))))]
+    : [];
+
+  const devices = await discoverRoom(platform, {
+    room: params.get("room") === "empty" ? "empty" : "demo",
+    ...(transports.length ? { sources: transportSources(transports) } : {}),
+  });
+
+  // What each transport can do *given what was found* — the same two calls the
+  // television hosts make, so the harness cannot drift from them.
+  const reach = await attachTransports(devices, transports);
+  for (const note of reach.notes) console.info(`[transport] ${note}`);
 
   // `?devices` prints the room the same way `?diag` prints the capabilities.
   if (params.has("devices")) {
@@ -123,10 +148,15 @@ async function boot(): Promise<void> {
     search: launchSearch(),
     globals: window as unknown as Record<string, unknown>,
   });
+  // Captured so `plan:end` can reach /v1/feedback below: the agent builds the
+  // planner from the factory, so this is the only place that ever holds the
+  // instance — and the instance is the only thing that knows which ModelPilot
+  // request a finished plan came from.
+  let modelPilot: ReturnType<typeof createModelPilotPlanner> | undefined;
   const planner = mpConfig.apiKey
     // A factory, so the planner reasons over the agent's *own* capability graph —
     // the one the boot probe withdraws from — rather than a copy beside it.
-    ? (ctx: PlannerContext) => createModelPilotPlanner({
+    ? (ctx: PlannerContext) => (modelPilot = createModelPilotPlanner({
         client: createModelPilotClient({
           baseUrl: mpConfig.baseUrl,
           apiKey: mpConfig.apiKey!,
@@ -142,7 +172,7 @@ async function boot(): Promise<void> {
         // the key, never the prompt, never the room state — the record type and
         // `sanitizeTelemetry` both see to that.
         telemetry: (record) => console.info("[modelpilot]", JSON.stringify(record)),
-      })
+      }))
     : undefined;
   console.info(
     `[modelpilot] mode=${mpConfig.mode} (${mpConfig.source})`
@@ -152,7 +182,8 @@ async function boot(): Promise<void> {
   const agent = new Agent({
     platform,
     llm,
-    tools: skills,
+    tools: [...skills, ...reach.tools],
+    ...(reach.capabilities.length ? { capabilities: reach.capabilities } : {}),
     devices,
     world: sharedWorld,
     ...(planner ? { planner, llmPlanning: true } : {}),
@@ -164,6 +195,15 @@ async function boot(): Promise<void> {
     // switch input) prompt before running. Same handler the device hosts use.
     confirm: createConfirmHandler(),
   });
+
+  // Close the loop: what the television actually did, back to /v1/feedback.
+  //
+  // ModelPilot does not count a completed call as a successful task until a
+  // verifier confirms the outcome, and the local read-back is the only thing
+  // here that can. Everything ambiguous is reported as nothing at all, and a
+  // shadow run reports nothing ever — its answer was never executed.
+  agent.events.on("plan:end", ({ outcome }) => void modelPilot?.report(outcome));
+
   // ?render=canvas uses the single-surface canvas renderer instead of the DOM
   // overlay; ?render=avatar draws the agent's face on the same canvas path.
   const renderer = params.get("render");

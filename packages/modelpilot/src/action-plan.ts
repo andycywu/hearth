@@ -6,8 +6,14 @@ import { REQUIRED_KEYS } from "./task-mapper.js";
  *
  * Strict on purpose, and strict in the direction that matters: an answer we
  * cannot fully understand does **not** become a device operation. Everything
- * that fails here goes to recovery or to the user, with the ModelPilot task and
- * trajectory ids attached so the decision can be looked up afterwards.
+ * that fails here goes to recovery or to the user, with the ModelPilot request
+ * id and the model that answered attached, so the decision can be looked up
+ * afterwards.
+ *
+ * The no-repair rule below earned its place the first time this ran against the
+ * real service's shape. A routing layer can answer 200 with something that is
+ * not a plan at all — prose, a refusal, a restatement of the question — and none
+ * of those are errors anywhere in the stack until they reach here.
  *
  * Note what this parser deliberately does not do: it does not repair. A missing
  * `expected_state` could be inferred, a `risk` could be defaulted to `low`, and

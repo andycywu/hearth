@@ -33,11 +33,12 @@ still needed, it is just no longer the top-level story.
 
 Shipped and verified (see [`STATUS.md`](STATUS.md)): the agent loop, the HAL and
 five adapters under one contract test, tool registry with validation, the
-`TvResult` envelope, boot capability probing with tool withdrawal, voice, three
-renderers, declarative skills, packaging for Android TV / Tizen / webOS, 518
-tests green.
+`TvResult` envelope, boot capability probing with capability withdrawal, voice,
+four renderers, declarative skills, packaging for Android TV / Tizen / webOS,
+**752 tests green**. Goal mode is verified on the Android TV emulator, not only
+in CI.
 
-Added in this change (M0, additive — nothing existing was modified):
+The state and reasoning tier (M0, additive — nothing existing was modified):
 
 | Module | Purpose |
 |---|---|
@@ -51,6 +52,17 @@ Added in this change (M0, additive — nothing existing was modified):
 
 All four P0 scenarios pass headless in
 [`scenarios.test.ts`](../packages/core/src/planner/scenarios.test.ts).
+
+Landed since, and not otherwise described by any plan document here:
+
+| | What it is | Why it is on this roadmap at all |
+|---|---|---|
+| `packages/modelpilot` | Planning and reasoning can go to the **ModelPilot** execution decision engine, as a third `Planner` behind the seam tasks 4 and 9 created. `off` / `shadow` / `enforce`, `shadow` by default, forced `off` with no credential | It is the answer to "who plans?" when the local model is too small — and it is where the boundary gets tested: a remote engine cannot name a capability this TV lacks, cannot weaken a check, and **cannot mark its own work as verified**. The local read-back keeps the last word in every mode. [ADR-0004](adr/0004-modelpilot-boundary.md) |
+| `core/src/planner/meter.ts` | Every plan carries a `source` — `deterministic`, `model`, `remote`, `local-fallback` — and `agent.planning` counts them | The ratio between a free plan and a paid one decides whether goal mode is a product or a demo, and nobody had counted it. First measurement: **the four P0 scenarios plan for 100% zero tokens**, 1.7 ms average |
+| `core/src/identity.ts` + [`service-metrics.md`](service-metrics.md) | A random, local, resettable install id, sent only where a ModelPilot call was already going | A service has to count installs; this runtime promised not to phone home. Both hold, because the count happens server-side on calls the host opted into |
+| `core/src/features.ts` | Optional code removed at **build** time by `esbuild` `define` — 74 / 95 / 121 KB for the three profiles | A TV parses the whole bundle on every launch. "Ship it and skip it at runtime" is not free there |
+| `packages/host` | One boot sequence for all four hosts | Four copies had drifted; the fifth host would have made it five |
+| `tools/device-report.mjs` | One command turns a television into a pasteable markdown section of [the Hearth Report](platform/capability-matrix.md) | The report is the project's main output, and every manual step between a stranger's TV and that table is a place the report does not get sent |
 
 ---
 
@@ -91,6 +103,8 @@ Verification → World Model.
 ## P1 — the real living room
 
 - HDMI-CEC transport: device discovery, power, active-source, OSD names.
+  *Built and mock-tested (task 7), with a `cec-ctl` implementation for Linux and
+  a one-line host hook. Needs a real bus — and on Android, a signed build.*
 - IR blaster profiles for devices with no back channel.
 - Real Android TV hardware bring-up (MTK / NVT boards).
 - Device discovery populating the Device Graph from CEC + manual registration.
@@ -259,7 +273,7 @@ Ordered. Each is independently shippable.
   platform source merged into it — `PlayStation 5 [ps5] — HDMI2 · 100% · manual`
   beside `AOSP TV on x86 [tv] — built in · 100% · manual+platform`.
 
-### 7. HDMI-CEC discovery and control adapter
+### 7. HDMI-CEC discovery and control adapter — **software done; hardware pending**
 
 - **Goal** — first real transport beyond the HAL: enumerate CEC devices, read
   power state, wake, set active source.
@@ -272,6 +286,49 @@ Ordered. Each is independently shippable.
 - **Risk** — high: CEC is advertised far more often than it works, and Android's
   CEC APIs are privileged on most builds.
 - **Complexity** — L, hardware-gated.
+- **Outcome so far** — [`packages/adapter-cec`](../packages/adapter-cec): a
+  message-shaped `CecTransport` (six methods, each named after the CEC message it
+  sends), an `hdmi_cec` discovery source that derives the HDMI port *and the
+  parent hop* from the physical address, power capabilities verified by a
+  `<Give Device Power Status>` read-back, and a mock bus that misbehaves the way
+  real hardware does. 27 tests; the four honest answers are pinned by one goal
+  against four buses. Design and rationale: [`cec.md`](cec.md).
+
+  Then the `cec-ctl` transport for Linux (`createLinuxCecTransport` in
+  `adapter-linux`), because it is the only implementation a person can verify
+  without a signing agreement — a Raspberry Pi has `/dev/cec0` and `v4l-utils` —
+  and `tools/verify-cec.mjs` beside it: scan, topology, power status, an optional
+  wake-and-restore, and a transcript ready to paste back as a fixture.
+
+  And then the seam that makes it a *host* decision rather than a code change:
+  `bootRuntime({ …, transports: () => [createCecTransport(bus)] })`.
+  `DeviceTransport` (`core/src/devices/transport.ts`) is deliberately not
+  CEC-shaped — a transport offers discovery sources before the room is built,
+  then is handed the merged graph and asked what it can do with it, which is the
+  order IR, Wake-on-LAN and Matter will need too. `?cec=mock` in the dev harness
+  runs that exact path, so the harness cannot drift from the televisions.
+
+  It found **five** defects in code that was already green, all the same shape —
+  correct for every device that had existed until now. **A read-back could verify
+  against its own assumption**: the executor checked that the read succeeded, not
+  that it *answered*, and every reader in this repo always answers. Over CEC a
+  silent-but-successful read is ordinary, and the result would have been a
+  confident `verified` for a console that never woke. **Two devices on one HDMI
+  port merged into one** — an AVR and the box plugged into it are both "on
+  HDMI3", and `cecAddress` was named in the identity rule but never stored.
+  **Two CEC devices could not coexist**, because core names a power tool after
+  its provider and the registry throws on a duplicate. **A parent link could
+  point at a node that no longer existed**, once the parent merged into a
+  hand-registered one — so an Apple TV behind an AVR silently had no input port.
+  And **the agent said the television had done something another device did**:
+  "Asked the TV to `ps5.power.on`", when the TV is the thing that sent the
+  message.
+
+  **What is still true: no real CEC bus has run any of this.** The parsers are
+  tested against output written from `cec-ctl`'s documentation, not recorded from
+  a device, and the code says so wherever a reader could mistake it for hardware
+  evidence. The Android API is `@SystemApi` and Tizen and webOS expose none, so
+  `available()` returning false stays the normal case.
 
 ### 8. Perception source interface with a mock camera — **done**
 

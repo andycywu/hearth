@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/modelpilot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ModelPilot Execution Decision Engine adapter: routes planning and reasoning through ModelPilot while device control stays local and locally verified.",
   "type": "module",
   "sideEffects": false,

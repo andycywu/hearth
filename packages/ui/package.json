@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/ui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Dependency-free 10-foot UI shell for the agent (DOM). A Lightning 3 / Blits WebGL renderer can replace the view layer for low-end MTK/NVT GPUs; see README.",
   "type": "module",
   "sideEffects": false,

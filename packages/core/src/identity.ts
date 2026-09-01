@@ -36,7 +36,7 @@ export const INSTALL_ID_KEY = "install:id";
  * and a build-time inject would be one more thing that can silently drift. Bump
  * it with the package version.
  */
-export const RUNTIME_VERSION = "0.1.0";
+export const RUNTIME_VERSION = "0.2.0";
 
 const PREFIX = "hth_";
 const ID_BYTES = 16;

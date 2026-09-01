@@ -1,7 +1,8 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl,
   discoverRoom, deviceTreeText, describeFeatures, loadInstallId, RUNTIME_VERSION,
-  type PlannerContext,
+  attachTransports, transportSources,
+  type DeviceTransport, type PlanOutcome, type PlannerContext,
 } from "@hearthkit/core";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
@@ -53,6 +54,21 @@ export interface HostDefinition {
    * sanctioned path.
    */
   provisionedKeys?: () => { llm?: string | undefined; modelPilot?: string | undefined };
+  /**
+   * Ways of reaching devices that are not the television — HDMI-CEC today, IR
+   * and Matter later.
+   *
+   * Built by the host rather than here, because whether a transport exists is a
+   * *host* question: the same Android build has CEC or does not depending on how
+   * it was signed, and no amount of code in this file changes that. A host with
+   * a bus supplies `createCecTransport(bus)` and changes nothing else — the
+   * room, the capabilities, the tools and the boot log all follow.
+   *
+   * A transport that throws is dropped with a note. A CEC adapter that is not
+   * there must never stop a television from booting, and not being there is the
+   * normal case.
+   */
+  transports?: () => DeviceTransport[] | Promise<DeviceTransport[]>;
   /** Where a full-screen report is written. Default: `#app`, else `document.body`. */
   reportRootId?: string;
   /** Element that shows a boot failure, when the page has one. Default `#status`. */
@@ -118,10 +134,20 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
     // `?timeout=90` when the model is slow: a local model on modest hardware can
     // take a minute a turn, and the 30s default makes that look broken.
     const turnTimeoutMs = turnTimeoutFromUrl();
-    // What is in the room: what storage remembers, plus what the TV can see.
-    // `?room=demo` seeds a console on HDMI2 so the multi-device scenario has
-    // something to plan for on a set with nothing plugged in.
-    const devices = await discoverRoom(platform);
+    // What is in the room: what storage remembers, what the TV can see, and
+    // whatever a transport can reach past it. `?room=demo` seeds a console on
+    // HDMI2 so the multi-device scenario has something to plan for on a set with
+    // nothing plugged in.
+    const transports = await resolveTransports(host);
+    const devices = await discoverRoom(platform, {
+      ...(transports.length ? { sources: transportSources(transports) } : {}),
+    });
+
+    // Then ask each transport what it can do *given what was found* — the answer
+    // depends on the merge, because capabilities have to be registered under the
+    // name the goal will use, and only the merged graph knows what that is.
+    const reach = await attachTransports(devices, transports);
+    for (const note of reach.notes) console.info(`[transport] ${note}`);
 
     // A random, resettable, device-generated id — never a hardware identifier —
     // carried only on ModelPilot calls, so the service can count installations
@@ -131,7 +157,9 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
 
     const agent = new Agent({
       platform, llm, confirm, devices,
-      ...(modelPilot ? { planner: modelPilot, llmPlanning: true } : {}),
+      ...(reach.capabilities.length ? { capabilities: reach.capabilities } : {}),
+      ...(reach.tools.length ? { tools: reach.tools } : {}),
+      ...(modelPilot ? { planner: modelPilot.factory, llmPlanning: true } : {}),
       ...(turnTimeoutMs ? { turnTimeoutMs } : {}),
     });
 
@@ -170,6 +198,16 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
 
     logPlanLifecycle(agent);
 
+    // Close the loop ModelPilot cannot close on its own.
+    //
+    // Its primary metric is Cost Per Successful Task, and it deliberately does
+    // not count a completed API call as a successful task until something
+    // confirms the outcome. On a television that something is the local
+    // read-back, and this is the one line that gets it back to the service.
+    // Everything ambiguous — `unverified`, `unsupported`, policy-denied — is
+    // reported as nothing at all; see `verdictFor`.
+    if (modelPilot) agent.events.on("plan:end", ({ outcome }) => void modelPilot.report(outcome));
+
     // After the shell exists, so the avatar can be told when it is speaking.
     speakReplies(agent, platform, { onSpeaking: (s) => ui.setSpeaking?.(s) });
     // `?demo` runs the built-in script, `?ask=…` runs your own — either way the
@@ -183,6 +221,22 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
     const status = document.getElementById(host.statusId ?? "status");
     if (status) status.textContent = message;
     return undefined;
+  }
+}
+
+/**
+ * The transports this host has, or none.
+ *
+ * Wrapped because a host builds them by reaching for a native bridge that an
+ * older host binary may not have: a newer bundle running on last month's APK
+ * must boot with no CEC rather than not boot at all.
+ */
+async function resolveTransports(host: HostDefinition): Promise<DeviceTransport[]> {
+  try {
+    return (await host.transports?.()) ?? [];
+  } catch (e) {
+    console.warn(`[transport] none available: ${(e as Error).message}`);
+    return [];
   }
 }
 
@@ -223,7 +277,10 @@ function readProvisionedKeys(host: HostDefinition): { llm?: string; modelPilot?:
 function buildModelPilotPlanner(
   provisionedKey: string | undefined,
   installId: string,
-): ((ctx: PlannerContext) => ReturnType<typeof createModelPilotPlanner>) | undefined {
+): {
+  factory: (ctx: PlannerContext) => ReturnType<typeof createModelPilotPlanner>;
+  report: (outcome: PlanOutcome) => Promise<void>;
+} | undefined {
   if (typeof __HEARTH_MODELPILOT__ !== "undefined" && !__HEARTH_MODELPILOT__) return undefined;
 
   const config = resolveModelPilotConfig({
@@ -237,7 +294,13 @@ function buildModelPilotPlanner(
   if (!config.apiKey) return undefined;
 
   const key = config.apiKey;
-  return (ctx: PlannerContext) => createModelPilotPlanner({
+  // The agent builds the planner from this factory, so the host never sees the
+  // instance — and the instance is the only thing that knows which ModelPilot
+  // request a finished plan came from. Capturing it here is what lets
+  // `plan:end` reach `/v1/feedback` without the planner needing a reference
+  // back to the agent that owns it.
+  let instance: ReturnType<typeof createModelPilotPlanner> | undefined;
+  const factory = (ctx: PlannerContext) => (instance = createModelPilotPlanner({
     client: createModelPilotClient({
       baseUrl: config.baseUrl,
       apiKey: key,
@@ -251,7 +314,14 @@ function buildModelPilotPlanner(
     meter: ctx.meter,
     maxTaskBudget: config.maxTaskBudget,
     telemetry: (record: unknown) => console.info("[modelpilot]", JSON.stringify(record)),
-  });
+  }));
+
+  return {
+    factory,
+    // Before the first plan there is no instance, and a plan the agent finished
+    // before one existed cannot have been ModelPilot's.
+    report: async (outcome: PlanOutcome) => instance?.report(outcome),
+  };
 }
 
 /**

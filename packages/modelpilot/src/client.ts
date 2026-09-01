@@ -1,51 +1,73 @@
 import { ModelPilotError } from "./errors.js";
-import type { TaskRequest } from "./task-mapper.js";
+import type { CompletionRequest } from "./task-mapper.js";
 
 /**
  * The ModelPilot transport.
  *
- * **REST, not MCP, and the reason is the runtime.** This bundle ships inside a
- * TV WebView under a size budget, targets ES2020, and has no dependencies at
- * all; a Remote MCP client means JSON-RPC over SSE or streamable HTTP plus a
- * session lifecycle, which is a lot of bytes and a lot of failure modes to put
- * on a television for a request/response call. The four operations below map
- * cleanly onto `fetch`, so they use `fetch`. If MCP becomes the better transport
- * — because a tool gains streaming or server-initiated messages — it slots in
- * behind this same interface.
+ * **What this file used to assume, and what is actually there.** It was written
+ * against a decision engine: `POST /v1/tasks/execute`, `GET /v1/tasks/:id`,
+ * `GET /v1/trajectories/:id`, task ids, trajectory ids, a per-task verification
+ * verdict. None of those exist. ModelPilot is a cost-aware *model routing*
+ * control plane, and its entire public API is three endpoints:
  *
- * **What is assumed, so it can be corrected in one place.** Three REST paths are
- * documented: `POST /v1/tasks/execute`, `GET /v1/tasks/:id`,
- * `GET /v1/trajectories/:id`. `decideExecution` has no documented REST path, so
- * it is mapped onto the execute endpoint with `strategy: "decide"`, which is an
- * assumption and is marked as one. If ModelPilot exposes a dedicated decision
- * endpoint, override `paths.decide` — one line, no other change.
+ *   - `GET  /v1/models`            — the catalogue
+ *   - `POST /v1/chat/completions`  — OpenAI-compatible; `model: "auto"` routes
+ *   - `POST /v1/feedback`          — `{ request_id, success, score? }`
  *
- * The response shape is read tolerantly for the same reason: the ids and status
- * are looked for under several plausible names rather than one guessed schema,
- * and anything not found is reported as missing rather than defaulted.
+ * So the transport is an OpenAI-compatible POST, and the identity of a call is
+ * `modelpilot.request_id` — the handle `/v1/feedback` takes, which is how the
+ * local verifier's verdict gets back to the service that needs it.
+ *
+ * **REST, not MCP** — unchanged, and for the same reason (ADR-0004): this bundle
+ * ships in a TV WebView under a size budget with no dependencies, and one
+ * request/response call does not justify JSON-RPC over SSE plus a session
+ * lifecycle. It is a weaker decision than it was, because there is no MCP
+ * surface left to weigh it against.
+ *
+ * **What is still unproven**: not the shapes — those are read off the deployed
+ * Worker — but the behaviour of a live tenant: provider credentials, plan
+ * limits, and the 429 a Free plan produces at 1000 requests a month.
  */
 
-export interface ModelPilotTaskResult {
-  /** Whatever the engine returned as the answer, unparsed. */
+export interface ModelPilotAnswer {
+  /** The assistant's message content, unparsed. `parseActionPlan` decides. */
   output: unknown;
-  taskId?: string;
-  trajectoryId?: string;
-  /** As reported by ModelPilot — `verified`, `unverified`, `failed`, … */
-  status?: string;
-  verified?: boolean;
+  /** `modelpilot.request_id` — the handle `/v1/feedback` takes. */
+  requestId?: string;
+  /** Which model the router actually chose, e.g. `openai-mini`. */
+  selectedModel?: string;
+  provider?: string;
+  /** The router's own explanation of the choice. */
+  routingReason?: string;
+  /** How many candidates failed before this one answered. */
+  fallbackCount?: number;
   actualCost?: number;
+  /** What the most expensive eligible candidate would have cost. */
+  baselineCost?: number;
+  /**
+   * ModelPilot's CST bookkeeping, and **never a gate on this answer**.
+   *
+   * It is `"unverified"` on every fresh completion, by design: the service does
+   * not count a task successful until a verifier says so. Reading that as "the
+   * answer is unusable" — which this integration did — meant enforce mode
+   * blocked on every single call. Whether the *plan* is usable is decided by
+   * `parseActionPlan`; whether the *television* did it is decided by the local
+   * read-back. This field is neither.
+   */
+  evaluationStatus?: string;
   latencyMs: number;
   /** Fields the response did not carry, for the integration to log once. */
   missing: string[];
 }
 
 export interface ModelPilotClientOptions {
+  /** Service origin. `/v1/chat/completions` is appended. */
   baseUrl: string;
   apiKey: string;
-  /** Per-call budget. Also the AbortController deadline. Default 5000ms. */
+  /** Per-call budget. Also the AbortController deadline. Default 8000ms. */
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
-  /** Override when the service's paths differ from the documented ones. */
+  /** Override when a deployment's paths differ. */
   paths?: Partial<typeof DEFAULT_PATHS>;
   /**
    * Who is calling, for the backend to count installs and usage.
@@ -61,10 +83,9 @@ export interface ModelPilotClientOptions {
 }
 
 const DEFAULT_PATHS = {
-  execute: "/v1/tasks/execute",
-  decide: "/v1/tasks/execute",
-  task: "/v1/tasks/",
-  trajectory: "/v1/trajectories/",
+  completions: "/v1/chat/completions",
+  models: "/v1/models",
+  feedback: "/v1/feedback",
 };
 
 export interface CallOptions {
@@ -72,16 +93,41 @@ export interface CallOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * A verdict on an earlier completion, posted to `/v1/feedback`.
+ *
+ * ModelPilot's primary metric is Cost Per Successful Task, and it deliberately
+ * refuses to count a completed API call as a successful task until something
+ * confirms the outcome. On a television, **this runtime is that something** —
+ * and a better verifier than user feedback, because it read the device back.
+ *
+ * `score` is optional and deliberately usually omitted: a made-up number is
+ * noise in someone else's denominator.
+ */
+export interface OutcomeReport {
+  success: boolean;
+  score?: number;
+  comment?: string;
+}
+
 export interface ModelPilotClient {
-  decideExecution(request: TaskRequest, opts?: CallOptions): Promise<ModelPilotTaskResult>;
-  executeVerifiedTask(request: TaskRequest, opts?: CallOptions): Promise<ModelPilotTaskResult>;
-  getTaskEvidence(taskId: string, opts?: CallOptions): Promise<unknown>;
-  getTaskTrajectory(taskId: string, opts?: CallOptions): Promise<unknown>;
+  /** One routed completion. The answer is a *proposal*, never a result. */
+  complete(request: CompletionRequest, opts?: CallOptions): Promise<ModelPilotAnswer>;
+  /** The catalogue, for a bring-up screen that wants to show what is routable. */
+  listModels(opts?: CallOptions): Promise<unknown>;
+  /**
+   * Tell ModelPilot whether the television actually did it.
+   *
+   * The one call in this client that is not on the path to a device operation,
+   * so a caller must be free to let it fail: the planner reports it as telemetry
+   * and carries on.
+   */
+  reportOutcome(requestId: string, report: OutcomeReport, opts?: CallOptions): Promise<void>;
 }
 
 export function createModelPilotClient(opts: ModelPilotClientOptions): ModelPilotClient {
   const doFetch = opts.fetchImpl ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
-  const timeoutMs = opts.timeoutMs ?? 5000;
+  const timeoutMs = opts.timeoutMs ?? 8000;
   const paths = { ...DEFAULT_PATHS, ...opts.paths };
   const now = opts.now ?? (() => Date.now());
   const base = opts.baseUrl.replace(/\/+$/, "");
@@ -126,17 +172,10 @@ export function createModelPilotClient(opts: ModelPilotClientOptions): ModelPilo
       });
 
       const latencyMs = now() - started;
-      if (res.status === 401 || res.status === 403) {
-        throw new ModelPilotError("unauthorized", `ModelPilot refused the credential (${res.status})`, { status: res.status });
-      }
-      if (res.status >= 500) {
-        throw new ModelPilotError("server", `ModelPilot answered ${res.status}`, { status: res.status });
-      }
-      if (!res.ok) {
-        throw new ModelPilotError("rejected", `ModelPilot answered ${res.status} for ${path}`, { status: res.status });
-      }
+      const text = await readBody(res);
 
-      const text = await res.text();
+      if (!res.ok) throw classify(res.status, path, text, opts.apiKey);
+
       if (text.length > MAX_RESPONSE_BYTES) {
         throw new ModelPilotError("server", "ModelPilot response was too large to read");
       }
@@ -147,8 +186,17 @@ export function createModelPilotClient(opts: ModelPilotClientOptions): ModelPilo
       }
     } catch (err) {
       if (err instanceof ModelPilotError) throw err;
+      // Our own abort is the authority, not the shape of what fetch threw.
+      //
+      // `controller.abort(reason)` makes some runtimes reject with *the reason*
+      // rather than an `AbortError`, so the name check alone reported every
+      // real timeout as `unreachable`. Unit tests could not see it — they mock
+      // fetch and throw a properly named AbortError — and the end-to-end run
+      // against `--answer slow` printed
+      // `unreachable: could not reach ModelPilot: timeout`, which is two
+      // different diagnoses in one line. Asking the controller removes the guess.
       const name = (err as { name?: string })?.name;
-      if (name === "AbortError" || name === "TimeoutError") {
+      if (controller?.signal.aborted || name === "AbortError" || name === "TimeoutError") {
         const cancelled = callOpts.signal?.aborted === true;
         throw new ModelPilotError(
           "timeout",
@@ -170,86 +218,146 @@ export function createModelPilotClient(opts: ModelPilotClientOptions): ModelPilo
     }
   }
 
-  async function task(path: string, request: TaskRequest, callOpts?: CallOptions): Promise<ModelPilotTaskResult> {
-    const { json, latencyMs } = await call("POST", path, request, callOpts);
-    return readTaskResult(json, latencyMs);
-  }
-
   return {
-    decideExecution: (request, callOpts) =>
-      // The assumption noted above, made visible in the payload rather than
-      // hidden in a URL: if the service ignores `strategy`, the answer is still
-      // an execution decision and the caller reads the same fields.
-      task(paths.decide, { ...request, strategy: "decide" }, callOpts),
+    complete: async (request, callOpts) => {
+      const { json, latencyMs } = await call("POST", paths.completions, request, callOpts);
+      return readAnswer(json, latencyMs);
+    },
+    listModels: async (callOpts) =>
+      (await call("GET", paths.models, undefined, callOpts)).json,
 
-    executeVerifiedTask: (request, callOpts) => task(paths.execute, request, callOpts),
-
-    getTaskEvidence: async (taskId, callOpts) =>
-      (await call("GET", `${paths.task}${encodeURIComponent(taskId)}`, undefined, callOpts)).json,
-
-    getTaskTrajectory: async (taskId, callOpts) =>
-      (await call("GET", `${paths.trajectory}${encodeURIComponent(taskId)}`, undefined, callOpts)).json,
+    reportOutcome: async (requestId, report, callOpts) => {
+      await call("POST", paths.feedback, {
+        request_id: requestId,
+        success: report.success,
+        ...(report.score !== undefined ? { score: report.score } : {}),
+        ...(report.comment ? { comment: report.comment } : {}),
+      }, callOpts);
+    },
   };
 }
 
 const MAX_RESPONSE_BYTES = 512 * 1024;
 
+async function readBody(res: Response): Promise<string> {
+  try {
+    return await res.text();
+  } catch {
+    return "";
+  }
+}
+
 /**
- * Read the ids and status out of the response without pretending to know its
- * schema.
+ * A status code and an error body, turned into the one thing the caller has to
+ * decide: fall back locally, or not.
  *
- * Several plausible names are tried per field, and whatever is absent is listed
- * in `missing` so the integration can say "ModelPilot answered but gave no
- * trajectory id" instead of logging `undefined` and moving on. That distinction
- * is the difference between a report someone can act on and a mystery.
+ * `429` earns its own kind because it is the failure a shipped fleet will
+ * actually hit — the Free plan is 1000 requests a month per *tenant*, so one
+ * heavy household on a shared key exhausts it for every other television on
+ * that key. "The engine is down" and "you are out of quota" want different
+ * reactions from whoever is watching, so they are not the same kind.
  */
-export function readTaskResult(json: unknown, latencyMs: number): ModelPilotTaskResult {
+function classify(status: number, path: string, body: string, apiKey: string): ModelPilotError {
+  const detail = errorMessage(body, apiKey);
+  const suffix = detail ? `: ${detail}` : "";
+  if (status === 401 || status === 403) {
+    return new ModelPilotError("unauthorized", `ModelPilot refused the credential (${status})${suffix}`, { status });
+  }
+  if (status === 429) {
+    return new ModelPilotError("rate_limited", `ModelPilot declined for quota (429)${suffix}`, { status });
+  }
+  if (status >= 500) {
+    return new ModelPilotError("server", `ModelPilot answered ${status}${suffix}`, { status });
+  }
+  return new ModelPilotError("rejected", `ModelPilot answered ${status} for ${path}${suffix}`, { status });
+}
+
+/**
+ * The service's own `{ error: { message, type } }`, redacted, or nothing.
+ *
+ * Worth carrying: `422 No eligible configured model satisfies this request
+ * policy` is the difference between "ModelPilot is broken" and "this tenant has
+ * no provider credential, or the quality threshold excluded everything", and a
+ * bare status code cannot tell those apart.
+ */
+function errorMessage(body: string, apiKey: string): string | undefined {
+  if (!body) return undefined;
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: unknown } };
+    const message = parsed?.error?.message;
+    if (typeof message === "string" && message) return redact(message, apiKey).slice(0, 200);
+  } catch { /* not JSON; a body we cannot read adds nothing to the status */ }
+  return undefined;
+}
+
+/**
+ * Read the routing metadata and the answer out of an OpenAI-shaped response.
+ *
+ * `output` is `choices[0].message.content` — a *string*, which is what a model
+ * returns. Unwrapping fences, prose and nesting is `parseActionPlan`'s job, and
+ * keeping that in one place is why this function does not try to be clever.
+ *
+ * `missing` exists so a gap is reported once rather than logged as `undefined`
+ * forever. It no longer lists a trajectory id, because there is no such thing.
+ */
+export function readAnswer(json: unknown, latencyMs: number): ModelPilotAnswer {
   const root = isObject(json) ? json : {};
-  const nested = isObject(root.task) ? root.task : {};
+  const meta = isObject(root.modelpilot) ? root.modelpilot : {};
+  // ModelPilot's extension first, then the envelope: `model` exists in both, and
+  // the routed choice is the one worth recording.
   const pick = (...names: string[]): unknown => {
     for (const n of names) {
+      if (meta[n] !== undefined) return meta[n];
       if (root[n] !== undefined) return root[n];
-      if (nested[n] !== undefined) return nested[n];
     }
     return undefined;
   };
 
-  const taskId = str(pick("taskId", "task_id", "id"));
-  const trajectoryId = str(pick("trajectoryId", "trajectory_id", "traceId", "trace_id"));
-  const status = str(pick("status", "state"));
-  const verifiedRaw = pick("verified", "isVerified");
-  const cost = num(pick("actualCost", "actual_cost", "cost", "costUsd"));
-  const output = pick("output", "result", "plan", "data", "content") ?? json;
+  const requestId = str(pick("request_id", "requestId", "id"));
+  const selectedModel = str(pick("selected_model", "selectedModel", "model"));
+  const provider = str(pick("provider"));
+  const routingReason = str(pick("routing_reason", "routingReason"));
+  const fallbackCount = num(pick("fallback_count", "fallbackCount"));
+  const actualCost = num(pick("actual_cost", "actualCost", "cost"));
+  const baselineCost = num(pick("baseline_cost", "baselineCost"));
+  const evaluationStatus = str(pick("evaluation_status", "evaluationStatus"));
 
   const missing: string[] = [];
-  if (!taskId) missing.push("taskId");
-  if (!trajectoryId) missing.push("trajectoryId");
-  if (!status && verifiedRaw === undefined) missing.push("status");
-  if (cost === undefined) missing.push("actualCost");
+  if (!requestId) missing.push("request_id");
+  if (!selectedModel) missing.push("selected_model");
+  if (actualCost === undefined) missing.push("actual_cost");
 
   return {
-    output,
-    ...(taskId ? { taskId } : {}),
-    ...(trajectoryId ? { trajectoryId } : {}),
-    ...(status ? { status } : {}),
-    ...(typeof verifiedRaw === "boolean" ? { verified: verifiedRaw } : {}),
-    ...(cost !== undefined ? { actualCost: cost } : {}),
+    output: readContent(root),
+    ...(requestId ? { requestId } : {}),
+    ...(selectedModel ? { selectedModel } : {}),
+    ...(provider ? { provider } : {}),
+    ...(routingReason ? { routingReason } : {}),
+    ...(fallbackCount !== undefined ? { fallbackCount } : {}),
+    ...(actualCost !== undefined ? { actualCost } : {}),
+    ...(baselineCost !== undefined ? { baselineCost } : {}),
+    ...(evaluationStatus ? { evaluationStatus } : {}),
     latencyMs,
     missing,
   };
 }
 
 /**
- * Did ModelPilot consider this task verified?
+ * The assistant's content, or the whole body when there is no completion in it.
  *
- * Unknown is not yes. A service that returns no status has not told us it
- * verified anything, and the caller treats that as `unverified` — which stops a
- * device operation, by design.
+ * The fallback is not politeness: a deployment that answers something other
+ * than a completion should reach the parser and be rejected there with what
+ * actually arrived visible, rather than becoming `undefined` here and producing
+ * a rejection that says nothing.
  */
-export function isVerified(result: ModelPilotTaskResult): boolean {
-  if (typeof result.verified === "boolean") return result.verified;
-  const status = result.status?.toLowerCase();
-  return status === "verified" || status === "succeeded" || status === "success" || status === "completed";
+function readContent(root: Record<string, unknown>): unknown {
+  const choices = root.choices;
+  if (Array.isArray(choices) && choices.length) {
+    const first = choices[0];
+    const message = isObject(first) && isObject(first.message) ? first.message : undefined;
+    if (message && message.content !== undefined) return message.content;
+  }
+  return root;
 }
 
 function describeNetworkError(err: unknown, apiKey: string): string {
@@ -258,28 +366,25 @@ function describeNetworkError(err: unknown, apiKey: string): string {
 }
 
 /**
- * Strip anything credential-shaped from text that came from somewhere else.
+ * Remove anything credential-shaped from text on its way to a log.
  *
- * Two passes, because there are two ways a key gets into a message. The literal
- * key we hold, wherever it appears — a fetch error quoting the request URL is
- * the case that caught this. And any `token=` / `key=` / `secret=` /
+ * Both halves matter: the key this client holds, and the generic
  * `authorization=` pair, because the next leak will be a credential we were
- * never given and therefore cannot match exactly.
+ * never given and so cannot match exactly.
  */
 export function redact(text: string, apiKey?: string): string {
   let out = text;
-  if (apiKey && apiKey.length >= 8) out = out.split(apiKey).join("***");
-  // `bearer` is handled both as a label and as the word between a header name
-  // and its value — "Authorization: Bearer sk-…" would otherwise mask the word
-  // "Bearer" and print the key.
+  if (apiKey) out = out.split(apiKey).join("[redacted]");
+  // The whole pair is replaced, including the label — matching only the value
+  // and its lead-in would leave "Authorization: Bearer" printing the key.
   return out.replace(
     /((?:api[_-]?key|token|secret|password|authorization)["'\s:=]+(?:bearer\s+)?|bearer\s+)([^\s"'&,}]+)/gi,
-    (_whole, prefix: string) => `${prefix}***`,
+    "$1[redacted]",
   );
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function str(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;

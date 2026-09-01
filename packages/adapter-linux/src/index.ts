@@ -126,3 +126,6 @@ export {
   parseWpctlVolume, parsePactlVolume, parseAmixerVolume, parseAmixerMuted, detectAudioBackend,
 } from "./audio.js";
 export { parseDesktopEntry, execArgv, applicationDirs, listDesktopEntries } from "./apps.js";
+export {
+  createLinuxCecTransport, parseTopology, parsePowerStatus, type LinuxCecOptions,
+} from "./cec.js";

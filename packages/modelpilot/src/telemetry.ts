@@ -11,21 +11,43 @@ import type { ModelPilotMode } from "./config.js";
  *
  * `local_final_verification` is the field that matters most and the one an
  * engine-side dashboard cannot know: whether *this television* ended up in the
- * expected state. A ModelPilot task can be `verified` and the TV still not have
- * switched, and the point of collecting both is to be able to see that.
+ * expected state. ModelPilot can route a call perfectly, bill for it, and the TV
+ * still not have switched — the point of collecting both is to be able to see
+ * that.
  */
 export interface ModelPilotTelemetry {
   local_workflow_id: string;
-  modelpilot_task_id?: string;
-  trajectory_id?: string;
+  /** `modelpilot.request_id`. Also the key `/v1/feedback` is posted against. */
+  modelpilot_request_id?: string;
+  /** Which model the router chose. The interesting column once cost matters. */
+  selected_model?: string;
+  /** How many candidates failed before one answered. */
+  fallback_count?: number;
   mode: ModelPilotMode;
   task_type: string;
-  /** How the ModelPilot call itself ended. */
-  status: "ok" | "unusable_output" | "unverified" | "error" | "skipped";
+  /**
+   * How the ModelPilot call itself ended — except `outcome`, which is not a
+   * call at all.
+   *
+   * `outcome` is the verdict row written later, when the television has finished
+   * with a plan and `/v1/feedback` has been told (or deliberately not told).
+   * It repeats `local_workflow_id` and `modelpilot_request_id` so a reader joins
+   * the two rows rather than waiting for one that can never be complete: the
+   * call is over long before the device is.
+   */
+  status: "ok" | "unusable_output" | "error" | "skipped" | "outcome";
   latency_ms?: number;
   actual_cost?: number;
-  /** ModelPilot's own verification verdict, as reported. */
-  verification_result?: string;
+  /** What the priciest eligible candidate would have cost — the saving claim. */
+  baseline_cost?: number;
+  /**
+   * ModelPilot's CST bookkeeping as reported, recorded and never acted on.
+   *
+   * `unverified` on every fresh completion, by design. It is here so a reader
+   * can see it move once `/v1/feedback` is wired up, not so anything can gate
+   * on it.
+   */
+  evaluation_status?: string;
   /** What the local action layer did: the plan step statuses, in order. */
   local_action_result?: string[];
   /** Whether the local verifier accepted the end state. */

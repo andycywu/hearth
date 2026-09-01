@@ -21,7 +21,7 @@ import type { PlatformProvider } from "@hearthkit/platform-api";
 import { parseArgs, HELP, type CliOptions } from "./args.js";
 import { readLines } from "./terminal.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 async function main(): Promise<number> {
   const opts = parseArgs(argv.slice(2), env);
