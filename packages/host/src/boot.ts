@@ -2,7 +2,7 @@ import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl,
   discoverRoom, deviceTreeText, describeFeatures, loadInstallId, RUNTIME_VERSION,
   attachTransports, transportSources,
-  type DeviceTransport, type PlannerContext,
+  type DeviceTransport, type PlanOutcome, type PlannerContext,
 } from "@hearthkit/core";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
@@ -159,7 +159,7 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
       platform, llm, confirm, devices,
       ...(reach.capabilities.length ? { capabilities: reach.capabilities } : {}),
       ...(reach.tools.length ? { tools: reach.tools } : {}),
-      ...(modelPilot ? { planner: modelPilot, llmPlanning: true } : {}),
+      ...(modelPilot ? { planner: modelPilot.factory, llmPlanning: true } : {}),
       ...(turnTimeoutMs ? { turnTimeoutMs } : {}),
     });
 
@@ -197,6 +197,16 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
     });
 
     logPlanLifecycle(agent);
+
+    // Close the loop ModelPilot cannot close on its own.
+    //
+    // Its primary metric is Cost Per Successful Task, and it deliberately does
+    // not count a completed API call as a successful task until something
+    // confirms the outcome. On a television that something is the local
+    // read-back, and this is the one line that gets it back to the service.
+    // Everything ambiguous — `unverified`, `unsupported`, policy-denied — is
+    // reported as nothing at all; see `verdictFor`.
+    if (modelPilot) agent.events.on("plan:end", ({ outcome }) => void modelPilot.report(outcome));
 
     // After the shell exists, so the avatar can be told when it is speaking.
     speakReplies(agent, platform, { onSpeaking: (s) => ui.setSpeaking?.(s) });
@@ -267,7 +277,10 @@ function readProvisionedKeys(host: HostDefinition): { llm?: string; modelPilot?:
 function buildModelPilotPlanner(
   provisionedKey: string | undefined,
   installId: string,
-): ((ctx: PlannerContext) => ReturnType<typeof createModelPilotPlanner>) | undefined {
+): {
+  factory: (ctx: PlannerContext) => ReturnType<typeof createModelPilotPlanner>;
+  report: (outcome: PlanOutcome) => Promise<void>;
+} | undefined {
   if (typeof __HEARTH_MODELPILOT__ !== "undefined" && !__HEARTH_MODELPILOT__) return undefined;
 
   const config = resolveModelPilotConfig({
@@ -281,7 +294,13 @@ function buildModelPilotPlanner(
   if (!config.apiKey) return undefined;
 
   const key = config.apiKey;
-  return (ctx: PlannerContext) => createModelPilotPlanner({
+  // The agent builds the planner from this factory, so the host never sees the
+  // instance — and the instance is the only thing that knows which ModelPilot
+  // request a finished plan came from. Capturing it here is what lets
+  // `plan:end` reach `/v1/feedback` without the planner needing a reference
+  // back to the agent that owns it.
+  let instance: ReturnType<typeof createModelPilotPlanner> | undefined;
+  const factory = (ctx: PlannerContext) => (instance = createModelPilotPlanner({
     client: createModelPilotClient({
       baseUrl: config.baseUrl,
       apiKey: key,
@@ -295,7 +314,14 @@ function buildModelPilotPlanner(
     meter: ctx.meter,
     maxTaskBudget: config.maxTaskBudget,
     telemetry: (record: unknown) => console.info("[modelpilot]", JSON.stringify(record)),
-  });
+  }));
+
+  return {
+    factory,
+    // Before the first plan there is no instance, and a plan the agent finished
+    // before one existed cannot have been ModelPilot's.
+    report: async (outcome: PlanOutcome) => instance?.report(outcome),
+  };
 }
 
 /**

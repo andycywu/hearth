@@ -35,7 +35,13 @@ const planner = createModelPilotPlanner({
 const llm = { id: "silent", complete: async () => ({ wantsToolCalls: false, message: { role: "assistant", content: "ok" } }) };
 const agent = new Agent({ platform, llm, devices, world, planner, llmPlanning: true, confirm: () => true });
 
+// The one line a host writes, and the half of the loop that is easiest to
+// forget: what the television actually did, posted back to /v1/feedback.
+const reported = [];
+agent.events.on("plan:end", ({ outcome }) => reported.push(planner.report(outcome)));
+
 const outcome = await agent.pursue({ id: "freeform", intent: "put the news on", desiredState: [] });
+await Promise.all(reported);
 console.log("plan     :", outcome.plan.steps.map((s) => `${s.action.capabilityId}(${JSON.stringify(s.action.args)})`).join(", ") || "(none)");
 console.log("outcomes :", outcome.outcomes.map((o) => `${o.step.action.capabilityId}:${o.status}`).join(", ") || "(none)");
 console.log("achieved :", outcome.achieved);

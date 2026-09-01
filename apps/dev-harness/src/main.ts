@@ -148,10 +148,15 @@ async function boot(): Promise<void> {
     search: launchSearch(),
     globals: window as unknown as Record<string, unknown>,
   });
+  // Captured so `plan:end` can reach /v1/feedback below: the agent builds the
+  // planner from the factory, so this is the only place that ever holds the
+  // instance — and the instance is the only thing that knows which ModelPilot
+  // request a finished plan came from.
+  let modelPilot: ReturnType<typeof createModelPilotPlanner> | undefined;
   const planner = mpConfig.apiKey
     // A factory, so the planner reasons over the agent's *own* capability graph —
     // the one the boot probe withdraws from — rather than a copy beside it.
-    ? (ctx: PlannerContext) => createModelPilotPlanner({
+    ? (ctx: PlannerContext) => (modelPilot = createModelPilotPlanner({
         client: createModelPilotClient({
           baseUrl: mpConfig.baseUrl,
           apiKey: mpConfig.apiKey!,
@@ -167,7 +172,7 @@ async function boot(): Promise<void> {
         // the key, never the prompt, never the room state — the record type and
         // `sanitizeTelemetry` both see to that.
         telemetry: (record) => console.info("[modelpilot]", JSON.stringify(record)),
-      })
+      }))
     : undefined;
   console.info(
     `[modelpilot] mode=${mpConfig.mode} (${mpConfig.source})`
@@ -190,6 +195,15 @@ async function boot(): Promise<void> {
     // switch input) prompt before running. Same handler the device hosts use.
     confirm: createConfirmHandler(),
   });
+
+  // Close the loop: what the television actually did, back to /v1/feedback.
+  //
+  // ModelPilot does not count a completed call as a successful task until a
+  // verifier confirms the outcome, and the local read-back is the only thing
+  // here that can. Everything ambiguous is reported as nothing at all, and a
+  // shadow run reports nothing ever — its answer was never executed.
+  agent.events.on("plan:end", ({ outcome }) => void modelPilot?.report(outcome));
+
   // ?render=canvas uses the single-surface canvas renderer instead of the DOM
   // overlay; ?render=avatar draws the agent's face on the same canvas path.
   const renderer = params.get("render");

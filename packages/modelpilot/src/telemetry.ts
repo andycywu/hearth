@@ -25,8 +25,17 @@ export interface ModelPilotTelemetry {
   fallback_count?: number;
   mode: ModelPilotMode;
   task_type: string;
-  /** How the ModelPilot call itself ended. */
-  status: "ok" | "unusable_output" | "error" | "skipped";
+  /**
+   * How the ModelPilot call itself ended — except `outcome`, which is not a
+   * call at all.
+   *
+   * `outcome` is the verdict row written later, when the television has finished
+   * with a plan and `/v1/feedback` has been told (or deliberately not told).
+   * It repeats `local_workflow_id` and `modelpilot_request_id` so a reader joins
+   * the two rows rather than waiting for one that can never be complete: the
+   * call is over long before the device is.
+   */
+  status: "ok" | "unusable_output" | "error" | "skipped" | "outcome";
   latency_ms?: number;
   actual_cost?: number;
   /** What the priciest eligible candidate would have cost — the saving claim. */

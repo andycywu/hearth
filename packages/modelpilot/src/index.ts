@@ -8,7 +8,7 @@
  */
 export { createModelPilotClient, readAnswer, redact } from "./client.js";
 export type {
-  ModelPilotClient, ModelPilotClientOptions, ModelPilotAnswer, CallOptions,
+  ModelPilotClient, ModelPilotClientOptions, ModelPilotAnswer, OutcomeReport, CallOptions,
 } from "./client.js";
 export { ModelPilotError, isModelPilotError } from "./errors.js";
 export type { ModelPilotErrorKind } from "./errors.js";
@@ -22,7 +22,7 @@ export {
 export type { CompletionRequest, RoomSummary, BuildRequestOptions } from "./task-mapper.js";
 export { parseActionPlan, TV_ACTIONS, RISKS } from "./action-plan.js";
 export type { TvActionPlan, TvAction, PlanRisk, ParseResult } from "./action-plan.js";
-export { createModelPilotPlanner, toSteps } from "./planner.js";
+export { createModelPilotPlanner, toSteps, verdictFor } from "./planner.js";
 export type { ModelPilotPlanner, ModelPilotPlannerOptions, ShadowRecord } from "./planner.js";
 export { sanitizeTelemetry, createTelemetryLogger } from "./telemetry.js";
 export type { ModelPilotTelemetry, TelemetrySink } from "./telemetry.js";

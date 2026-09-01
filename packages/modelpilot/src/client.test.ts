@@ -227,6 +227,34 @@ describe("ModelPilotClient", () => {
     expect(urls).toEqual(["https://modelpilot.example/v1/models"]);
   });
 
+  it("posts a verdict to the endpoint that keeps ModelPilot's own metric honest", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({ status: "accepted" }));
+    }) as unknown as typeof fetch;
+
+    await client(fetchImpl).reportOutcome("req-9", { success: true, comment: "locally verified" });
+
+    expect(calls[0]?.url).toBe("https://modelpilot.example/v1/feedback");
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      request_id: "req-9", success: true, comment: "locally verified",
+    });
+  });
+
+  it("omits a score rather than inventing one", async () => {
+    // The endpoint takes an optional score. A made-up number is noise in
+    // somebody else's denominator, so nothing sends one by default.
+    const bodies: string[] = [];
+    const fetchImpl = (async (_u: string, init: RequestInit) => {
+      bodies.push(String(init.body));
+      return new Response(JSON.stringify({ status: "accepted" }));
+    }) as unknown as typeof fetch;
+
+    await client(fetchImpl).reportOutcome("req-9", { success: false });
+    expect(JSON.parse(bodies[0]!)).toEqual({ request_id: "req-9", success: false });
+  });
+
   it("attributes the call to an install, without identifying hardware", async () => {
     const calls = [];
     const fetchImpl = (async (_u, init) => {
