@@ -3,7 +3,7 @@ import {
   CapabilityGraph, DeviceGraph, WorldModel, W, applyPerception,
   createTvCapabilities, createMediaCapabilities,
 } from "@hearthkit/core";
-import { buildTaskRequest, minimiseRoomState, REQUIRED_KEYS } from "./task-mapper.js";
+import { buildCompletionRequest, minimiseRoomState, REQUIRED_KEYS } from "./task-mapper.js";
 
 /**
  * The mapper is the boundary where a household's living room could leak, so
@@ -42,42 +42,61 @@ const goal = {
   desiredState: [{ path: W.tvInput, equals: "hdmi2" }],
 };
 
-describe("TaskRequest mapping", () => {
-  it("carries the shape ModelPilot expects", () => {
+describe("request mapping", () => {
+  it("is an OpenAI-compatible completion, because that is what the service is", () => {
     const { world, devices, capabilities } = room();
-    const req = buildTaskRequest({ goal, world, devices, capabilities });
+    const req = buildCompletionRequest({ goal, world, devices, capabilities });
 
-    expect(req.strategy).toBe("plan_execute_verify");
-    expect(req.requirements.intelligence).toBe("reasoning");
-    expect(req.requirements.capabilities).toEqual(["planning", "tv_control"]);
-    expect(req.requirements.approvalMode).toBe("high_risk");
-    expect(req.verification).toEqual({ type: "json_schema", requiredKeys: [...REQUIRED_KEYS] });
-    expect(req.economics).toEqual({ maxTaskBudget: 0.05, currency: "USD" });
+    // `auto` is the entire routing trigger. Pin a model and ModelPilot stops
+    // being a router.
+    expect(req.model).toBe("auto");
+    expect(req.messages.map((m) => m.role)).toEqual(["system", "user"]);
+    expect(req.messages[0]?.content).toContain(REQUIRED_KEYS.join(", "));
   });
 
-  it("maps the confidential + zero-retention policy exactly", () => {
+  it("sends the three routing knobs the service actually reads, and no others", () => {
     const { world, devices, capabilities } = room();
-    const req = buildTaskRequest({ goal, world, devices, capabilities });
+    const req = buildCompletionRequest({ goal, world, devices, capabilities });
 
-    expect(req.requirements.privacy).toBe("no_training");
-    expect(req.requirements.dataPolicy).toEqual({
-      sensitivity: "confidential",
-      retentionRequirement: "zero",
-      trainingUse: "prohibited",
-      // The engine may reason; it may not reach anything in this house.
-      toolEgress: "denied",
-      humanReview: "allowed",
-    });
+    expect(Object.keys(req.metadata).sort()).toEqual(["latency_priority", "max_cost", "quality_threshold"]);
+    expect(Object.keys(req).sort()).toEqual(["messages", "metadata", "model"]);
   });
 
-  it("honours the caller's budget and latency ceilings", () => {
+  it("asks for a model that can actually emit strict JSON", () => {
     const { world, devices, capabilities } = room();
-    const req = buildTaskRequest({
-      goal, world, devices, capabilities, maxTaskBudget: 0.01, maxLatencyMs: 2000,
+    const req = buildCompletionRequest({ goal, world, devices, capabilities });
+
+    // Price is part of a router's score, so the cheapest eligible candidate wins
+    // more often than not. The threshold is what keeps the weak end of a
+    // catalogue out — a model that cannot hold a schema does not fail loudly, it
+    // answers with prose, and that costs a round trip to discover.
+    expect(req.metadata.quality_threshold).toBeGreaterThan(0.8);
+  });
+
+  it("never sets stream, which the service answers with 400", () => {
+    const { world, devices, capabilities } = room();
+    const req = buildCompletionRequest({ goal, world, devices, capabilities });
+    expect((req as Record<string, unknown>).stream).toBeUndefined();
+  });
+
+  it("declares no policy the service does not enforce", () => {
+    const { world, devices, capabilities } = room();
+    const body = JSON.stringify(buildCompletionRequest({ goal, world, devices, capabilities }));
+
+    // These were sent for a release and read by nobody. A retention guarantee
+    // in a field the server ignores is worse than no guarantee: it reads like
+    // one. The real boundary is `minimiseRoomState` and the tests below.
+    for (const claim of ["dataPolicy", "retentionRequirement", "trainingUse", "toolEgress", "approvalMode"]) {
+      expect(body, `${claim} was a promise nothing kept`).not.toContain(claim);
+    }
+  });
+
+  it("honours the caller's budget ceiling", () => {
+    const { world, devices, capabilities } = room();
+    const req = buildCompletionRequest({
+      goal, world, devices, capabilities, maxTaskBudget: 0.01,
     });
-    expect(req.economics.maxTaskBudget).toBe(0.01);
-    expect(req.requirements.maxCost).toBe(0.01);
-    expect(req.requirements.maxLatencyMs).toBe(2000);
+    expect(req.metadata.max_cost).toBe(0.01);
   });
 
   it("tells the engine what it may name, and nothing else", () => {
@@ -99,7 +118,7 @@ describe("TaskRequest mapping", () => {
 describe("what must never leave the television", () => {
   it("sends no device names, vendors, models, IPs or MACs", () => {
     const { world, devices, capabilities } = room();
-    const body = JSON.stringify(buildTaskRequest({ goal, world, devices, capabilities }));
+    const body = JSON.stringify(buildCompletionRequest({ goal, world, devices, capabilities }));
 
     for (const leak of ["PlayStation 5", "Andy", "Sony", "CFI-1216A", "10.0.0.5", "aa:bb:cc:dd:ee:ff", "mdns"]) {
       expect(body, `"${leak}" must not cross the boundary`).not.toContain(leak);
@@ -120,7 +139,7 @@ describe("what must never leave the television", () => {
     });
 
     const summary = minimiseRoomState(world, devices, capabilities);
-    const body = JSON.stringify(buildTaskRequest({ goal, world, devices, capabilities }));
+    const body = JSON.stringify(buildCompletionRequest({ goal, world, devices, capabilities }));
 
     // "Someone is in" is enough for every plan we have; "three people" is a fact
     // about a household.
@@ -140,7 +159,7 @@ describe("what must never leave the television", () => {
     world.observe({ path: "room.snapshotDataUrl", value: "data:image/png;base64,AAAA", source: "perception" });
     world.observe({ path: "users.0.name", value: "Andy", source: "user" });
 
-    const body = JSON.stringify(buildTaskRequest({ goal, world, devices, capabilities }));
+    const body = JSON.stringify(buildCompletionRequest({ goal, world, devices, capabilities }));
     for (const leak of ["transcript", "cancel the subscription", "data:image", "base64", "Andy"]) {
       expect(body, `"${leak}" must not cross the boundary`).not.toContain(leak);
     }
@@ -160,14 +179,12 @@ describe("what must never leave the television", () => {
 
   it("sends no conversation history", () => {
     const { world, devices, capabilities } = room();
-    const req = buildTaskRequest({
+    const req = buildCompletionRequest({
       goal, world, devices, capabilities,
       utterance: "put the PlayStation on",
     });
-    // One utterance, because the goal came from it. Not the transcript of a
-    // household's evening.
-    expect(req.task.instruction).toContain("put the PlayStation on");
-    expect(req.task.context).not.toContain("put the PlayStation on");
+    const user = req.messages[1]?.content ?? "";
+    expect(user).toContain("put the PlayStation on");
     // Once — the goal was built from it. Not twice, and not a transcript of a
     // household's evening.
     expect(JSON.stringify(req).match(/PlayStation/g)).toHaveLength(1);

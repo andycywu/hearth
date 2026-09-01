@@ -27,7 +27,7 @@ MODELPILOT_MODE=shadow|enforce
       └─ x-hearth-mode: shadow          which mode
       │
       ▼
-  ModelPilot already has: a timestamp, a task id, a trajectory id, a cost
+  ModelPilot already has: a timestamp, a request id, a selected model, a cost
 ```
 
 From those, entirely server-side and with no new endpoint:
@@ -97,13 +97,20 @@ code question.
 
 ## Two things to fix before this is a product
 
-**1. "Zero retention" currently contradicts counting.** Every TaskRequest we send
-declares `retentionRequirement: "zero"`. If ModelPilot retains request *metadata*
-— timestamps, install ids, costs — to produce these metrics, then that policy has
-to be scoped explicitly to task **content**, in the request, in ModelPilot's own
-docs, and in whatever an OEM's privacy notice says. As written, the two claims
-cannot both be true, and that is the kind of inconsistency a data-protection
-review finds first.
+**1. "Zero retention" was never enforced, and now is not claimed.** The runtime
+used to declare `retentionRequirement: "zero"` on every request. Nothing on the
+service side read it — see the
+[ADR-0004 amendment](adr/0004-modelpilot-boundary.md) — so the declaration has
+been removed rather than left reading like a guarantee.
+
+That does not make the question go away, it relocates it. ModelPilot's own
+position is that prompts are not stored by default and a SHA-256 request hash
+supports correlation without retention; what it *does* store per call is
+metadata — timestamps, tenant, selected model, cost. So the policy that has to be
+written down, in ModelPilot's docs and in whatever an OEM's privacy notice says,
+is: zero retention of task **content**, bounded retention of request
+**metadata**. Both claims can be true; neither is currently stated where a
+data-protection review would look.
 
 **2. GDPR basis and retention.** A pseudonymous install id plus usage timestamps
 is personal data under GDPR — pseudonymous is not anonymous — and Titan's market

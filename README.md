@@ -341,7 +341,7 @@ hardware.
 - [Writing a cross-vendor skill](docs/skills.md) · [Extending (tools, persistence, new OS)](docs/extending.md) · [API reference](docs/api.md)
 - [On-device inference](docs/on-device-inference.md) · [Architecture](docs/architecture.md) · [Project status](docs/STATUS.md) · [What still needs a real TV](docs/HARDWARE_VERIFICATION.md)
 - Bring-up: [POC plan (no vendor signing)](docs/POC.md) · [emulator setup](docs/EMULATOR_SETUP.md) · [checklist](docs/BRINGUP_CHECKLIST.md)
-- [ModelPilot integration](docs/modelpilot-integration.md) · [counting installs without watching living rooms](docs/service-metrics.md) — planning through a remote decision engine, device control and verification staying local
+- [ModelPilot integration](docs/modelpilot-integration.md) · [counting installs without watching living rooms](docs/service-metrics.md) — planning through a remote model router, device control and verification staying local
 - Living-room agent design: [HDMI-CEC](docs/cec.md) · [world model](docs/world-model.md) · [capability graph](docs/capability-graph.md) · [device graph](docs/device-graph.md) · [planner & verification](docs/agent-planner.md) · [tools & adapters](docs/tool-adapter-design.md) · [policy & safety](docs/policy-and-safety.md)
 - [Security review](docs/SECURITY_REVIEW.md) · [Releasing](docs/RELEASING.md) · [Roadmap](docs/roadmap.md) · [platform bring-up plan](docs/DEVELOPMENT_PLAN.md)
 - Contributing: [**the Hearth Report**](docs/platform/capability-matrix.md) (what TVs can actually do) · [ten ways in](docs/good-first-issues.md) · [naming & namespaces](docs/adr/0003-name-and-namespace.md)
