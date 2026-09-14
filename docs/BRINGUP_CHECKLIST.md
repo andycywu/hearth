@@ -71,8 +71,22 @@ needs a Samsung certificate** (free Samsung account).
 - [ ] App installs and launches; on-screen status shows `model` + `soc`.
 - [ ] Note the reported **soc** = mediatek / novatek (from `productinfo`).
 
-**Capability probe:** launch with `?diag` (set the app start URL to
-`index.html?diag`, or `index.html?diag&writes` to exercise volume set/restore).
+**Capability probe:** one command, over the Web Inspector — the Tizen twin of
+`tools/device-report.mjs`:
+
+```bash
+node tools/device-report-tizen.mjs        # → docs/platform/reports/<target>.md
+```
+
+It launches the app with the inspector, waits for the boot, and writes a
+finished report section — plus the three things only this platform needs stated:
+which audio API the build has, which launch flags the installed package was
+really built with, and an independent volume reading from `vconftool` where it
+exists.
+
+By hand instead: repackage with `--flags diag` (`--flags writes` to exercise
+volume set/restore). Not `index.html?diag` — Tizen drops the query string from
+`config.xml` and the app then ignores the flag without a word.
 - [ ] Screenshot / copy the Markdown table it renders.
 - [ ] Record which privileges installed vs. were rejected (trim `config.xml`
       until it installs; note partner/platform-level ones you couldn't self-sign).

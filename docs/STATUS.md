@@ -37,7 +37,7 @@ AVR, a console, a camera and a far-field microphone need a room rather than a TV
 | Host boot (`@hearthkit/host`) | ✅ one boot sequence for all four hosts, replacing four divergent copies |
 | Build profiles (`--full` / `--with` / `--without`) | ✅ optional code removed at build time, not skipped at runtime — 74 / 95 / 121 KB |
 | Install identity + service metrics | ✅ random, local, resettable id on ModelPilot calls only; no analytics endpoint exists |
-| Device report (`tools/device-report.mjs`) | ✅ one command turns a TV into a pasteable markdown section |
+| Device report (`tools/device-report.mjs`, `tools/device-report-tizen.mjs`) | ✅ one command turns a TV into a pasteable markdown section — adb on Android, the Web Inspector on Tizen |
 | LLM connectors (OpenAI-compatible + offline scripted) | ✅ done, with retry |
 | UI renderers (avatar, DOM overlay, 2D canvas, Blits WebGL) | ✅ one shared view-model behind all of them |
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
@@ -144,4 +144,12 @@ node tools/mock-llm-server.mjs &           # offline brain over HTTP
 adb reverse tcp:8080 tcp:8080
 node tools/device-acceptance.mjs           # the CI acceptance script, on the device
 node tools/device-report.mjs               # → docs/platform/reports/<target>.md
+```
+
+On a connected Tizen television (`sdb connect <tv-ip>:26101`) — the same two
+answers, over the Web Inspector rather than adb:
+
+```bash
+node tools/device-report-tizen.mjs         # → docs/platform/reports/<target>.md
+node tools/device-acceptance-tizen.mjs     # the CI acceptance script, on the TV
 ```

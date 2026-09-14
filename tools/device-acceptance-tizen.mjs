@@ -27,9 +27,10 @@
  * `confirm=auto` because launching an app is a confirm-required tool and nobody
  * is here to press a dialog.
  */
-import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import {
+  findSdb, sdbFor, requireDevice, launchWithInspector, forwardInspector, unforward,
+  independentVolume, Cdp, findPageTarget, sleep, readAudioApi, readFlags, NO_AUDIO_NOTE,
+} from "./tizen-device.mjs";
 
 /**
  * Same script and same expectations as the Android runner, deliberately: the
@@ -68,166 +69,12 @@ const appId = opt("--app-id", "tvaiagent0.TvAiAgent");
 const asJson = has("--json");
 const skipZh = has("--no-zh");
 
-const sdb = findSdb();
+// sdb discovery, the Web Inspector launch, the CDP client and the vconftool
+// readback are shared with tools/device-report-tizen.mjs — see tizen-device.mjs
+// for why each of them is the way it is.
+const sdbPath = findSdb();
+const sdb = sdbFor(sdbPath, serial);
 const log = (...a) => { if (!asJson) console.log(...a); };
-
-// --- sdb plumbing ----------------------------------------------------------
-function findSdb() {
-  const home = process.env.USERPROFILE ?? process.env.HOME ?? "";
-  const candidates = [
-    process.env.TIZEN_SDK && join(process.env.TIZEN_SDK, "tools", "sdb.exe"),
-    // Where the VS Code Tizen extension keeps its SDK. Worth trying first on
-    // Windows: Tizen Studio is no longer the only way to get these tools, and
-    // this path is the one a VS Code-only setup has.
-    home && join(home, ".tizen-extension-platform", "server", "sdktools", "data", "tools", "sdb.exe"),
-    home && join(home, "tizen-studio", "tools", "sdb.exe"),
-    home && join(home, "tizen-studio", "tools", "sdb"),
-    "sdb",
-  ].filter(Boolean);
-  for (const c of candidates) {
-    if (c === "sdb" || existsSync(c)) return c;
-  }
-  throw new Error("sdb not found — set TIZEN_SDK or put sdb on PATH");
-}
-function sh(...argv) {
-  const full = serial ? ["-s", serial, ...argv] : argv;
-  return execFileSync(sdb, full, { encoding: "utf8", maxBuffer: 8 << 20 }).trim();
-}
-/** Best-effort: some of these are informational and a board may not have them. */
-function shq(...argv) {
-  try { return sh(...argv); } catch { return ""; }
-}
-
-function requireDevice() {
-  const out = shq("devices");
-  const lines = out.split("\n").slice(1).map((l) => l.trim()).filter(Boolean);
-  if (!lines.length) {
-    throw new Error(
-      "no device attached. Connect the board first:\n" +
-      "  sdb connect <board-ip>:26101      (or plug in USB)\n" +
-      "  sdb devices                       (it must be listed)",
-    );
-  }
-  return lines;
-}
-
-/**
- * Start the app with the Web Inspector and return its port.
- *
- * Killed first so the page is fresh, and therefore the agent is: a re-run
- * against a warm app inherits the previous run's conversation history, which
- * quietly changes what the model does on turn one.
- */
-function launchWithInspector() {
-  shq("shell", "app_launcher", "-k", appId);
-  const out = sh("shell", "app_launcher", "-w", "-s", appId);
-  const port = /port:\s*(\d+)/.exec(out)?.[1];
-  if (!port) {
-    throw new Error(
-      `could not start ${appId} with the Web Inspector.\n` +
-      `app_launcher said: ${out.trim()}\n` +
-      "Check the id with: sdb shell app_launcher -l",
-    );
-  }
-  return Number(port);
-}
-
-/**
- * An independent reading of the volume, straight from the platform's own
- * config store rather than from the code under test.
- *
- * The whole point of a device run is not to trust our own return value, and on
- * Android `dumpsys audio` gives that for free. Tizen has no such guarantee —
- * `vconftool` is not on every build and the key differs between them — so this
- * is best-effort and clearly labelled. When it answers, it is the strongest
- * evidence in the report; when it does not, the report says the readback is
- * self-reported rather than pretending otherwise.
- */
-function independentVolume() {
-  const keys = [
-    "file/private/sound/volume/system",
-    "memory/private/sound/volume/system",
-    "db/setting/volume/system",
-  ];
-  for (const key of keys) {
-    const out = shq("shell", "vconftool", "get", key);
-    const value = /value\s*=\s*(\d+)/i.exec(out)?.[1];
-    if (value !== undefined) return { key, value: Number(value) };
-  }
-  return null;
-}
-
-// --- CDP client (Node's built-in WebSocket; no dependencies) ---------------
-class Cdp {
-  #ws; #next = 1; #pending = new Map();
-  consoleLines = [];
-
-  static async connect(wsUrl) {
-    const cdp = new Cdp();
-    cdp.#ws = new WebSocket(wsUrl);
-    await new Promise((resolve, reject) => {
-      cdp.#ws.addEventListener("open", resolve, { once: true });
-      cdp.#ws.addEventListener("error", () => reject(new Error(`cannot open ${wsUrl}`)), { once: true });
-    });
-    cdp.#ws.addEventListener("message", (ev) => cdp.#onMessage(String(ev.data)));
-    await cdp.send("Runtime.enable");
-    return cdp;
-  }
-
-  #onMessage(data) {
-    const msg = JSON.parse(data);
-    if (msg.id && this.#pending.has(msg.id)) {
-      const { resolve, reject } = this.#pending.get(msg.id);
-      this.#pending.delete(msg.id);
-      msg.error ? reject(new Error(msg.error.message)) : resolve(msg.result);
-      return;
-    }
-    if (msg.method === "Runtime.consoleAPICalled") {
-      const text = (msg.params.args ?? []).map((a) => a.value ?? a.description ?? "").join(" ");
-      this.consoleLines.push(`[${msg.params.type}] ${text}`);
-    }
-  }
-
-  send(method, params = {}) {
-    const id = this.#next++;
-    this.#ws.send(JSON.stringify({ id, method, params }));
-    return new Promise((resolve, reject) => this.#pending.set(id, { resolve, reject }));
-  }
-
-  async eval(expression) {
-    const r = await this.send("Runtime.evaluate", {
-      expression, awaitPromise: true, returnByValue: true,
-    });
-    if (r.exceptionDetails) {
-      const e = r.exceptionDetails;
-      throw new Error(`page error: ${e.exception?.description ?? e.text}`);
-    }
-    return r.result?.value;
-  }
-
-  /** Run an expression and report whether it threw, instead of throwing. */
-  async attempt(expression) {
-    try { return { ok: true, value: await this.eval(expression) }; }
-    catch (e) { return { ok: false, error: String(e.message ?? e) }; }
-  }
-
-  close() { this.#ws.close(); }
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function findPageTarget(port) {
-  for (let attempt = 0; attempt < 20; attempt++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${port}/json/list`);
-      const targets = await res.json();
-      const page = targets.find((t) => t.type === "page" && /index\.html/.test(t.url ?? ""));
-      if (page?.webSocketDebuggerUrl) return page;
-    } catch { /* inspector not up yet */ }
-    await sleep(500);
-  }
-  throw new Error(`no page target on the Web Inspector endpoint (port ${port})`);
-}
 
 // --- the run ---------------------------------------------------------------
 const results = {
@@ -236,13 +83,12 @@ const results = {
 };
 
 try {
-  log(`[tizen] sdb: ${sdb}`);
-  log(`[tizen] devices: ${requireDevice().join(" | ")}`);
+  log(`[tizen] sdb: ${sdbPath}`);
+  log(`[tizen] devices: ${requireDevice(sdb).join(" | ")}`);
 
-  const port = launchWithInspector();
+  const port = launchWithInspector(sdb, appId);
   log(`[tizen] ${appId} started, inspector on device port ${port}`);
-  shq("forward", "--remove", `tcp:${port}`);   // usually nothing to remove; sdb says so loudly
-  sh("forward", `tcp:${port}`, `tcp:${port}`);
+  forwardInspector(sdb, port);
 
   const target = await findPageTarget(port);
   log(`[tizen] page: ${target.url}`);
@@ -263,34 +109,13 @@ try {
   results.device = JSON.parse(await cdp.eval("JSON.stringify(window.__tvPlatform.device)"));
   log(`[tizen] ${results.device.os} ${results.device.osVersion} · ${results.device.model} · soc=${results.device.soc}`);
 
-  // Which audio API this build actually has. This is the single most valuable
-  // line of the report on a first bring-up: the adapter prefers Samsung's
-  // proprietary `webapis.audiocontrol` and falls back to the standard
-  // `tizen.tvaudiocontrol`, and until a real board runs it, *neither* branch has
-  // ever executed. A non-Samsung board is expected to take the second.
-  results.audio = JSON.parse(await cdp.eval(`JSON.stringify({
-    webapis: typeof webapis !== "undefined" && !!(webapis && webapis.audiocontrol),
-    standard: typeof tizen !== "undefined" && !!(tizen && tizen.tvaudiocontrol),
-  })`));
-  const noAudioApi = !results.audio.webapis && !results.audio.standard;
-  const api = results.audio.webapis ? "webapis.audiocontrol (Samsung)"
-    : results.audio.standard ? "tizen.tvaudiocontrol (standard)"
-    : "NONE";
+  results.audio = await readAudioApi(cdp);
+  const noAudioApi = results.audio.none;
+  const api = results.audio.name;
   log(`[tizen] audio API: ${api}`);
-  if (api === "NONE") {
-    results.notes.push(
-      "no audio control API on this build — volume and mute cannot work here. " +
-      "If this is a Samsung TV, the host page is missing " +
-      '<script src="$WEBAPIS/webapis/webapis.js">.',
-    );
-  }
+  if (noAudioApi) results.notes.push(NO_AUDIO_NOTE);
 
-  // Tizen drops config.xml's query string, so flags arrive baked. An app that
-  // boots fine and silently ignores every flag is the worst failure available;
-  // say it out loud.
-  results.flags = await cdp.eval(
-    "typeof globalThis.__AGENT_FLAGS__ === 'string' ? globalThis.__AGENT_FLAGS__ : ''",
-  );
+  results.flags = await readFlags(cdp);
   log(`[tizen] launch flags: ${results.flags || "(none)"}`);
   if (!/confirm=auto/.test(results.flags)) {
     results.notes.push(
@@ -340,7 +165,7 @@ try {
     mutedError: endMuted.ok ? null : endMuted.error,
   };
 
-  results.independent = independentVolume();
+  results.independent = independentVolume(sdb);
   if (results.independent) {
     log(`[tizen] independent readback: ${results.independent.key} = ${results.independent.value}`);
   } else {
@@ -369,7 +194,7 @@ try {
   }
 
   cdp.close();
-  shq("forward", "--remove", `tcp:${port}`);
+  unforward(sdb, port);
 
   // --- verdict -------------------------------------------------------------
   // A build with no audio API cannot pass the audio half of this script, and
