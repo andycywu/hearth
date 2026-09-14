@@ -20,10 +20,20 @@
  * Prerequisites:
  *
  *   sdb connect <tv-ip>:26101           # or plug in USB
- *   node tools/bundle.mjs tizen --with diag
- *   node tools/package-tizen.mjs --profile <samsung-profile> \
+ *   node tools/package-tizen.mjs --profile <profile> --with diag --with offline \
  *        --flags plan --flags confirm=auto --flags room=demo
  *   tz install -p apps/tizen-app/Debug/tizen-app.wgt
+ *
+ * The build flags go on the **packager**, not on a separate `bundle.mjs` run:
+ * packaging re-bundles, so `node tools/bundle.mjs tizen --with diag` followed by
+ * a plain `package-tizen.mjs` silently overwrites what you just built with the
+ * default profile. The report then fails saying the diagnostics are missing,
+ * which is true and is not the reason.
+ *
+ * `--with offline` because the host refuses to boot with no model configured,
+ * and a capability report does not need a real one. Without it — and without a
+ * `--flags llm=…` — the page dies at boot with "No model endpoint configured"
+ * and there is nothing exposed to collect.
  *
  * Note the flags go in at *package* time. Tizen's web runtime drops the query
  * string from config.xml's `<content src>`, so unlike Android there is no
@@ -67,8 +77,9 @@ try {
   sdb = sdbFor(findSdb(), serial);
   log(`[report] devices: ${requireDevice(sdb).join(" | ")}`);
 
-  port = launchWithInspector(sdb, appId);
-  log(`[report] ${appId} started, inspector on device port ${port}`);
+  const launched = launchWithInspector(sdb, appId);
+  port = launched.port;
+  log(`[report] ${appId} started via \`${launched.via}\`, inspector on device port ${port}`);
   forwardInspector(sdb, port);
 
   const target = await findPageTarget(port);
@@ -104,7 +115,7 @@ try {
   if (independent) log(`[report] independent readback: ${independent.key} = ${independent.value}`);
 
   const notes = [
-    "collected by tools/device-report-tizen.mjs over the Web Inspector",
+    `collected by tools/device-report-tizen.mjs over the Web Inspector (launched with \`${launched.via}\`)`,
     `launch flags baked into this package: ${flags || "(none)"}`,
     `audio control API present on this build: ${audio.name}`,
   ];

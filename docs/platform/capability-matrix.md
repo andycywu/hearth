@@ -13,6 +13,7 @@ people with different televisions in different living rooms can.
 |---|---|---|
 | Android TV 34 emulator | `?diag`, `?plan`, acceptance run | 12 ok / 0 errors. Input switching refused (platform signature). Volume is quantised to 15 steps — which broke exact-match verification until a tolerance was added. |
 | Samsung Tizen TV 10.0 emulator | `?diag`, `?demo` | **No audio API at all** — neither `webapis.audiocontrol` nor `tizen.tvaudiocontrol` exists. Apps, storage and network pass. |
+| **HKC TTQ55UQ1CS — Tizen 7.0, a real television** | `device-report-tizen.mjs` + the acceptance script | **The first hardware this project has ever run on.** 16 ok · 0 error, and the acceptance script passes. Audio works through the *standard* `tizen.tvaudiocontrol`, which had never executed anywhere — and the first call found `getMute()` missing from it. See [the report](reports/tizen-ttq55uq1cs.md). |
 | webOS TV 26 simulator | install + boot | Network is real; audio and app management are Luna stubs. Found that `webOS.service.request` is not a platform global. |
 | Ubuntu 26.04 (real machine, real sound card) | CI + by hand | All three audio backends verified. No TV inputs, and it says so. |
 | **Your TV** | see below | — |
@@ -63,24 +64,26 @@ returned**. A capability that answered `ok` and changed nothing is the single
 most valuable row anyone can contribute, because it is the one no adapter can
 self-report.
 
-Legend: ✅ works · ⚠️ needs partner/platform/system signing · ❔ untested · ➖ n/a
+Legend: ✅ works · ⚠️ needs partner/platform/system signing · ⛔ the device refuses
+it, so the capability is withdrawn · ⏭️ deliberately not auto-run · ❔ untested ·
+➖ n/a
 
 **POC-safe rows (no signing needed):** volume, mute, list/launch apps, network,
 navigation, media. The ⚠️ rows (input source, key injection, power standby) are
 deferred until a self-signed eng board — see [`../POC.md`](../POC.md).
 
-| Capability        | AOSP emu | AOSP+MTK | AOSP+NVT | Tizen+MTK | Tizen+NVT |
+| Capability        | AOSP emu | AOSP+MTK | AOSP+NVT | Tizen+MTK | Tizen+NVT⁵ |
 |-------------------|----------|----------|----------|-----------|-----------|
-| set/get volume    | ✅       | ❔       | ❔       | ❔⁴       | ❔⁴       |
-| mute              | ✅       | ❔       | ❔       | ❔⁴       | ❔⁴       |
-| list apps         | ✅       | ❔       | ❔       | ❔        | ❔        |
-| launch app        | ✅       | ❔       | ❔       | ❔        | ❔        |
-| input source      | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ⚠️        |
-| key injection     | ✅¹      | ⚠️       | ⚠️       | ❔        | ❔        |
-| power standby     | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ⚠️        |
-| network status    | ✅       | ❔       | ❔       | ❔        | ❔        |
-| media transport   | ➖²      | ➖²      | ➖²      | ❔        | ❔        |
-| voice pipeline    | ➖³      | ➖³      | ➖³      | ❔        | ❔        |
+| set/get volume    | ✅       | ❔       | ❔       | ❔⁴       | ✅⁵       |
+| mute              | ✅       | ❔       | ❔       | ❔⁴       | ✅⁵       |
+| list apps         | ✅       | ❔       | ❔       | ❔        | ✅⁵       |
+| launch app        | ✅       | ❔       | ❔       | ❔        | ✅⁵       |
+| input source      | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ⛔⁵       |
+| key injection     | ✅¹      | ⚠️       | ⚠️       | ❔        | ✅⁵       |
+| power standby     | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ⏭️⁵       |
+| network status    | ✅       | ❔       | ❔       | ❔        | ✅⁵       |
+| media transport   | ➖²      | ➖²      | ➖²      | ❔        | ✅⁵       |
+| voice pipeline    | ➖³      | ➖³      | ➖³      | ❔        | ✅⁵       |
 
 ¹ Via the user-enabled AccessibilityService — no signing. `navigation.available`
 reports `ready`; individual keys can still fail when the focused window has no
@@ -94,11 +97,23 @@ emulator. Web Speech is still unavailable in that WebView — the page is
 deliberately not a secure context (see `apps/aosp-app/README.md`) — which is
 exactly why the bridge exists.
 
-⁴ Not merely untested — **unexercised**. The Tizen TV 10.0 emulator has neither
+⁴ Still unexercised on this column. The Tizen TV 10.0 emulator has neither
 `webapis.audiocontrol` nor `tizen.tvaudiocontrol` (both globals read
-`undefined`), so no audio code path on that platform has ever run. The adapter
-reports this as `unsupported` rather than failing, and `?diag` prints which API
-it looked for. See [`../HARDWARE_VERIFICATION.md`](../HARDWARE_VERIFICATION.md).
+`undefined`), so no audio code path ran there at all. The adapter reports that
+as `unsupported` rather than failing, and `?diag` prints which API it looked
+for. See [`../HARDWARE_VERIFICATION.md`](../HARDWARE_VERIFICATION.md).
+
+⁵ From **one real television**, an HKC TTQ55UQ1CS on Tizen 7.0 — firmware
+`TIZEN-LICENSE-TV-2023-MP-NVT-LICENSE-HOTFIX-RELEASE_20260421.1`, which is the
+only reason it is filed under NVT: the string says so, while `?diag` reports
+`soc=unknown` because the adapter has no rule that reads it. One set is not a
+column, and a Samsung-branded NVT set may answer differently — in particular
+this one has `webapis` **without** `audiocontrol`, so it takes the standard-API
+path that a retail Samsung TV would not. `⛔` for input source is the honest
+answer rather than `⚠️`: this build refuses `setInputSource` outright, so the
+capability is withdrawn and the tool is never offered. Power standby was not
+run — it is destructive and the probe never auto-runs it. Full run:
+[reports/tizen-ttq55uq1cs.md](reports/tizen-ttq55uq1cs.md).
 
 Record firmware version, WebView/Chromium version, and required privileges next
 to each result.
@@ -184,6 +199,69 @@ Two defects only a real device could produce, both fixed:
   read-back the executor was overwriting the observed value with the requested
   one, so the world said 23 while the TV was at 20. A read-back is now
   authoritative: the observation stands.
+
+## Tizen — HKC TTQ55UQ1CS, a real television (verified 2026-09-14)
+
+**The first hardware this project has run on.** Tizen 7.0, Chromium 94, armv7,
+firmware `TIZEN-LICENSE-TV-2023-MP-NVT-LICENSE-HOTFIX-RELEASE_20260421.1`,
+`vendor_name: HKC` from `sdb capability` — a licensed Tizen set, not a
+Samsung-branded one. Collected with `tools/device-report-tizen.mjs`; the full
+run is [`reports/tizen-ttq55uq1cs.md`](reports/tizen-ttq55uq1cs.md).
+
+**16 ok · 0 unsupported · 0 error · 2 skipped**, and
+`tools/device-acceptance-tizen.mjs` reports **PASS** — the same tool sequence and
+end state as CI, with the Chinese turns answering in Chinese.
+
+Five things this set settled that no emulator could.
+
+- **Audio exists here, through the standard API.** `tizen.tvaudiocontrol` is
+  present and `webapis.audiocontrol` is *not* — this build carries Samsung's
+  `webapis` (productinfo, tvinfo, network, microphone, avplay…) with the audio
+  module missing from it. So the fallback branch of the adapter, the one no
+  image had ever executed, is the branch that runs a whole television.
+- **And its first execution failed.** `getMute()` is not on the standard API:
+  it spells the question `isMute()`, and has no `getMute` at all. Every other
+  method this adapter uses is spelled identically in both APIs, which is exactly
+  why this one survived review — the code read `getMute` off whichever object it
+  was handed. A television that could answer perfectly well reported
+  `TypeError: (...).getMute is not a function`. Asked by name now, and the probe
+  went from `15 ok · 1 unsupported` to `16 ok · 0 unsupported` on the same set.
+  - Worth noting what it cost elsewhere: with mute unreadable, goal mode
+    answered *「turn it down」* with "I can't tell how loud it is right now" and
+    ran nothing. After the fix the same goal plans `tv.audio.set_volume(level=5)`
+    and comes back **verified**. One missing read had withdrawn a working
+    capability.
+- **`sdb shell` does not exist on a retail set.** `intershell_support:disabled`,
+  and `sdb shell echo hello` returns *empty output and exit 0* — every command
+  the bring-up tooling ran succeeded silently and did nothing. What a television
+  accepts instead is a fixed vocabulary through its restricted shell:
+  `0 vd_applist`, `0 debug <vd-app-id>` (which is how you get a Web Inspector
+  port), `0 was_kill <vd-app-id>`. Note `0 killapp` is accepted and does nothing,
+  which is the same failure shape one level down.
+  - An installed app has **two ids** and neither predicts the other:
+    `app_tizen_id` is what `config.xml` declares (`tvaiagent0.TvAiAgent`), and
+    `app_id` is minted at install time from the project directory
+    (`tvaiagent0.tizen-app`). The `0` verbs take the second, so it has to be read
+    back from `0 vd_applist`.
+- **A generic `tizen-dev` certificate installs.** No Samsung certificate, no
+  Samsung account, no DUID registration: `tz install` completed with the SDK's
+  own distributor signer. That is a licensed set's answer and should not be
+  assumed for a Samsung-branded TV, where the same package is expected to be
+  rejected — but it means a licensed Tizen television is a *much* cheaper way
+  into this platform than the documentation assumed.
+- **Launching another app can stop the agent, and not reliably.** `open Prime
+  Video` on a cold start left the page connected with its JavaScript no longer
+  running: the CDP request was delivered, nothing rejected, nothing closed. The
+  next run of the identical script launched the same app, kept running and
+  passed. So it is a timing property of the launch rather than a rule — recorded
+  because a harness that hangs forever on it is worse than one that says so, and
+  because on Android this cannot happen at all (the agent is a WebView inside our
+  own app; here it is an app the launched one displaces).
+
+Two smaller ones: `soc` reports `unknown` although the firmware string names NVT
+— the adapter has no rule that reads it — and `vconftool` is absent, so there is
+no independent volume readback on this build and the report says so rather than
+quietly presenting the adapter's own number as corroboration.
 
 ## Tizen — Samsung TV 10.0 emulator (verified 2026-08-03)
 

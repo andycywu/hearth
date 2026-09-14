@@ -75,8 +75,16 @@ needs a Samsung certificate** (free Samsung account).
 `tools/device-report.mjs`:
 
 ```bash
+node tools/package-tizen.mjs --profile <profile> --with diag --with offline \
+     --flags plan --flags confirm=auto --flags room=demo
+tz install -p apps/tizen-app/Debug/tizen-app.wgt
 node tools/device-report-tizen.mjs        # → docs/platform/reports/<target>.md
 ```
+
+Build flags go on the **packager**: it re-bundles, so a separate
+`node tools/bundle.mjs tizen --with diag` beforehand is silently overwritten.
+`--with offline` because the host refuses to boot with no model configured, and
+a capability report does not need a real one.
 
 It launches the app with the inspector, waits for the boot, and writes a
 finished report section — plus the three things only this platform needs stated:

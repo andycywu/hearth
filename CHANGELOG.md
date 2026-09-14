@@ -130,8 +130,53 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   report tool would have drifted on the first bring-up day, and the two tools
   would then have disagreed about the same television.
 
+- **The first report from real television hardware**
+  ([`docs/platform/reports/tizen-ttq55uq1cs.md`](docs/platform/reports/tizen-ttq55uq1cs.md)),
+  an HKC TTQ55UQ1CS on Tizen 7.0: **16 ok · 0 error**, and
+  `device-acceptance-tizen.mjs` reports PASS — the CI tool sequence and end
+  state, Chinese turns included. Every claim in
+  [the Hearth Report](docs/platform/capability-matrix.md) about Tizen audio was
+  written from an emulator that had no audio API; one of them is now a
+  measurement, and the rest are marked for what they still are.
+
 ### Fixed
 
+- **`getMute()` does not exist on the standard Tizen audio API.** It is
+  `isMute()`. `adapter-tizen` prefers Samsung's `webapis.audiocontrol` and falls
+  back to `tizen.tvaudiocontrol`, and every other method it needs is spelled
+  identically in both — which is exactly why this one survived: the code read
+  `getMute` off whichever object it was handed, and no image this project had
+  run on carried *either* API, so the line had never executed. Its first
+  execution was on a television that could answer the question perfectly well,
+  and it answered `TypeError: (...).getMute is not a function`. Asked by name
+  now; the probe went from `15 ok · 1 unsupported` to `16 ok · 0 unsupported` on
+  the same set.
+  - What it had cost is the part worth keeping: with the mute read failing, goal
+    mode answered *「turn it down」* with "I can't tell how loud it is right now"
+    and ran nothing. The same goal now plans `tv.audio.set_volume(level=5)` and
+    comes back **verified**. One unreadable value had withdrawn a working
+    capability.
+- **The bring-up tooling could not drive a retail television at all.** A real
+  set reports `intershell_support:disabled`, and `sdb shell echo hello` returns
+  empty output with exit 0 — so `app_launcher -w`, `app_launcher -k` and
+  `vconftool` all "succeeded" and did nothing, and the launch step then failed
+  with `no page target on the Web Inspector endpoint`, which blames the
+  inspector. `tizen-device.mjs` now goes through the restricted shell's own
+  vocabulary — `0 vd_applist`, `0 debug <vd-app-id>`, `0 was_kill <vd-app-id>` —
+  and keeps `app_launcher` as the fallback, because the emulator is the special
+  case here, not the television. Resolving the id is part of it: an installed
+  app has both an `app_tizen_id` (what `config.xml` declares) and an `app_id`
+  (minted at install time from the project directory), the `0` verbs take the
+  second, and neither predicts the other.
+- **A suspended page hung the acceptance runner forever.** Launching another app
+  can stop the television scheduling ours: the CDP request is delivered, nothing
+  rejects, nothing closes, and Node exits with `Detected unsettled top-level
+  await` and no explanation. Every CDP call now has a 60-second limit and says
+  what a timeout means; the runner stops at that step instead of spending the
+  limit again on each remaining one, and snapshots the tool sequence after every
+  turn so the evidence for the steps that *did* work survives. Observed once on
+  a cold launch and not reproduced on the next run, so it is recorded as timing,
+  not as a rule.
 - **`sdb devices` was misread on the first run after a reboot**, and the tool
   said a television was attached when none was. The daemon prints
   `* Server has started successfully *` above its header on that first call, so

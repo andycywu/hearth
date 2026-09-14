@@ -49,7 +49,7 @@ export function createTizenAdapter(): PlatformProvider {
       // says so. It used to swallow the failure and answer `false`, which meant
       // "is the TV muted?" got a confident "no" from a TV that cannot tell —
       // and `getVolume` on the same build threw. One of those was wrong.
-      getMute: async () => Boolean(audio().getMute()),
+      getMute: async () => readMute(),
       setMute: async (m) => audio().setMute(m),
       getInputSource: async () => mapTizenSource(safe(() => webapis?.tvinfo?.getCurrentSource?.())),
       setInputSource: async (s) => { notSupported("setInputSource on this firmware", s); },
@@ -159,6 +159,32 @@ function audio(): any {
   throw new TvUnsupportedError(
     "no audio control API on this build — neither Samsung's webapis.audiocontrol " +
     '(host page needs <script src="$WEBAPIS/webapis/webapis.js">) nor tizen.tvaudiocontrol',
+  );
+}
+
+/**
+ * Is the television muted — asked in whichever of the two spellings this build
+ * understands.
+ *
+ * The two APIs do not agree on the name. Samsung's `webapis.audiocontrol` has
+ * `getMute()`; the standard `tizen.tvaudiocontrol` calls the same question
+ * `isMute()` and has no `getMute` at all. Everything else this adapter needs is
+ * spelled identically in both, which is exactly why this one was missed: the
+ * code read `getMute()` off whichever object `audio()` returned, and no image
+ * this project had run on carried *either* API, so it had never executed.
+ *
+ * It executed for the first time on an HKC-built Tizen 7.0 television
+ * (2026-09-14) and answered `TypeError: (...).getMute is not a function` — a
+ * failure, from a set that was perfectly able to answer the question. Asked by
+ * name rather than by API, because a build can carry either one.
+ */
+function readMute(): boolean {
+  const api = audio();
+  if (typeof api.getMute === "function") return Boolean(api.getMute());
+  if (typeof api.isMute === "function") return Boolean(api.isMute());
+  throw new TvUnsupportedError(
+    "this audio API has neither getMute() (Samsung's webapis.audiocontrol) nor " +
+    "isMute() (the standard tizen.tvaudiocontrol)",
   );
 }
 

@@ -5,21 +5,24 @@ A snapshot of what is built, what is verified, and by what. For the plan see
 (platform bring-up). For what an emulator structurally cannot answer, see
 [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
 
-_Last updated: 2026-08-31 · released: v0.1.0 (2026-08-05) · cutting: v0.2.0_
+_Last updated: 2026-09-14 · released: v0.1.0 (2026-08-05) · cutting: v0.2.0_
 
-**The honest one-line version: the runtime works and is verified on emulators;
-it has not run on retail TV hardware, and nothing with a second device in it has
-run at all.**
+**The honest one-line version: the runtime works, and as of 2026-09-14 it has
+run on exactly one real television — an HKC TTQ55UQ1CS on Tizen 7.0, where the
+capability probe is clean and the acceptance script passes. Everything else is
+still emulators, and nothing with a second device in it has run at all.**
 
 The agent runs end-to-end on the Android TV and Samsung Tizen emulators and on
 the webOS 26 simulator, driven by a real local model, with goal mode — device
 graph → plan → policy → execute → verify — proven on the Android TV emulator
 through logcat. Packaging is verified for all three hosts (APK / signed `.wgt` /
-`.ipk`). What is *not* proven is anything the emulators do not have: Tizen has no
-audio API on that image, webOS stubs audio and app management, and CEC, IR, an
-AVR, a console, a camera and a far-field microphone need a room rather than a TV.
+`.ipk`). One real television has now answered the Tizen half of that — see
+below — and what is still unproven is what neither an emulator nor a single TV
+has: webOS stubs audio and app management, no Samsung-branded set has run
+anything, and CEC, IR, an AVR, a console, a camera and a far-field microphone
+need a room rather than a television.
 
-**775 tests green**, across 18 packages.
+**777 tests green**, across 18 packages.
 
 ## At a glance
 
@@ -43,24 +46,25 @@ AVR, a console, a camera and a far-field microphone need a room rather than a TV
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
 | CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 752 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 777 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
 | **Tizen emulator bring-up** | ✅ installs, runs, offline demo runs, real model works |
 | **webOS install run** | ✅ runs on the TV 26 Simulator; audio and app management are stubs there |
 | **Linux platform** | ✅ all three backends against real tooling — `pactl`/`wpctl` in CI, `amixer` on a real sound card |
-| **Tizen audio (volume, mute)** | ⛔ unexercised code — that emulator has no audio API at all |
+| **Tizen audio (volume, mute)** | ✅ **verified on a real TV 2026-09-14** — through the *standard* `tizen.tvaudiocontrol`, whose first execution found `getMute()` missing from it (it is `isMute()`). Still unexercised on Samsung's `webapis.audiocontrol`, which that set does not carry |
+| **Tizen on retail hardware** | ✅ HKC TTQ55UQ1CS, Tizen 7.0 — 16 ok / 0 error, acceptance script PASS, installed with a plain `tizen-dev` certificate. [Report](platform/reports/tizen-ttq55uq1cs.md) |
 | **HDMI-CEC** | 🟡 transport, discovery, verified power, a `cec-ctl` implementation for Linux, and a one-line host hook — mock- and fixture-tested, **no real bus has run it**. `node tools/verify-cec.mjs` is how that changes. [`cec.md`](cec.md) |
-| **Real MTK/NVT device bring-up** | ⛔ needs hardware |
+| **Real MTK/NVT device bring-up** | 🟡 one licensed NVT-firmware Tizen set is done (above). No Samsung-branded set, no MTK set, no AOSP board |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (752 tests)
+## Test coverage (777 tests)
 
 core 197 · ui 167 · llm-connectors 61 · modelpilot 69 · skill-manifest 56 ·
 adapter-linux 42 · adapter-cec 37 · adapter-aosp 28 · cli 21 · acceptance 20 ·
-perception-mock 14 · adapter-tizen 14 · skills-example 13 · adapter-webos 10 ·
+perception-mock 14 · adapter-tizen 16 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 
 ## What has been verified on a device, and what it cost
@@ -82,6 +86,13 @@ recorded rather than summarised.
   all.
 - **webOS 26 Simulator** (first run): the app shipped no `webOSTV.js`, so every
   capability threw `ReferenceError`.
+- **HKC TTQ55UQ1CS, Tizen 7.0** (the first real television): `getMute()` does
+  not exist on the standard `tizen.tvaudiocontrol` — it is `isMute()` — so the
+  one API call that had never run anywhere failed on the set that could answer
+  it, and took relative-volume goal mode down with it. Separately, `sdb shell`
+  is disabled on a retail set and answers empty output with exit 0, so every
+  bring-up command "succeeded" and did nothing until the tooling moved to the
+  `0 debug` / `0 vd_applist` verbs.
 - **Voice on Android**: the voice key never reached the WebView (`onKeyDown` is
   not called when a view has consumed the key), and the first reply was never
   spoken because `TextToSpeech` binds in ~3 s while the offline brain answers
@@ -102,10 +113,11 @@ Report.
 2. **Phase 2 device bring-up (critical path).** MTK + NVT boards (Tizen + AOSP),
    `?diag`, fill the capability matrix, obtain signing (partner on Tizen,
    platform on Android) for the gated controls.
-3. **Tizen audio on a retail TV.** The emulator exposes neither audio API, so
-   `volume` and `mute` have never executed on that platform. A retail TV in
-   Developer Mode is also where Samsung's `webapis` exists, so it settles the
-   rest of that surface at once.
+3. **Tizen audio on a *Samsung* TV.** Done on a licensed set (2026-09-14), which
+   settled the standard `tizen.tvaudiocontrol` path and found `getMute()` missing
+   from it. What that set cannot answer is Samsung's own `webapis.audiocontrol`:
+   it carries `webapis` without the audio module, so that branch is still
+   unexercised code and will first run on somebody's Samsung-branded television.
 4. **Blits → default UI.** Needs WebGL rendering and perf validated on the
    weakest target GPU before it can replace the DOM fallback.
 5. **On-device model benchmark.** Model size vs. RAM/latency on real silicon;
