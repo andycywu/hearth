@@ -47,6 +47,17 @@ pnpm install
 pnpm build && pnpm test
 ```
 
+**Node 26 or newer** — `.nvmrc`, `engines.node` and every CI job say the same
+number, and so does `@types/node`. That last one is the point: `@types/node`
+describes a *runtime*, so a version above the floor is TypeScript quietly
+accepting calls the supported runtime does not have — code that compiles and
+then fails on the thing it was written for, which is the failure this whole
+project exists to refuse. If the floor moves, those four move together.
+
+Only `apps/cli` and `packages/adapter-linux` actually execute on Node; a TV
+bundle runs in a WebView and `tools/*.mjs` are development-only. So the floor
+binds contributors and CLI users, and nothing that ships to a television.
+
 ## Support tiers
 
 Every adapter someone contributes is one the project inherits. Rather than

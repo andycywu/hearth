@@ -139,6 +139,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   written from an emulator that had no audio API; one of them is now a
   measurement, and the rest are marked for what they still are.
 
+### Changed
+
+- **The supported Node floor is now 26**, and `.nvmrc`, `engines.node`, all five
+  CI jobs and `@types/node` all say so. They had drifted apart: the floor said
+  20, CI ran 20, and `@types/node` was bumped to 26 — so TypeScript was checking
+  this code against a runtime six majors newer than the one it promised to run
+  on, and would have accepted any call the supported runtime does not have.
+  Types that describe a different runtime than the one you ship on are the same
+  failure this project refuses everywhere else: a confident answer from
+  something that cannot actually do it. Only `apps/cli` and
+  `packages/adapter-linux` execute on Node — a TV bundle runs in a WebView and
+  `tools/*.mjs` are development-only — so this binds contributors and CLI users
+  and nothing that reaches a television.
+
 ### Fixed
 
 - **`getMute()` does not exist on the standard Tizen audio API.** It is
