@@ -63,8 +63,12 @@ Currently: **752 tests**, 18 packages, clean lint.
 
 ## Gotchas that have cost real time
 
-- **`pnpm` must be on PATH.** `corepack pnpm <cmd>` works for the top-level call,
-  but nested scripts invoke `pnpm` directly. `corepack enable pnpm` first.
+- **`pnpm` must be on PATH, and not via corepack.** Node 26 does not ship
+  corepack at all. Worse than missing: a `pnpm` shim left behind by an older
+  Node still resolves, runs pnpm on *that* Node, and `engine-strict` then
+  refuses the install with `Got: v24` from a shell whose `node --version` says
+  26. `npm install -g pnpm@9.12.0` under the Node you actually mean. Nested
+  scripts invoke `pnpm` directly, so a top-level-only shim is not enough.
 - **`examples/blits-demo` is deliberately outside the workspace** — install it
   separately (`npm install` in that directory). CI builds it in a separate
   non-blocking job.

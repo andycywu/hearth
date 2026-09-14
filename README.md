@@ -109,7 +109,7 @@ so that a regression to "verified" fails rather than reading as an improvement.
 ## Quick start
 
 ```bash
-corepack enable pnpm
+npm install -g pnpm@9.12.0   # Node 26 dropped corepack, which used to do this
 pnpm install
 pnpm dev            # http://localhost:5173 — the demo above, locally
 ```
