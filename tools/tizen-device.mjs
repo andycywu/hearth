@@ -103,27 +103,91 @@ export function requireDevice({ shq }) {
 }
 
 /**
- * Start the app with the Web Inspector and return its port.
+ * The `0 vd_applist` table, parsed.
+ *
+ * A television answers with one block of `--------key   =value-------` lines per
+ * app, and the two ids in it are *both* needed and are not derivable from each
+ * other:
+ *
+ *   app_id        tvaiagent0.tizen-app    ← what the `0` verbs take
+ *   app_tizen_id  tvaiagent0.TvAiAgent    ← what config.xml declares
+ *
+ * The first is minted at install time from the project directory name, so
+ * nothing in this repo can predict it; it has to be read back from the device.
+ */
+function parseVdAppList(out) {
+  const apps = [];
+  let current = {};
+  for (const raw of out.split("\n")) {
+    const m = /^-+([A-Za-z_0-9]+)\s*=(.*?)-+\s*$/.exec(raw.trim());
+    if (!m) continue;
+    const [, key, value] = m;
+    if (key === "app_id" && current.app_id) {
+      apps.push(current);
+      current = {};
+    }
+    current[key] = value.trim();
+  }
+  if (current.app_id) apps.push(current);
+  return apps;
+}
+
+/** The `0`-verb id for a Tizen application id, or undefined on a board without them. */
+export function resolveVdAppId({ shq }, appId) {
+  const apps = parseVdAppList(shq("shell", "0", "vd_applist"));
+  return apps.find((a) => a.app_tizen_id === appId)?.app_id;
+}
+
+/**
+ * Start the app with the Web Inspector and return its port and how it got it.
  *
  * Killed first so the page is fresh, and therefore the agent is: a re-run
  * against a warm app inherits the previous run's conversation history, which
  * quietly changes what the model does on turn one.
  *
- * `app_launcher -w` is the one that works. `tz run -d` and `--debug-mode` both
- * report `with debug 0` and give you no inspector at all.
+ * **Two launch paths, because a real television is not an emulator.** A retail
+ * or licensed set reports `intershell_support:disabled` and answers *nothing at
+ * all* to `sdb shell echo hello` — no output, no error, exit 0. Every command
+ * this file used to run therefore succeeded silently and did nothing, which is
+ * the exact failure this project exists to refuse, arriving in our own tooling.
+ * What such a television does accept is a fixed vocabulary of `0 <verb>`
+ * commands through its restricted shell:
+ *
+ *     0 vd_applist              the installed apps, with both of their ids
+ *     0 was_kill <vd-app-id>    terminate ( `0 killapp` is accepted and does nothing )
+ *     0 debug <vd-app-id>       launch with the inspector, printing its port
+ *
+ * So the VD path is tried first and `app_launcher` is the fallback, rather than
+ * the other way round: the emulator is the special case, not the television.
+ * Verified 2026-09-14 on an HKC-built Tizen 7.0 set, where `app_launcher -w`
+ * returns an empty string and `0 debug` returns
+ * `... successfully launched pid = 731 with debug 1 port: 38573`.
  */
-export function launchWithInspector({ sh, shq }, appId) {
-  shq("shell", "app_launcher", "-k", appId);
-  const out = sh("shell", "app_launcher", "-w", "-s", appId);
-  const port = /port:\s*(\d+)/.exec(out)?.[1];
-  if (!port) {
-    throw new Error(
-      `could not start ${appId} with the Web Inspector.\n` +
-      `app_launcher said: ${out.trim()}\n` +
-      "Check the id with: sdb shell app_launcher -l",
-    );
+export function launchWithInspector(sdb, appId) {
+  const { shq } = sdb;
+  const vdAppId = resolveVdAppId(sdb, appId);
+  if (vdAppId) {
+    shq("shell", "0", "was_kill", vdAppId);
+    const out = shq("shell", "0", "debug", vdAppId);
+    const port = /port:\s*(\d+)/.exec(out)?.[1];
+    if (port) return { port: Number(port), via: `0 debug ${vdAppId}` };
   }
-  return Number(port);
+
+  // A board or emulator with a real shell.
+  shq("shell", "app_launcher", "-k", appId);
+  const out = shq("shell", "app_launcher", "-w", "-s", appId);
+  const port = /port:\s*(\d+)/.exec(out)?.[1];
+  if (port) return { port: Number(port), via: `app_launcher -w -s ${appId}` };
+
+  throw new Error(
+    `could not start ${appId} with the Web Inspector.\n` +
+    (vdAppId
+      ? `  \`0 debug ${vdAppId}\` printed no port, and app_launcher answered nothing either.`
+      : "  This app is not in `0 vd_applist`, so it may not be installed — and\n" +
+        "  `app_launcher -w` printed no port. On a television that answers nothing\n" +
+        "  at all, check `sdb capability` for intershell_support:disabled.") + "\n" +
+    `  Installed apps and their ids: sdb shell 0 vd_applist`,
+  );
 }
 
 /** Forward the inspector to the same port locally, replacing any stale rule. */
@@ -166,6 +230,22 @@ export class Cdp {
   #ws; #next = 1; #pending = new Map();
   consoleLines = [];
 
+  /**
+   * How long one evaluation may take before it is called a failure.
+   *
+   * There has to be a limit, because a television can stop answering without
+   * closing the socket. Launching another app suspends the agent's page and its
+   * JavaScript simply stops running mid-call: the request is delivered, nothing
+   * rejects, nothing closes, and the promise never settles. Node then exits with
+   * `Detected unsettled top-level await` and no explanation — which is what the
+   * acceptance runner did on an HKC Tizen 7.0 set at the `launch_app` step
+   * (2026-09-14), after the three audio steps before it had passed.
+   *
+   * Generous, because a real model on modest silicon can genuinely take most of
+   * a minute for one turn, and calling that a hang would be its own wrong answer.
+   */
+  timeoutMs = 60_000;
+
   static async connect(wsUrl) {
     const cdp = new Cdp();
     cdp.#ws = new WebSocket(wsUrl);
@@ -195,7 +275,19 @@ export class Cdp {
   send(method, params = {}) {
     const id = this.#next++;
     this.#ws.send(JSON.stringify({ id, method, params }));
-    return new Promise((resolve, reject) => this.#pending.set(id, { resolve, reject }));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.#pending.delete(id);
+        reject(new Error(
+          `${method} got no answer in ${this.timeoutMs} ms. The page is still connected but ` +
+          "its JavaScript is not running — on a television this is what launching another app " +
+          "looks like: the agent's page is suspended, and it will not answer again until it is " +
+          "in the foreground.",
+        ));
+      }, this.timeoutMs);
+      const settle = (fn) => (value) => { clearTimeout(timer); fn(value); };
+      this.#pending.set(id, { resolve: settle(resolve), reject: settle(reject) });
+    });
   }
 
   async eval(expression) {

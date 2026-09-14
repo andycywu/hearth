@@ -65,6 +65,35 @@ describe("adapter-tizen", () => {
     expect(await p.system.getVolume()).toBe(33);
   });
 
+  it("reads mute through isMute() on the standard API, which has no getMute()", async () => {
+    // The two APIs disagree on this one name and on no other, which is why it
+    // survived: Samsung's webapis.audiocontrol answers getMute(), the standard
+    // tizen.tvaudiocontrol answers isMute() and has no getMute at all. Asking
+    // the wrong one is a TypeError — a *failure* from a television that can
+    // answer perfectly well. Shaped after the real object, read off an HKC
+    // Tizen 7.0 set on 2026-09-14: setMute, isMute, setVolume, setVolumeUp,
+    // setVolumeDown, getVolume, ... and no getMute.
+    delete (globalThis as any).webapis;
+    let muted = true;
+    (globalThis as any).tizen.tvaudiocontrol = {
+      getVolume: () => 15,
+      setVolume: () => {},
+      setMute: (m: boolean) => { muted = m; },
+      isMute: () => muted,
+    };
+    const p = createTizenAdapter();
+    expect(await p.system.getMute()).toBe(true);
+    await p.system.setMute(false);
+    expect(await p.system.getMute()).toBe(false);
+  });
+
+  it("says so when an audio API has neither spelling of the mute read", async () => {
+    delete (globalThis as any).webapis;
+    (globalThis as any).tizen.tvaudiocontrol = { getVolume: () => 1, setVolume: () => {} };
+    await expect(createTizenAdapter().system.getMute())
+      .rejects.toThrow(/neither getMute\(\).*nor isMute\(\)/s);
+  });
+
   it("names both APIs when neither exists, rather than a TypeError", async () => {
     // "cannot read property of undefined" tells you nothing from a TV you can't
     // attach a debugger to; ?diag surfaces this sentence verbatim.

@@ -1,6 +1,6 @@
 # What still needs a real TV
 
-_Last updated: 2026-08-18_
+_Last updated: 2026-09-14_
 
 An emulator proves the code runs. It does not prove the code is right, because
 the thing an emulator is least faithful about is **the hardware you are trying
@@ -14,7 +14,7 @@ not have, the emulator cannot test, and its silence reads exactly like success.*
 
 | OS | State | What a real device is for |
 |----|-------|---------------------------|
-| **Tizen** | Emulator only | **All audio.** The emulator has no audio API at all, so volume and mute have never run. Plus Samsung's whole `webapis.*` surface, and retail signing. |
+| **Tizen** | ✅ **one real television** (HKC TTQ55UQ1CS, 7.0) | Audio is answered — through the *standard* API. Still open: Samsung's `webapis.audiocontrol`, which that set does not carry, and anything Samsung-branded. |
 | **webOS** | Simulator, first run | Audio and app management — the simulator stubs those Luna services. Plus partner APIs and a real TV's method names. |
 | **Android TV / AOSP** | Emulator, thoroughly | Input switching, standby, real remotes, real apps, and MTK/NVT performance. |
 | **Linux** | Real machine ✅ | Nothing outstanding — verified on Ubuntu with a real sound card. |
@@ -22,12 +22,31 @@ not have, the emulator cannot test, and its silence reads exactly like success.*
 
 ---
 
-## Tizen — the biggest gap
+## Tizen — answered, on one television
 
-Verified on the TV 10.0 emulator: install, launch, app list, storage, network
-status, the UI, and a real LLM driving tool calls.
+**Verified on real hardware 2026-09-14** (HKC TTQ55UQ1CS, Tizen 7.0, Chromium 94
+— [the report](platform/reports/tizen-ttq55uq1cs.md)): volume, mute, app list and
+launch, foreground app, key dispatch, network, storage, TTS/STT engines, and the
+acceptance script end to end. Installed with a plain `tizen-dev` certificate — a
+licensed set does not require a Samsung one.
 
-**Not verified, because the emulator physically cannot:**
+The first call into the audio API failed, which is the entire argument for doing
+this: `tizen.tvaudiocontrol` has `isMute()` and no `getMute()`, and the adapter
+had been asking for the latter since before either API had ever run.
+
+**What one licensed set still cannot answer:**
+
+| Capability | Why this television can't settle it |
+|---|---|
+| Samsung's `webapis.audiocontrol` | Absent here. This build has `webapis` *without* the audio module, so the Samsung branch remains unexercised code. |
+| Samsung partner APIs | `setInputSource` is refused outright and withdrawn; power standby is never auto-run. Both need a Samsung set and a partner certificate. |
+| Samsung retail signing | Never exercised: the generic distributor installed. A Samsung-branded TV is expected to reject it. |
+| MTK silicon | This firmware names NVT. |
+
+The emulator section below is kept because it is still the only record of what a
+build with *no* audio API does, and that is a real configuration.
+
+**Not verified on the TV 10.0 emulator, because it physically cannot:**
 
 | Capability | Why the emulator can't answer |
 |---|---|
