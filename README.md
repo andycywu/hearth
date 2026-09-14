@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/andycywu/hearth/actions/workflows/ci.yml/badge.svg)](https://github.com/andycywu/hearth/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%E2%89%A520-informational)](.nvmrc)
+[![Node](https://img.shields.io/badge/node-%E2%89%A526-informational)](.nvmrc)
 
 **An AI agent runtime for smart TVs and living-room devices.** Write the agent
 once; run it on Android TV / AOSP, Tizen and webOS, on MediaTek or Novatek
