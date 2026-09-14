@@ -34,7 +34,18 @@ scenarios, and writes a finished section into
 [`reports/`](reports/) — no editing, no reformatting. Paste it into an issue or
 open a PR adding it to this page.
 
-Anywhere else (Tizen, webOS, a platform with no adb): open the app and ask the
+On a **Tizen** television it is also one command — same report, over the Web
+Inspector instead of adb:
+
+```bash
+node tools/device-report-tizen.mjs
+```
+
+It additionally records which audio API your build has, which launch flags the
+installed package was actually built with, and an independent volume reading
+from the platform's own store where `vconftool` exists.
+
+Anywhere else (webOS, a platform with neither): open the app and ask the
 page directly, in the WebView console —
 
 ```js
@@ -176,9 +187,21 @@ Two defects only a real device could produce, both fixed:
 
 ## Tizen — Samsung TV 10.0 emulator (verified 2026-08-03)
 
-Everything under `tizen.*` works: 84 apps listed, `getForegroundApp`, `sendKey`,
-storage round-trip, and — after the fallbacks below — volume and mute.
-`?diag&writes` reports `system.setVolume ✅ round-trip ok`.
+Everything under `tizen.*` works: 84 apps listed, `getForegroundApp`, `sendKey`
+and a storage round-trip. **Audio does not, and has never run at all**: this
+image has neither `webapis.audiocontrol` nor `tizen.tvaudiocontrol`, so both
+branches of the adapter's fallback are unexercised code and `?diag` answers
+`unsupported` for volume and mute. That is footnote ⁴ on the table above, and
+the reason a retail Samsung TV is the next thing this platform needs —
+[`../HARDWARE_VERIFICATION.md`](../HARDWARE_VERIFICATION.md).
+
+> **Corrected 2026-09-14.** This paragraph used to claim volume and mute worked
+> here "after the fallbacks below", and quoted `system.setVolume ✅ round-trip
+> ok` — which is the *Android* emulator's line, from the section above.
+> `6ff0e16` corrected the identical claim in `STATUS.md` on 2026-08-11 and
+> missed this copy, so for six weeks this page's summary table said the audio
+> API is absent while its own Tizen section said volume worked. The page exists
+> to be quoted from; a wrong row in it is worse than an empty one.
 
 Three things about this image are worth knowing before you lose a day to them.
 
@@ -346,8 +369,15 @@ paste its output.
 then open it with the `?diag` query flag (append `&writes` to also exercise
 volume set/restore and a key press):
 
-- Tizen: launch with a URL containing `?diag`, or set the app's start URL to
-  `index.html?diag`.
+- Tizen: **not** by a URL — the web runtime drops the query string from
+  `config.xml`'s `<content src>` without saying so, and the app boots perfectly
+  while ignoring every flag. Bake them in at package time instead, which is what
+  `--flags` is for:
+  ```bash
+  node tools/package-tizen.mjs --flags diag --flags writes
+  ```
+  Or skip the flag entirely and run `node tools/device-report-tizen.mjs`, which
+  collects the same probe over the Web Inspector.
 - AOSP: pass the page as an intent extra (note the escaped `&`, which the device
   shell would otherwise treat as "run in background"):
   ```bash

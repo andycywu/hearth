@@ -109,10 +109,55 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     is the honest price of the seam existing and is stated rather than rounded
     away.
 
+- **`tools/device-report-tizen.mjs`** — the Tizen twin of `device-report.mjs`,
+  so a Samsung television becomes a pasteable section of
+  [the Hearth Report](docs/platform/capability-matrix.md) in one command instead
+  of a person copying a table out of a Web Inspector console. The formatting
+  still happens on the device, by the same `exposeDeviceReport` every host ships,
+  so a Tizen report is identical in shape to an Android one.
+
+  It states three things no other target has to: **which audio API this build
+  actually has** (`webapis.audiocontrol`, `tizen.tvaudiocontrol`, or neither —
+  the question a retail TV exists to answer, since no image this project has run
+  on had either), **which launch flags the installed package really carries**
+  (Tizen drops `config.xml`'s query string, so an app that boots perfectly and
+  ignores every flag is the failure mode), and an **independent volume reading
+  from `vconftool`** where the build has it — evidence that does not come from
+  the code under test.
+- **`tools/tizen-device.mjs`**, where the sdb discovery, the `app_launcher -w`
+  inspector launch, the CDP client and the vconftool readback now live once.
+  They were written for `device-acceptance-tizen.mjs`; a second copy in the
+  report tool would have drifted on the first bring-up day, and the two tools
+  would then have disagreed about the same television.
+
 ### Fixed
 
-Five defects in code that was already green, all found by CEC being the first
-thing that reaches past the television — and all correct for every device that
+- **`sdb devices` was misread on the first run after a reboot**, and the tool
+  said a television was attached when none was. The daemon prints
+  `* Server has started successfully *` above its header on that first call, so
+  skipping one line left the header itself looking like a device. The run then
+  failed several steps later at `app_launcher` with `error: target not found` —
+  a sentence about an app id, which sends you to check the app id. Device lines
+  are now identified by rejecting banners and headers rather than by position,
+  and a device listed as `offline` or `unauthorized` is called out instead of
+  being used. Wrong exactly once per boot, which is exactly when someone is
+  connecting a TV for the first time.
+- **`pnpm test` could not finish on a many-core machine.** `pnpm -r` runs four
+  packages at a time and each one's vitest starts one fork per core, so a
+  16-core box ran ~60 processes over 16 cores; tinypool's shutdown window then
+  expired while a worker was descheduled and the run died with
+  `Error: Failed to terminate worker` *after every test in it had passed*. Four
+  packages hit it at once, `pnpm -r` stopped at the first, and six packages never
+  ran at all — while CI, with fewer cores to oversubscribe, stayed green and
+  reported nothing. `tools/test.mjs` now divides the machine once: it picks the
+  workspace concurrency and hands vitest a matching `VITEST_MAX_FORKS` (and
+  `VITEST_MIN_FORKS`, without which the minimum stays at one per core and every
+  package dies at startup instead). The whole suite went from unfinishable to
+  **775 tests green in 100 seconds**; oversubscription had not been buying
+  parallelism, it had been paying for it.
+
+Five more defects in code that was already green, all found by CEC being the
+first thing that reaches past the television — and all correct for every device that
 had existed until now:
 
 - **A parent link could point at a node that no longer existed.** The CEC source

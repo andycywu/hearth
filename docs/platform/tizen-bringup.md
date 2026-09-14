@@ -14,9 +14,20 @@
 3. Launch (`tz run -p tvaiagent` — `-p` takes the **package** id from
    `config.xml`, not the application id), open the on-screen status, confirm
    `device.model` / `device.soc`.
-4. Walk the HAL: volume, list/launch app, network. Record results in
-   `capability-matrix.md`. Use `?diag` for the capability probe — the report goes
-   to the console too, so the Web Inspector gives you copyable text.
+4. Walk the HAL: volume, list/launch app, network. Rather than doing that by
+   hand, run the two device tools — they drive the television over the Web
+   Inspector described below, and between them answer "what can it do?" and
+   "does it behave like CI?":
+
+   ```bash
+   node tools/device-report-tizen.mjs       # → docs/platform/reports/<target>.md
+   node tools/device-acceptance-tizen.mjs   # the CI script, on the television
+   ```
+
+   The report names the audio API this build actually has, which is the one
+   thing the emulator could never answer. Bake `--flags diag` in at package time
+   if you want the on-screen table as well — `?diag` in a URL does nothing here,
+   because Tizen strips the query string from `config.xml`.
 
 ## Driving and inspecting the emulator
 
