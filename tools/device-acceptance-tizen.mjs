@@ -86,8 +86,8 @@ try {
   log(`[tizen] sdb: ${sdbPath}`);
   log(`[tizen] devices: ${requireDevice(sdb).join(" | ")}`);
 
-  const port = launchWithInspector(sdb, appId);
-  log(`[tizen] ${appId} started, inspector on device port ${port}`);
+  const { port, via } = launchWithInspector(sdb, appId);
+  log(`[tizen] ${appId} started via \`${via}\`, inspector on device port ${port}`);
   forwardInspector(sdb, port);
 
   const target = await findPageTarget(port);
@@ -146,18 +146,51 @@ try {
   results.app = app;
   log(`[tizen] ${installed.length} apps installed; using "${app}" for the launch step`);
 
+  // Snapshotted after every turn rather than collected at the end, because the
+  // end may not be reachable: once the television suspends the page, `__probe`
+  // is as unreadable as everything else, and the evidence for the steps that
+  // *did* work would be lost with it — reporting "no tool ran at all" about a
+  // run where three did.
+  let probe = { tools: [], errors: [] };
+
   for (const command of script(app)) {
     const turn = await cdp.attempt(`window.__tvAgent.run(${JSON.stringify(command)})`);
     results.turns.push({ command, output: turn.ok ? turn.value : null, error: turn.ok ? null : turn.error });
     log(`  ▸ ${command}\n    → ${turn.ok ? turn.value : `THREW: ${turn.error}`}`);
+
+    if (turn.ok) {
+      const snapshot = await cdp.attempt("JSON.stringify(window.__probe)");
+      if (snapshot.ok) probe = JSON.parse(snapshot.value);
+    }
+
+    // A television *can* stop scheduling the page when another app takes the
+    // foreground, and then the turn that launched it is the last one that can
+    // answer. Observed on an HKC Tizen 7.0 set at a cold `open Prime Video`
+    // (2026-09-14) — and not reproduced on the next run, when the same launch
+    // returned and the script finished, so it is a timing property of the
+    // launch and not a rule about the platform. Either way, every command after
+    // it would spend the full timeout learning the same thing: stop, and name
+    // the step the television stopped at.
+    if (!turn.ok && /is not running|suspended/.test(turn.error)) {
+      results.suspendedAt = command;
+      results.notes.push(
+        `the page stopped answering at "${command}" — the television stopped scheduling the ` +
+        "agent while another app took the foreground, so the steps after it could not run. " +
+        "This is timing-dependent: the same launch has also returned normally. The tool " +
+        "sequence below is what happened up to that point.",
+      );
+      break;
+    }
   }
 
-  const probe = JSON.parse(await cdp.eval("JSON.stringify(window.__probe)"));
   results.tools = probe.tools;
   results.errors = probe.errors;
 
-  const endVolume = await cdp.attempt("window.__tvPlatform.system.getVolume()");
-  const endMuted = await cdp.attempt("window.__tvPlatform.system.getMute()");
+  // A suspended page cannot be asked anything, and asking anyway costs a full
+  // timeout per question to learn what we already know.
+  const unreachable = { ok: false, error: "not asked — the page was suspended" };
+  const endVolume = results.suspendedAt ? unreachable : await cdp.attempt("window.__tvPlatform.system.getVolume()");
+  const endMuted = results.suspendedAt ? unreachable : await cdp.attempt("window.__tvPlatform.system.getMute()");
   results.end = {
     volume: endVolume.ok ? endVolume.value : null,
     muted: endMuted.ok ? endMuted.value : null,
@@ -175,7 +208,7 @@ try {
     );
   }
 
-  if (!skipZh) {
+  if (!skipZh && !results.suspendedAt) {
     const zhSet = await cdp.attempt('window.__tvAgent.run("音量調到 30")');
     const zhAsk = await cdp.attempt('window.__tvAgent.run("現在音量多少?")');
     const answer = String(zhAsk.value ?? "");
@@ -223,12 +256,19 @@ try {
     }
   }
 
-  const zhOk = skipZh || results.zh?.ok === true;
+  const zhOk = (skipZh || results.suspendedAt) ? true : results.zh?.ok === true;
   results.pass = toolsMatch && mutedOk && volumeOk && zhOk;
   results.mode = noAudio ? "no-audio (audio steps excluded)" : "full";
 
   if (!toolsMatch) {
-    if (results.errors?.length) {
+    if (results.suspendedAt) {
+      results.diagnosis =
+        `the television stopped scheduling the agent at "${results.suspendedAt}", so the ` +
+        "script could not finish. Not a runtime fault and not reliably reproducible: on " +
+        "Android the agent is a WebView inside our own app and always survives a launch; on a " +
+        "TV it is an app the launched one displaces, and whether it keeps running through a " +
+        "cold start varies. Judge the steps before it, and re-run before concluding anything.";
+    } else if (results.errors?.length) {
       results.diagnosis = "the agent raised errors — treat this as a platform/transport problem, not the model";
     } else if (actual.length === 0) {
       results.diagnosis = "no tool ran at all — check the model endpoint is reachable from the TV " +
@@ -268,7 +308,8 @@ try {
                     "(read from the platform, not from the adapter)");
       }
     }
-    if (!skipZh) console.log(`chinese replies: ${zhOk ? "OK" : "WRONG"} (${results.zh.gradedOn})`);
+    if (results.suspendedAt) console.log("chinese replies: not reached — the page was suspended");
+    else if (!skipZh) console.log(`chinese replies: ${zhOk ? "OK" : "WRONG"} (${results.zh.gradedOn})`);
     if (results.errors?.length) console.log(`agent errors  : ${results.errors.join(" | ")}`);
     for (const note of results.notes) console.log(`note          : ${note}`);
     console.log(`\n${results.pass ? "PASS" : "FAIL"} — on-device behaviour ${results.pass ? "matches" : "differs from"} the CI baseline\n`);
