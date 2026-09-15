@@ -16,13 +16,6 @@
   "engines": {
     "node": ">=26"
   },
-  "workspaces": [
-    "packages/*",
-    "apps/tizen-app",
-    "apps/aosp-app",
-    "apps/webos-app",
-    "apps/dev-harness"
-  ],
   "scripts": {
     "build": "pnpm -r --filter \"./packages/*\" run build && pnpm --filter @hearthkit/cli run build",
     "typecheck": "pnpm -r run typecheck",
