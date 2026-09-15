@@ -141,6 +141,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **`engine-strict` is off again, one day after going on.** Its first victim was
+  Dependabot: the updater runs pnpm in its own container on its own Node, the
+  install failed with `ERR_PNPM_UNSUPPORTED_ENGINE`, and Dependabot read that as
+  *"these dependencies are no longer updatable"* and closed its own pull
+  request — while the three updates it wanted were sitting on the registry. A
+  gate that stops the repository maintaining itself is not worth what it
+  catches, and CI already refuses anything that fails on the version `.nvmrc`
+  names. `engines.node` goes back to being a statement to humans; the refusal
+  lives where it blocks a merge.
 - **The supported Node floor is now 26**, and `.nvmrc`, `engines.node`, all five
   CI jobs and `@types/node` all say so. They had drifted apart: the floor said
   20, CI ran 20, and `@types/node` was bumped to 26 — so TypeScript was checking

@@ -2,7 +2,7 @@
 
 Thanks for your interest. This is an **experimental project and a testbed**, not
 a product: Apache-2.0, no support hours, no roadmap promises. What it does have
-is a demo you can run in sixty seconds, 620 tests, and a boundary it takes
+is a demo you can run in sixty seconds, 777 tests, and a boundary it takes
 seriously.
 
 ## The most valuable contribution needs no code
@@ -54,9 +54,11 @@ your PATH, the shim it left behind silently runs pnpm on *that* one instead,
 which is how you get `Expected version: >=26 / Got: v24` from a shell where
 `node --version` says 26.
 
-**Node 26 or newer**, and it is a gate rather than a claim: `.npmrc` sets
-`engine-strict=true`, so `pnpm install` on anything below the floor fails and
-names the version it wanted.
+**Node 26 or newer.** CI runs that version and blocks the merge if anything
+fails on it, so the floor is enforced there rather than on your machine —
+`engine-strict` briefly lived in `.npmrc` and its first victim was Dependabot,
+whose updater runs pnpm on its own Node and read the refusal as "no updates
+available".
 
 `.nvmrc`, `engines.node`, every CI job and `@types/node` all say the same
 number. That last one is the point: `@types/node` describes a *runtime*, so a
