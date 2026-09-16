@@ -165,6 +165,39 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `tools/*.mjs` are development-only — so this binds contributors and CLI users
   and nothing that reaches a television.
 
+- **Voice on Linux** (`adapter-linux`), verified on a Raspberry Pi 3B with a
+  ReSpeaker 4-Mic array. Every other adapter gets voice from something that
+  already exists — the browser hands web, Tizen and webOS a `SpeechRecognition`
+  and a `speechSynthesis`, Android has a bridge to the platform's engines. A Pi
+  has a microphone, a speaker and nothing that turns one into words, so this is
+  the first place in the repo that had to say out loud where recognition comes
+  from.
+  - It does not guess. `arecord` captures, `espeak-ng` speaks, and **the step in
+    between is injected**: a `Transcriber` is a function from audio to text, and
+    a build without one answers `unsupported` rather than listening to a
+    microphone it cannot understand. `createOpenAiTranscriber` is the one
+    implementation shipped, because the runtime already speaks that schema for
+    planning — pointing it at a whisper server on the LAN is the same move as
+    `?llm=`.
+  - **`startWakeWord` is deliberately not implemented.** It needs an always-on
+    detector, and the honest options here are a third-party engine or a bad
+    imitation of one. `VoicePipeline` makes those methods optional exactly so an
+    adapter can decline, and `has("voice")` stays true for the half that works.
+  - `detectVoice` asks the two halves separately, because they are two
+    questions: a box with a microphone HAT and no `espeak-ng` can hear and not
+    answer. It reads a capture *card* out of `arecord -l` rather than trusting
+    its exit code — that command exits 0 and prints only a header when there is
+    no microphone at all, which had already reported a microphone on a Pi that
+    had none.
+  - Stated rather than hidden: the listening window is fixed, there is no
+    voice-activity detection, and `stopListening` cannot cut `arecord` off
+    mid-word — what it guarantees is that nothing arrives afterwards. A caller
+    that pressed stop and then received a transcript would have been right to
+    call that a bug, so there is a test for it.
+  - On hardware: `detectVoice` → `{capture: true, tts: true}`, `speak()` spoke,
+    and a 3-second attempt handed the transcriber **384044 bytes** — exactly
+    3 × 16000 × 4 channels × 2 bytes plus a 44-byte header.
+
 - **The first real HDMI-CEC bus** (2026-09-16). A Raspberry Pi 3B on HDMI 3 of
   an HKC TTQ55UQ1CS, `v4l-utils` 1.30.1, kernel 6.18.50 — `tools/verify-cec.mjs`
   run natively on the Pi, which also means **the workspace builds and its tests
