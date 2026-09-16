@@ -15,6 +15,68 @@ import type { Runner, RunResult } from "./run.js";
  * these, and any difference they find is a bug in the parser, not in their TV.
  */
 
+/**
+ * `cec-ctl --show-topology`, recorded from a real bus on 2026-09-16.
+ *
+ * A Raspberry Pi 3B (kernel 6.18.50, v4l-utils 1.30.1) on HDMI 3 of an HKC
+ * TTQ55UQ1CS with HDMI-CEC switched on. The first real CEC bus this package has
+ * seen; everything below it in this file was written from `cec-ctl`'s
+ * documentation, which is why this one is kept verbatim.
+ *
+ * Two things worth keeping it for:
+ *
+ * 1. The **adapter describes itself** in the driver info — `Logical Address : 4
+ *    (Playback Device 1)` — and a parser that scanned for addresses rather than
+ *    for `System Information` blocks would report the Pi as a device in the
+ *    room. It does not, and now that is tested against real output.
+ * 2. The television answers `Vendor ID: 0x0000f0 (Samsung)` on a set that is
+ *    **not Samsung-branded**. A licensed Tizen TV reports Samsung's CEC vendor
+ *    id, so vendor id is not a way to tell those apart.
+ */
+const TOPOLOGY_PI3B_REAL = `
+Driver Info:
+	Driver Name                : vc4_hdmi
+	Adapter Name               : vc4-hdmi
+	Capabilities               : 0x0000031e
+		Logical Addresses
+		Transmit
+		Passthrough
+		Remote Control Support
+		Connector Info
+		Reply Vendor ID
+	Driver version             : 6.18.50
+	Available Logical Addresses: 1
+	DRM Connector Info         : card 0, connector 35
+	Physical Address           : 3.0.0.0
+	Logical Address Mask       : 0x0010
+	CEC Version                : 2.0
+	Vendor ID                  : 0x000c03 (HDMI)
+	OSD Name                   : 'Playback'
+	Logical Addresses          : 1 (Allow RC Passthrough)
+
+	  Logical Address          : 4 (Playback Device 1)
+	    Primary Device Type    : Playback
+	    Logical Address Type   : Playback
+	    All Device Types       : Playback
+	    RC TV Profile          : None
+	    Device Features        :
+		None
+
+	System Information for device 0 (TV) from device 4 (Playback Device 1):
+		CEC Version                : 1.4
+		Physical Address           : 0.0.0.0
+		Primary Device Type        : TV
+		Vendor ID                  : 0x0000f0 (Samsung)
+		OSD Name                   : 'TV'
+		Menu Language              : eng
+		Power Status               : On
+
+	Topology:
+
+	    0.0.0.0: TV
+	        3.0.0.0: Playback Device 1
+`;
+
 const TOPOLOGY = `
 Driver Info:
 	Driver Name                : vc4
@@ -97,6 +159,22 @@ describe("parsing cec-ctl --show-topology", () => {
     // and it is *this* adapter, not something on the bus. Only blocks under
     // "System Information for device N" count.
     expect(parseTopology(TOPOLOGY).map((d) => d.logical)).not.toContain(4);
+  });
+
+  it("agrees with a real bus", () => {
+    // The first time this parser saw hardware (2026-09-16). Everything above was
+    // written from cec-ctl's documentation and had never been disagreed with by
+    // a television.
+    const devices = parseTopology(TOPOLOGY_PI3B_REAL);
+
+    expect(devices).toEqual([
+      { logical: 0, physical: "0.0.0.0", osdName: "TV", vendorId: "Samsung" },
+    ]);
+    // The real driver block is far longer than the invented one and describes
+    // *this* adapter as `Logical Address : 4 (Playback Device 1)` — the exact
+    // shape that would make a looser parser report the Raspberry Pi as a device
+    // in the living room.
+    expect(devices.map((d) => d.logical)).not.toContain(4);
   });
 
   it("leaves out a field the device declined to answer", () => {

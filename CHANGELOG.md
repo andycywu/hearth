@@ -43,8 +43,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     A mock that only behaves well is a mock that agrees with you.
   - `discoverRoom(platform, { sources })` lets a host wire a transport in without
     core learning what a CEC bus is.
-  - **No real CEC bus has run any of this.** The Android API is `@SystemApi`,
-    Tizen and webOS expose none, so an absent transport is the *normal* case.
+  - **A real bus has now read this** — see the 2026-09-16 entry below; what it
+    has still never done is report `verified` for a device other than the
+    television, which needs a second device on the bus. The Android API is
+    `@SystemApi`, Tizen and webOS expose none, so an absent transport remains
+    the *normal* case.
 - **A Linux CEC transport over `cec-ctl`** (`createLinuxCecTransport`), which is
   the only implementation of `CecTransport` a person can verify without a signing
   agreement: a Raspberry Pi has `/dev/cec0` and `apt install v4l-utils`. It
@@ -161,6 +164,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `packages/adapter-linux` execute on Node — a TV bundle runs in a WebView and
   `tools/*.mjs` are development-only — so this binds contributors and CLI users
   and nothing that reaches a television.
+
+- **The first real HDMI-CEC bus** (2026-09-16). A Raspberry Pi 3B on HDMI 3 of
+  an HKC TTQ55UQ1CS, `v4l-utils` 1.30.1, kernel 6.18.50 — `tools/verify-cec.mjs`
+  run natively on the Pi, which also means **the workspace builds and its tests
+  pass on ARM64** for the first time. An adapter answered, the bus scanned,
+  `0.0.0.0 · TV` came back through the discovery source as `tv, internal`, and
+  the topology parser read the same device count from the raw output as the tool
+  did. The transcript is now `TOPOLOGY_PI3B_REAL` in `adapter-linux`, standing
+  beside the invented fixtures it judges — including the one case only real
+  output has: the adapter describes *itself* as `Logical Address : 4 (Playback
+  Device 1)` in the driver block, which is exactly the shape that would make a
+  looser parser report the Raspberry Pi as a device in the living room.
+  - The television answers `Vendor ID: 0x0000f0 (Samsung)` on a set that is
+    **not Samsung-branded**, so a CEC vendor id cannot tell a licensed Tizen TV
+    from a Samsung one.
+  - What one television still cannot settle: `verified` for a power change needs
+    a **second device** on the bus. Here `0/0` devices answer `<Give Device Power
+    Status>` — the TV is the platform's own, not a CEC target.
 
 ### Fixed
 

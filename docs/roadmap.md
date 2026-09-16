@@ -273,7 +273,7 @@ Ordered. Each is independently shippable.
   platform source merged into it — `PlayStation 5 [ps5] — HDMI2 · 100% · manual`
   beside `AOSP TV on x86 [tv] — built in · 100% · manual+platform`.
 
-### 7. HDMI-CEC discovery and control adapter — **software done; hardware pending**
+### 7. HDMI-CEC discovery and control adapter — **discovery verified on a real bus; the verified power path still needs a second device**
 
 - **Goal** — first real transport beyond the HAL: enumerate CEC devices, read
   power state, wake, set active source.
@@ -299,6 +299,29 @@ Ordered. Each is independently shippable.
   without a signing agreement — a Raspberry Pi has `/dev/cec0` and `v4l-utils` —
   and `tools/verify-cec.mjs` beside it: scan, topology, power status, an optional
   wake-and-restore, and a transcript ready to paste back as a fixture.
+
+  **On a real bus, 2026-09-16.** A Raspberry Pi 3B on HDMI 3 of an HKC
+  TTQ55UQ1CS, `v4l-utils` 1.30.1, kernel 6.18.50 — `node tools/verify-cec.mjs`
+  run natively on the Pi: an adapter answered, the bus scanned, `0.0.0.0 · TV`
+  came back through the discovery source as `tv, internal`, every device
+  reported a physical address, and **the topology parser read the same device
+  count from the raw output as the tool did**. *No problems.* The transcript is
+  now the fixture `TOPOLOGY_PI3B_REAL` in `adapter-linux`, beside the invented
+  ones it stands in judgement of.
+
+  Getting there cost two defects. `cec-ctl` **never prints the word NACK** — an
+  unanswered transmit is `Tx, Not Acknowledged (4), Max Retries` and **exits 0**,
+  so the check that was supposed to catch it never fired and a message that
+  reached nobody came back as a successful transmit; found on an *empty* bus,
+  before the television was even switched on. And the television's CEC vendor id
+  is `0x0000f0 (Samsung)` on a set that is not Samsung-branded, so vendor id
+  cannot tell a licensed Tizen TV from a Samsung one.
+
+  **What a single television still cannot settle**: the acceptance criterion
+  above needs a *second* device on the bus. `0/0 devices answer <Give Device
+  Power Status>` here — the TV is the platform's own, not a CEC target — so
+  `verified` for a power change has still never been produced by hardware. A
+  console, a Blu-ray player or an AVR on any HDMI port closes it.
 
   And then the seam that makes it a *host* decision rather than a code change:
   `bootRuntime({ …, transports: () => [createCecTransport(bus)] })`.

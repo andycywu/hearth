@@ -5,12 +5,14 @@ A snapshot of what is built, what is verified, and by what. For the plan see
 (platform bring-up). For what an emulator structurally cannot answer, see
 [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
 
-_Last updated: 2026-09-14 · released: v0.1.0 (2026-08-05) · cutting: v0.2.0_
+_Last updated: 2026-09-16 · released: v0.1.0 (2026-08-05) · cutting: v0.2.0_
 
-**The honest one-line version: the runtime works, and as of 2026-09-14 it has
-run on exactly one real television — an HKC TTQ55UQ1CS on Tizen 7.0, where the
-capability probe is clean and the acceptance script passes. Everything else is
-still emulators, and nothing with a second device in it has run at all.**
+**The honest one-line version: the runtime works, it has run on one real
+television — an HKC TTQ55UQ1CS on Tizen 7.0, where the capability probe is clean
+and the acceptance script passes — and as of 2026-09-16 it has read one real
+HDMI-CEC bus from a Raspberry Pi 3B beside it. Everything else is still
+emulators, and nothing has yet reported `verified` for a device that is not the
+television itself.**
 
 The agent runs end-to-end on the Android TV and Samsung Tizen emulators and on
 the webOS 26 simulator, driven by a real local model, with goal mode — device
@@ -22,7 +24,7 @@ has: webOS stubs audio and app management, no Samsung-branded set has run
 anything, and CEC, IR, an AVR, a console, a camera and a far-field microphone
 need a room rather than a television.
 
-**777 tests green**, across 18 packages.
+**779 tests green**, across 18 packages.
 
 ## At a glance
 
@@ -46,7 +48,7 @@ need a room rather than a television.
 | Voice (ASR/TTS + wake word) | ✅ all four adapters — Web Speech on web/Tizen/webOS, native bridge on Android |
 | CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 777 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 779 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
@@ -55,15 +57,15 @@ need a room rather than a television.
 | **Linux platform** | ✅ all three backends against real tooling — `pactl`/`wpctl` in CI, `amixer` on a real sound card |
 | **Tizen audio (volume, mute)** | ✅ **verified on a real TV 2026-09-14** — through the *standard* `tizen.tvaudiocontrol`, whose first execution found `getMute()` missing from it (it is `isMute()`). Still unexercised on Samsung's `webapis.audiocontrol`, which that set does not carry |
 | **Tizen on retail hardware** | ✅ HKC TTQ55UQ1CS, Tizen 7.0 — 16 ok / 0 error, acceptance script PASS, installed with a plain `tizen-dev` certificate. [Report](platform/reports/tizen-ttq55uq1cs.md) |
-| **HDMI-CEC** | 🟡 transport, discovery, verified power, a `cec-ctl` implementation for Linux, and a one-line host hook — mock- and fixture-tested, **no real bus has run it**. `node tools/verify-cec.mjs` is how that changes. [`cec.md`](cec.md) |
+| **HDMI-CEC** | 🟡 **discovery verified on a real bus 2026-09-16** — a Pi 3B on HDMI 3 of the HKC set: adapter answered, `0.0.0.0 · TV` discovered as `tv, internal`, the topology parser agreed with the raw output. Two defects found getting there, one of them on an *empty* bus. Still open: `verified` for a power change needs a **second device** on the bus — the TV is the platform's own, so `0/0` devices answer `<Give Device Power Status>`. [`cec.md`](cec.md) |
 | **Real MTK/NVT device bring-up** | 🟡 one licensed NVT-firmware Tizen set is done (above). No Samsung-branded set, no MTK set, no AOSP board |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (777 tests)
+## Test coverage (779 tests)
 
 core 197 · ui 167 · llm-connectors 61 · modelpilot 69 · skill-manifest 56 ·
-adapter-linux 42 · adapter-cec 37 · adapter-aosp 28 · cli 21 · acceptance 20 ·
+adapter-linux 44 · adapter-cec 37 · adapter-aosp 28 · cli 21 · acceptance 20 ·
 perception-mock 14 · adapter-tizen 16 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 
@@ -86,6 +88,14 @@ recorded rather than summarised.
   all.
 - **webOS 26 Simulator** (first run): the app shipped no `webOSTV.js`, so every
   capability threw `ReferenceError`.
+- **A real CEC bus** (Pi 3B → HKC TTQ55UQ1CS, 2026-09-16): `cec-ctl` never
+  prints the word `NACK` — an unanswered transmit reads `Tx, Not Acknowledged
+  (4), Max Retries` and **exits 0** — so the check meant to catch it never fired
+  and a message that reached nobody came back as a successful transmit. Found on
+  an *empty* bus, before the television's CEC was even switched on. The test
+  fixture had been a string ending in `: NACK`, which no version of cec-ctl
+  prints: the code and the test agreed with each other, and neither had asked a
+  device.
 - **HKC TTQ55UQ1CS, Tizen 7.0** (the first real television): `getMute()` does
   not exist on the standard `tizen.tvaudiocontrol` — it is `isMute()` — so the
   one API call that had never run anywhere failed on the set that could answer
