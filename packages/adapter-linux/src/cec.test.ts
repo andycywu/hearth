@@ -211,10 +211,39 @@ describe("the Linux CEC transport", () => {
     // NACK means nothing answered at that address — the device is not there.
     // Reporting it as a successful transmit would leave the planner believing a
     // console it cannot reach is now awake.
+    //
+    // This fixture is *invented*: no version of cec-ctl has been seen printing
+    // the word NACK. It is kept because tolerating the spec's own spelling costs
+    // nothing, and marked because it is the reason the real one below was missing
+    // for so long — the code and the test agreed with each other, and neither had
+    // asked a device.
     const run = fakeRunner({ "--standby": { stdout: "Transmit to Playback Device 2 (8): NACK\n" } });
     const cec = createLinuxCecTransport({ run });
 
     await expect(cec.standby(8)).rejects.toThrow(/no device answered/);
+  });
+
+  it("treats what cec-ctl actually prints for an unanswered transmit as a failure", async () => {
+    // Recorded 2026-09-15 from a Raspberry Pi Zero W (kernel 6.18.34, v4l-utils
+    // 1.30.1) asking a bus with nothing on it for the TV's power status. Verbatim,
+    // tabs and all.
+    //
+    // Two things here that no fixture written from documentation had: the word
+    // NACK never appears, and `cec-ctl` **exits 0**. So the exit-code check
+    // upstream did not fire either, and this reached the planner as a successful
+    // transmit to a device that had not answered.
+    const NOT_ACKNOWLEDGED = [
+      "Transmit from Playback Device 1 to TV (4 to 0):",
+      "GIVE_DEVICE_POWER_STATUS (0x8f)",
+      "\tSequence: 20 Tx Timestamp: 22142.328382s",
+      "\tTx, Not Acknowledged (4), Max Retries",
+      "",
+    ].join("\n");
+
+    const run = fakeRunner({ "--give-device-power-status": { stdout: NOT_ACKNOWLEDGED, code: 0 } });
+    const cec = createLinuxCecTransport({ run });
+
+    await expect(cec.powerStatus(0)).rejects.toThrow(/no device answered/);
   });
 
   it("reads the room through the discovery source it exists for", async () => {
