@@ -16,6 +16,7 @@ people with different televisions in different living rooms can.
 | **HKC TTQ55UQ1CS — Tizen 7.0, a real television** | `device-report-tizen.mjs` + the acceptance script | **The first hardware this project has ever run on.** 16 ok · 0 error, and the acceptance script passes. Audio works through the *standard* `tizen.tvaudiocontrol`, which had never executed anywhere — and the first call found `getMute()` missing from it. See [the report](reports/tizen-ttq55uq1cs.md). |
 | webOS TV 26 simulator | install + boot | Network is real; audio and app management are Luna stubs. Found that `webOS.service.request` is not a platform global. |
 | Ubuntu 26.04 (real machine, real sound card) | CI + by hand | All three audio backends verified. No TV inputs, and it says so. |
+| **Raspberry Pi 3B → the HKC set, over HDMI-CEC** | `tools/verify-cec.mjs` | The first real CEC bus. Discovery works and the topology parser agrees with the hardware. `cec-ctl` never prints `NACK` and **exits 0** on an unanswered transmit, so the check for it had never fired. The TV answers `Vendor ID: 0x0000f0 (Samsung)` although it is not Samsung-branded. |
 | **Your TV** | see below | — |
 
 Nothing in the table below is claimed for hardware that has not run it. `❔`
