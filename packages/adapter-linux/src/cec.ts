@@ -90,7 +90,7 @@ export function createLinuxCecTransport(opts: LinuxCecOptions = {}): CecTranspor
   const transmit = async (args: string[]): Promise<string> => {
     await ensureConfigured();
     const out = await cec(args);
-    if (/\bNACK\b/i.test(out)) throw new Error(`no device answered: ${args.join(" ")}`);
+    if (isNotAcknowledged(out)) throw new Error(`no device answered: ${args.join(" ")}`);
     return out;
   };
 
@@ -185,6 +185,45 @@ export function parseTopology(out: string): CecDevice[] {
     devices.push(device);
   }
   return devices;
+}
+
+/**
+ * Did the bus refuse to acknowledge that transmit?
+ *
+ * **This function is why the package needed real hardware.** It used to be
+ * `/\bNACK\b/i` — a spelling taken from how the CEC specification talks, not
+ * from what `cec-ctl` prints. A Raspberry Pi running v4l-utils 1.30.1 answers an
+ * unanswered transmit like this:
+ *
+ * ```text
+ * Transmit from Playback Device 1 to TV (4 to 0):
+ * GIVE_DEVICE_POWER_STATUS (0x8f)
+ * 	Sequence: 20 Tx Timestamp: 22142.328382s
+ * 	Tx, Not Acknowledged (4), Max Retries
+ * ```
+ *
+ * The word `NACK` never appears, and **`cec-ctl` exits 0** — so neither the
+ * exit-code check above nor the old pattern fired, and a message that reached
+ * nobody came back as a successful transmit. `wake()` would have resolved on a
+ * bus with nothing on it.
+ *
+ * The verification loop still caught the end result — the power-status read-back
+ * cannot confirm a device that is not there, so the step reported `unverified`
+ * rather than `verified` — but `unverified` means "nothing here can confirm it"
+ * and this is "nothing accepted it", which is
+ * [a different one of the four answers](../../../docs/platform/capability-matrix.md).
+ *
+ * Recorded 2026-09-15 on a Pi Zero W, kernel 6.18.34, with no HDMI attached —
+ * note that an empty bus was enough to find it. `Low Drive`, `Arbitration Lost`
+ * and a bare `Error` are also transmit failures in `cec-ctl`'s vocabulary; they
+ * are matched here on the same reasoning, and unlike the first two that is still
+ * reasoning rather than a recording.
+ */
+export function isNotAcknowledged(out: string): boolean {
+  return /\bNot Acknowledged\b/i.test(out)
+    || /\bNACK\b/i.test(out)
+    || /\bLow Drive\b/i.test(out)
+    || /\bArbitration Lost\b/i.test(out);
 }
 
 /** `cec-ctl`'s spelling of the four `<Report Power Status>` operands. */
