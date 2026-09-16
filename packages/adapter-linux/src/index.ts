@@ -5,6 +5,7 @@ import {
   type PlatformProvider, type DeviceInfo, type InputSource,
 } from "@hearthkit/platform-api";
 import { systemRunner, type Runner } from "./run.js";
+import { createLinuxVoicePipeline, detectVoice, type LinuxVoiceOptions } from "./voice.js";
 import { detectAudioBackend, noAudio, type AudioBackend } from "./audio.js";
 import { execArgv, listDesktopEntries, type DesktopEntry } from "./apps.js";
 import { createFileStore } from "./storage.js";
@@ -31,6 +32,12 @@ export interface LinuxAdapterOptions {
   storePath?: string;
   /** Skip the `.desktop` scan (tests, or a box with no launcher). */
   apps?: DesktopEntry[];
+  /**
+   * Microphone and speech. Omit it and this box has no voice at all; pass it
+   * without a `transcribe` and it can speak but not listen, which `?diag`
+   * reports as two separate answers because they are two separate questions.
+   */
+  voice?: LinuxVoiceOptions;
 }
 
 export function createLinuxAdapter(opts: LinuxAdapterOptions = {}): PlatformProvider {
@@ -49,6 +56,7 @@ export function createLinuxAdapter(opts: LinuxAdapterOptions = {}): PlatformProv
 
   const provider: PlatformProvider = {
     device,
+    ...(opts.voice ? { voice: createLinuxVoicePipeline({ run: opts.run, ...opts.voice }) } : {}),
     system: {
       getVolume: async () => (audio ? audio.getVolume(run) : noAudio()),
       setVolume: async (level) => (audio ? audio.setVolume(run, level) : noAudio()),
@@ -109,6 +117,13 @@ export function createLinuxAdapter(opts: LinuxAdapterOptions = {}): PlatformProv
       device.capabilities.audio = audio !== undefined;
       device.capabilities.apps = apps.length > 0;
       device.model = audio ? `Linux (${audio.name})` : "Linux";
+
+      // Asked, not assumed: a box with a microphone HAT and no espeak-ng can
+      // hear and not answer, and one with neither must not advertise voice.
+      if (opts.voice) {
+        const heard = await detectVoice(opts.voice.run ?? run);
+        device.capabilities.voice = heard.capture || heard.tts;
+      }
     },
   };
   return provider;
@@ -126,6 +141,10 @@ export {
   parseWpctlVolume, parsePactlVolume, parseAmixerVolume, parseAmixerMuted, detectAudioBackend,
 } from "./audio.js";
 export { parseDesktopEntry, execArgv, applicationDirs, listDesktopEntries } from "./apps.js";
+export {
+  createLinuxVoicePipeline, createOpenAiTranscriber, detectVoice,
+  type Transcriber, type CaptureFormat, type LinuxVoiceOptions, type OpenAiTranscriberOptions,
+} from "./voice.js";
 export {
   createLinuxCecTransport, parseTopology, parsePowerStatus, type LinuxCecOptions,
 } from "./cec.js";
