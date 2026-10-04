@@ -18,6 +18,22 @@ export interface CliOptions {
   json: boolean;
   help: boolean;
   version: boolean;
+  /**
+   * Listen on a microphone as well as on stdin. Linux only: it is the adapter
+   * that owns `arecord`, and the mock has no ears.
+   */
+  voice: boolean;
+  /**
+   * Where recorded audio is turned into text — an OpenAI-compatible
+   * `/audio/transcriptions`, cloud or a whisper server on the LAN.
+   *
+   * Without it `--voice` can still speak but not listen, and says so at startup
+   * rather than sitting silently in front of a microphone it cannot understand.
+   */
+  asrBaseUrl?: string;
+  asrModel?: string;
+  /** The APA102 status ring on a ReSpeaker array, if this box has one. */
+  leds: boolean;
   /** Anything wrong with the invocation, in the order found. */
   errors: string[];
   /** Non-fatal things worth saying once. */
@@ -48,6 +64,8 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     model: DEFAULT_MODEL,
     quiet: false,
     yes: false,
+    voice: false,
+    leds: false,
     json: false,
     help: false,
     version: false,
@@ -66,6 +84,8 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (env.TV_AGENT_LLM) opts.baseUrl = env.TV_AGENT_LLM;
   if (env.TV_AGENT_MODEL) opts.model = env.TV_AGENT_MODEL;
   if (env.TV_AGENT_API_KEY) opts.apiKey = env.TV_AGENT_API_KEY;
+  if (env.TV_AGENT_ASR) opts.asrBaseUrl = env.TV_AGENT_ASR;
+  if (env.TV_AGENT_ASR_MODEL) opts.asrModel = env.TV_AGENT_ASR_MODEL;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -95,6 +115,10 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
         opts.platform = value as CliOptions["platform"];
         break;
       }
+      case "--voice": opts.voice = true; break;
+      case "--leds": opts.leds = true; break;
+      case "--asr": { const v = takeValue("--asr"); if (v !== undefined) opts.asrBaseUrl = v; break; }
+      case "--asr-model": { const v = takeValue("--asr-model"); if (v !== undefined) opts.asrModel = v; break; }
       case "--llm": { const v = takeValue("--llm"); if (v !== undefined) opts.baseUrl = v; break; }
       case "--model": { const v = takeValue("--model"); if (v !== undefined) opts.model = v; break; }
       case "--key": case "--api-key":
@@ -118,6 +142,20 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (opts.json && !opts.yes) {
     opts.warnings.push("--json without --yes: a tool that needs confirmation will still prompt");
   }
+  // Said once, at startup, rather than discovered by standing in front of a
+  // microphone waiting for something that was never going to happen.
+  if (opts.voice && !opts.asrBaseUrl) {
+    opts.warnings.push(
+      "--voice without --asr: this build can speak but not listen. Point --asr at an " +
+      "OpenAI-compatible /audio/transcriptions (a whisper server on the LAN will do).",
+    );
+  }
+  if (opts.voice && opts.platform !== "linux") {
+    opts.warnings.push(`--voice needs --platform linux; the ${opts.platform} adapter has no microphone`);
+  }
+  if (opts.leds && opts.platform !== "linux") {
+    opts.warnings.push(`--leds needs --platform linux; the ${opts.platform} adapter has no ring`);
+  }
   return opts;
 }
 
@@ -131,6 +169,10 @@ OPTIONS
   --platform mock|linux   which TV to drive (default: mock, or $TV_PLATFORM)
   --llm <url>             OpenAI-compatible base URL (or $TV_AGENT_LLM)
   --model <name>          model name (or $TV_AGENT_MODEL)
+      --voice             listen on the microphone too (linux)
+      --asr <url>         OpenAI-compatible transcription base URL (or $TV_AGENT_ASR)
+      --asr-model <name>  transcription model (or $TV_AGENT_ASR_MODEL)
+      --leds              show each outcome on the APA102 status ring (linux)
   -y, --yes               approve confirmation prompts without asking
   -q, --quiet             don't print the tool trace to stderr
       --json              print one JSON object per turn on stdout
@@ -148,6 +190,7 @@ NOTES
 
 EXAMPLES
   hearth "set volume to 30"
+  hearth --platform linux --voice --leds --asr http://192.168.1.104:9000/v1
   hearth --platform linux "mute"
   TV_AGENT_LLM=http://127.0.0.1:11434/v1 TV_AGENT_MODEL=llama3.2 hearth
   echo "what's the volume?" | hearth --json --yes

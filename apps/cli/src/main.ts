@@ -18,6 +18,7 @@ import {
   createOpenAiCompatibleClient, createScriptedClient,
 } from "@hearthkit/llm-connectors";
 import type { PlatformProvider } from "@hearthkit/platform-api";
+import type { RingState, StatusRing } from "@hearthkit/adapter-linux";
 import { parseArgs, HELP, type CliOptions } from "./args.js";
 import { readLines } from "./terminal.js";
 
@@ -32,7 +33,7 @@ async function main(): Promise<number> {
   if (opts.errors.length) { stderr.write("try --help\n"); return 2; }
   for (const warning of opts.warnings) stderr.write(`hearth: ${warning}\n`);
 
-  const platform = await openPlatform(opts.platform);
+  const platform = await openPlatform(opts);
   const agent = new Agent({
     platform,
     llm: opts.baseUrl
@@ -60,14 +61,13 @@ async function main(): Promise<number> {
     });
   }
 
-  // One agent for the whole session, so "make it louder" after "set volume to
-  // 30" means what it should. That is `ConversationContext` doing its job; a
-  // fresh Agent per line would throw the conversation away.
-  const commands = opts.commands.length ? opts.commands : await readLines();
+  const ring = opts.leds && opts.platform === "linux" ? await openRing() : undefined;
+  if (ring) showOutcomes(agent, ring);
+
   let failures = 0;
-  for await (const command of commands) {
-    if (!command.trim()) continue;
+  const handle = async (command: string): Promise<void> => {
     try {
+      await ring?.show("thinking");
       const output = await agent.run(command);
       stdout.write(opts.json
         ? JSON.stringify({ ok: true, input: command, output }) + "\n"
@@ -77,10 +77,142 @@ async function main(): Promise<number> {
       const message = err instanceof Error ? err.message : String(err);
       if (opts.json) stdout.write(JSON.stringify({ ok: false, input: command, error: message }) + "\n");
       else stderr.write(`hearth: ${message}\n`);
+      await ring?.show("failed");
     }
+  };
+
+  // The microphone is a second source of the same commands, not a second agent:
+  // a spoken "make it louder" continues the conversation a typed one started,
+  // because both go through the one `agent` above.
+  const voice = platform.has("voice") ? platform.voice : undefined;
+  const spoken = opts.voice && voice ? listenForever(voice, ring, handle, opts) : undefined;
+  if (opts.voice && !spoken) {
+    stderr.write("hearth: this platform reports no voice; carrying on with stdin only\n");
   }
+  if (voice) speakReplies(agent, voice);
+
+
+  // One agent for the whole session, so "make it louder" after "set volume to
+  // 30" means what it should. That is `ConversationContext` doing its job; a
+  // fresh Agent per line would throw the conversation away.
+  const commands = opts.commands.length ? opts.commands : await readLines();
+  for await (const command of commands) {
+    if (!command.trim()) continue;
+    await handle(command);
+  }
+  await spoken?.stop();
+  await ring?.off();
   // A non-zero exit for a failed turn, so this composes in a shell script.
   return failures ? 1 : 0;
+}
+
+/**
+ * The status ring, if this box has one.
+ *
+ * Optional in every sense: a Pi without a ReSpeaker array has no `/dev/spidev0.1`
+ * and no GPIO5 to switch, and none of that should stop the agent running. A ring
+ * that cannot be opened is reported once and then forgotten about.
+ */
+async function openRing(): Promise<StatusRing | undefined> {
+  try {
+    const { createStatusRing } = await import("@hearthkit/adapter-linux");
+    const ring = createStatusRing();
+    await ring.off();          // proves the power gate and the bus before relying on them
+    return ring;
+  } catch (err) {
+    stderr.write(`hearth: no status ring (${err instanceof Error ? err.message : String(err)})\n`);
+    return undefined;
+  }
+}
+
+/**
+ * Put each step's outcome on the ring, in the colour that outcome deserves.
+ *
+ * The television is probably showing a film. This is the one channel that can
+ * answer "did that work?" without taking the picture away, so what it carries is
+ * the distinction the whole runtime turns on — and `unverified` gets its own
+ * colour, because amber and green mean different things to the person who asked.
+ *
+ * `satisfied` is green: the world was already how they wanted it, which is a
+ * fine answer to "make it quieter". `denied` and `skipped` light nothing at all
+ * — neither is a statement about the device, and the terminal already explains
+ * them.
+ */
+function showOutcomes(agent: Agent, ring: StatusRing): void {
+  agent.events.on("plan:step", ({ outcome }) => {
+    const state: RingState | undefined =
+      outcome.status === "verified" || outcome.status === "satisfied" ? "verified"
+      : outcome.status === "unverified" ? "unverified"
+      : outcome.status === "unsupported" ? "unsupported"
+      : outcome.status === "failed" ? "failed"
+      : undefined;
+    if (state) void ring.show(state);
+  });
+}
+
+/**
+ * Say each reply out loud.
+ *
+ * `packages/ui` has a `speakReplies` already, and this is deliberately not it:
+ * that module reaches for an overlay, an avatar and an on-screen keyboard, none
+ * of which exist in a terminal. Ten lines here is a better trade than dragging
+ * a DOM into a Node process — and it is the same ten lines, including the part
+ * that matters: **speaking must never delay or fail a turn**, so this is
+ * fire-and-forget and swallows its own errors.
+ */
+function speakReplies(agent: Agent, voice: NonNullable<PlatformProvider["voice"]>): void {
+  agent.events.on("turn:end", ({ output }) => {
+    if (!output.trim()) return;
+    try {
+      void Promise.resolve(voice.speak(output)).catch(() => {});
+    } catch { /* an engine that throws synchronously is still not a failed turn */ }
+  });
+}
+
+/**
+ * Listen, hand what was heard to the same agent stdin talks to, listen again.
+ *
+ * `startListening` records one bounded attempt and resolves; hands-free means
+ * asking again as soon as it ends. There is no wake word on this adapter — it
+ * declines to implement one rather than imitate one — so this is a room
+ * microphone that is always attentive, which is a thing to know before leaving
+ * it switched on.
+ */
+function listenForever(
+  voice: NonNullable<PlatformProvider["voice"]>,
+  ring: StatusRing | undefined,
+  handle: (command: string) => Promise<void>,
+  opts: CliOptions,
+): { stop(): Promise<void> } {
+  let running = true;
+
+  voice.onTranscript((text, isFinal) => {
+    if (!isFinal || !text.trim()) return;
+    if (!opts.quiet && !opts.json) stderr.write(`  🎤 ${text}\n`);
+    void handle(text.trim());
+  });
+
+  const loop = async (): Promise<void> => {
+    while (running) {
+      try {
+        await ring?.show("listening");
+        await voice.startListening();
+      } catch (err) {
+        // One complaint, then stop: a microphone that cannot be opened will not
+        // heal itself, and a tight retry loop would bury the terminal.
+        stderr.write(`hearth: listening stopped — ${err instanceof Error ? err.message : String(err)}\n`);
+        running = false;
+      }
+    }
+  };
+  void loop();
+
+  return {
+    stop: async () => {
+      running = false;
+      await voice.stopListening();
+    },
+  };
 }
 
 /**
@@ -110,13 +242,32 @@ function confirmer(opts: CliOptions): (req: { name: string; args: Record<string,
   };
 }
 
-async function openPlatform(name: CliOptions["platform"]): Promise<PlatformProvider> {
-  if (name === "linux") {
+async function openPlatform(opts: CliOptions): Promise<PlatformProvider> {
+  if (opts.platform === "linux") {
     // Deliberately a clear error rather than a silent fall back to the mock:
     // "it ran and did nothing to my TV" is a much worse afternoon than "that
     // adapter isn't here yet".
-    const { createLinuxAdapter } = await import("@hearthkit/adapter-linux");
-    const platform = createLinuxAdapter();
+    const linux = await import("@hearthkit/adapter-linux");
+    const platform = linux.createLinuxAdapter({
+      ...(opts.voice
+        ? {
+            voice: {
+              // No endpoint means no transcriber, and the adapter then answers
+              // `unsupported` for listening rather than recording audio it has
+              // no way to read. `parseArgs` has already said so out loud.
+              ...(opts.asrBaseUrl
+                ? {
+                    transcribe: linux.createOpenAiTranscriber({
+                      baseUrl: opts.asrBaseUrl,
+                      ...(opts.asrModel ? { model: opts.asrModel } : {}),
+                      ...(opts.apiKey ? { apiKey: opts.apiKey } : {}),
+                    }),
+                  }
+                : {}),
+            },
+          }
+        : {}),
+    });
     await platform.init();
     return platform;
   }

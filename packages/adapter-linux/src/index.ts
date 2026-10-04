@@ -142,6 +142,10 @@ export {
 } from "./audio.js";
 export { parseDesktopEntry, execArgv, applicationDirs, listDesktopEntries } from "./apps.js";
 export {
+  apa102Frame, createStatusRing, RING_COLOURS,
+  type Rgb, type RingState, type StatusRing, type StatusRingOptions,
+} from "./leds.js";
+export {
   createLinuxVoicePipeline, createOpenAiTranscriber, detectVoice,
   type Transcriber, type CaptureFormat, type LinuxVoiceOptions, type OpenAiTranscriberOptions,
 } from "./voice.js";
