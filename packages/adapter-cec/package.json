@@ -1,6 +1,6 @@
 {
   "name": "@hearthkit/adapter-cec",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "HDMI-CEC transport: device discovery and power control past the television, with a mock bus that misbehaves the way real ones do.",
   "type": "module",
   "sideEffects": false,

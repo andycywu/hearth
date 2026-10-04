@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.3.0] - 2026-10-04
+
+The first transport past the television, and the first real room. HDMI-CEC
+read a real bus from a Raspberry Pi 3B beside an HKC television; the Linux
+adapter learned to hear through a ReSpeaker array and to say plainly what it
+cannot do; the Tizen path ran on its first real set. Minor, not patch: a new
+package (`adapter-cec`) and new capabilities, no HAL break.
+
 ### Added
 
 - **HDMI-CEC, the first transport past the television** (`packages/adapter-cec`,
@@ -1053,5 +1063,7 @@ The core as it stood on 2026-07-27, before device bring-up.
   a partner/platform certificate (Tizen) or system signature (Android); the
   open-source build degrades gracefully via `has()`.
 
+[Unreleased]: https://github.com/andycywu/hearth/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/andycywu/hearth/releases/tag/v0.3.0
 [0.2.0]: https://github.com/andycywu/hearth/releases/tag/v0.2.0
 [0.1.0]: https://github.com/andycywu/hearth/releases/tag/v0.1.0

@@ -1,5 +1,8 @@
 # Roadmap
 
+_This is the software roadmap. For who it is for, the flywheel, and the
+milestones with exit conditions, see [`PRODUCT_PLAN.md`](PRODUCT_PLAN.md)._
+
 The product is an **AI Agent Runtime / cross-OS agent control plane for smart TVs
 and living-room devices** — not a TV OS, and not a voice assistant. A TV OS is
 one execution environment among several, reached through an adapter.
@@ -35,7 +38,7 @@ Shipped and verified (see [`STATUS.md`](STATUS.md)): the agent loop, the HAL and
 five adapters under one contract test, tool registry with validation, the
 `TvResult` envelope, boot capability probing with capability withdrawal, voice,
 four renderers, declarative skills, packaging for Android TV / Tizen / webOS,
-**752 tests green**. Goal mode is verified on the Android TV emulator, not only
+**806 tests green**. Goal mode is verified on the Android TV emulator, not only
 in CI.
 
 The state and reasoning tier (M0, additive — nothing existing was modified):

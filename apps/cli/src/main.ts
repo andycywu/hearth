@@ -22,7 +22,7 @@ import type { RingState, StatusRing } from "@hearthkit/adapter-linux";
 import { parseArgs, HELP, type CliOptions } from "./args.js";
 import { readLines } from "./terminal.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 async function main(): Promise<number> {
   const opts = parseArgs(argv.slice(2), env);

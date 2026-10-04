@@ -1,11 +1,11 @@
 # Project Status
 
 A snapshot of what is built, what is verified, and by what. For the plan see
-[`roadmap.md`](roadmap.md) (product) and [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md)
-(platform bring-up). For what an emulator structurally cannot answer, see
+[`roadmap.md`](roadmap.md) (software), [`PRODUCT_PLAN.md`](PRODUCT_PLAN.md) (product)
+and [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md) (platform bring-up). For what an emulator structurally cannot answer, see
 [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
 
-_Last updated: 2026-09-16 · released: v0.1.0 (2026-08-05) · cutting: v0.2.0_
+_Last updated: 2026-10-04 · released: v0.3.0 (2026-10-04) · previous: v0.2.0 (2026-08-28), v0.1.0 (2026-08-05)_
 
 **The honest one-line version: the runtime works, it has run on one real
 television — an HKC TTQ55UQ1CS on Tizen 7.0, where the capability probe is clean
@@ -24,7 +24,7 @@ has: webOS stubs audio and app management, no Samsung-branded set has run
 anything, and CEC, IR, an AVR, a console, a camera and a far-field microphone
 need a room rather than a television.
 
-**793 tests green**, across 18 packages.
+**806 tests green**, across 18 packages.
 
 ## At a glance
 
@@ -48,7 +48,7 @@ need a room rather than a television.
 | Voice (ASR/TTS + wake word) | ✅ Web Speech on web/Tizen/webOS, native bridge on Android, and **ALSA + espeak-ng on Linux, verified on a Pi 3B with a ReSpeaker 4-Mic array 2026-09-16**. Recognition on Linux is an *injected* `Transcriber` — a build without one reports `unsupported` rather than listening to a microphone it cannot understand. No wake word there: that needs an always-on detector, and `VoicePipeline` makes it optional so an adapter can decline instead of imitating one |
 | CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 793 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 806 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
@@ -62,11 +62,11 @@ need a room rather than a television.
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (793 tests)
+## Test coverage (806 tests)
 
-core 197 · ui 167 · llm-connectors 61 · modelpilot 69 · skill-manifest 56 ·
-adapter-linux 58 · adapter-cec 37 · adapter-aosp 28 · cli 21 · acceptance 20 ·
-perception-mock 14 · adapter-tizen 16 · skills-example 13 · adapter-webos 10 ·
+core 197 · ui 167 · adapter-linux 71 · modelpilot 69 · llm-connectors 61 ·
+skill-manifest 56 · adapter-cec 37 · adapter-aosp 28 · cli 21 · acceptance 20 ·
+adapter-tizen 16 · perception-mock 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 
 ## What has been verified on a device, and what it cost

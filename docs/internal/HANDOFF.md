@@ -8,6 +8,7 @@ whose software half finished a month ago. If any file here disagrees with
 Read in this order: [`README.md`](../../README.md) (what this is and is not) →
 [`STATUS.md`](../STATUS.md) (what is built and verified) →
 [`roadmap.md`](../roadmap.md) (what to build next) →
+[`PRODUCT_PLAN.md`](../PRODUCT_PLAN.md) (who it is for and in what order) →
 [`HARDWARE_VERIFICATION.md`](../HARDWARE_VERIFICATION.md) (why the rest is
 blocked on physical objects).
 
@@ -38,7 +39,7 @@ Run before every commit. CI runs the same thing:
 pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm bundle:all && pnpm check:size
 ```
 
-Currently: **752 tests**, 18 packages, clean lint.
+Currently: **806 tests**, 18 packages, clean lint.
 
 ## Conventions that are load-bearing
 

@@ -33,7 +33,7 @@ const client = createModelPilotClient({
   baseUrl: config.baseUrl,
   apiKey: config.apiKey,
   timeoutMs: config.timeoutMs,
-  identity: { installId: "hth_livecheck", runtimeVersion: "0.2.0", mode: config.mode },
+  identity: { installId: "hth_livecheck", runtimeVersion: "0.3.0", mode: config.mode },
 });
 
 // What the service will route between. A 401 here and nothing else matters.
