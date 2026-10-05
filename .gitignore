@@ -65,3 +65,6 @@ apps/tizen-app/.buildResult/
 
 # VS Code Local History — file snapshots, not source.
 .history/
+
+# Claude Code: private, per-machine context
+CLAUDE.local.md
