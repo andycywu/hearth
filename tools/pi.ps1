@@ -7,7 +7,8 @@
 #
 # Needs key-based ssh to the Pi. A non-interactive ssh reads no .profile, so
 # Node's directory is put on PATH here — the same thing a service unit will
-# have to do.
+# have to do. Never put an API key in -Command: it lands in shell history on
+# both machines. Put it in ~/.config/hearth/env on the Pi instead.
 param(
   [string]$Command = "bash tools/pi-first-report.sh",
   [string]$Pi = $env:HEARTH_PI,
@@ -18,9 +19,7 @@ $ErrorActionPreference = "Stop"
 if (-not $Pi) { throw "Set `$env:HEARTH_PI = 'user@host' or pass -Pi user@host." }
 $Local = Split-Path -Parent $PSScriptRoot
 
-Write-Host "== push tools/ to $Pi" -ForegroundColor Cyan
-scp -q "$Local\tools\pi-first-report.sh" "${Pi}:$PiRepo/tools/"
-
+# tools/ is in the repo now; `git pull` on the Pi brings it. Nothing is pushed.
 Write-Host "== run on the Pi: $Command" -ForegroundColor Cyan
 ssh -t $Pi "export HEARTH_TV=$Tv PATH=`$HOME/.local/node/bin:`$HOME/.local/bin:`$PATH; cd $PiRepo && $Command"
 
