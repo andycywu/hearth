@@ -47,6 +47,19 @@ It additionally records which audio API your build has, which launch flags the
 installed package was actually built with, and an independent volume reading
 from the platform's own store where `vconftool` exists.
 
+On a **Raspberry Pi or any Linux box beside the television** — the one vantage
+point that sees the TV, the console and the AVR from outside, over HDMI-CEC:
+
+```bash
+pnpm build && node apps/cli/dist/main.js --platform linux report --yes
+```
+
+Same report, same markdown; `--out docs/platform/reports/my-pi.md` writes it
+straight into this directory. Add `--writes` to let the probe round-trip the
+volume. A device that woke and answered `<Give Device Power Status>` shows as
+**verified**; one that never answers shows as `unverified`, which on a CEC bus is
+a fact about the device and worth recording.
+
 Anywhere else (webOS, a platform with neither): open the app and ask the
 page directly, in the WebView console —
 

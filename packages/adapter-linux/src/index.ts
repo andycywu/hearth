@@ -9,6 +9,7 @@ import { createLinuxVoicePipeline, detectVoice, type LinuxVoiceOptions } from ".
 import { detectAudioBackend, noAudio, type AudioBackend } from "./audio.js";
 import { execArgv, listDesktopEntries, type DesktopEntry } from "./apps.js";
 import { createFileStore } from "./storage.js";
+import { describeHost, type FileReader } from "./host.js";
 
 /**
  * A Linux device that *is* the TV — a set-top box, a Pi, an embedded panel —
@@ -38,6 +39,12 @@ export interface LinuxAdapterOptions {
    * reports as two separate answers because they are two separate questions.
    */
   voice?: LinuxVoiceOptions;
+  /**
+   * Read a file for host identification (`/proc/device-tree/model`,
+   * `/etc/os-release`). Substituted in tests; defaults to the filesystem, with a
+   * missing file reading as empty.
+   */
+  readFile?: FileReader;
 }
 
 export function createLinuxAdapter(opts: LinuxAdapterOptions = {}): PlatformProvider {
@@ -116,7 +123,16 @@ export function createLinuxAdapter(opts: LinuxAdapterOptions = {}): PlatformProv
       if (!opts.apps) apps = await listDesktopEntries();
       device.capabilities.audio = audio !== undefined;
       device.capabilities.apps = apps.length > 0;
-      device.model = audio ? `Linux (${audio.name})` : "Linux";
+
+      // Name the box, not the runtime: a Hearth Report headed "Linux v26.10.0"
+      // (the Node version, which is what used to be here) is a report nobody
+      // can compare with the next one. The audio backend stays in the model
+      // string because on a generic Linux box it *is* the most device-specific
+      // fact about how volume gets set.
+      const host = await describeHost(opts.readFile);
+      device.model = audio ? `${host.model} (${audio.name})` : host.model;
+      device.osVersion = host.osVersion;
+      device.soc = host.soc;
 
       // Asked, not assumed: a box with a microphone HAT and no espeak-ng can
       // hear and not answer, and one with neither must not advertise voice.
@@ -137,6 +153,7 @@ function activeInterfaces(): string[] {
 }
 
 export { systemRunner, type Runner, type RunResult } from "./run.js";
+export { describeHost, socFrom, type HostIdentity, type FileReader } from "./host.js";
 export {
   parseWpctlVolume, parsePactlVolume, parseAmixerVolume, parseAmixerMuted, detectAudioBackend,
 } from "./audio.js";

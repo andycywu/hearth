@@ -38,6 +38,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@hearthkit/adapter-cec':
+        specifier: workspace:*
+        version: link:../../packages/adapter-cec
       '@hearthkit/adapter-linux':
         specifier: workspace:*
         version: link:../../packages/adapter-linux

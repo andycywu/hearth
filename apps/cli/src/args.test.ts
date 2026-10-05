@@ -78,3 +78,37 @@ describe("parseArgs", () => {
       .toMatchObject({ quiet: true, yes: true, help: true, version: true });
   });
 });
+
+describe("hearth report", () => {
+  it("is a subcommand only as the first word, so 'report the volume' stays a sentence", () => {
+    expect(parseArgs(["report"])).toMatchObject({ report: true, commands: [] });
+    expect(parseArgs(["report the volume"])).toMatchObject({ report: false, commands: ["report the volume"] });
+  });
+
+  it("refuses commands after it, rather than silently dropping them", () => {
+    const opts = parseArgs(["report", "mute"]);
+    expect(opts.report).toBe(true);
+    expect(opts.errors[0]).toMatch(/report takes no commands/);
+  });
+
+  it("takes its own options and leaves the room alone by default", () => {
+    const opts = parseArgs(["report", "--out", "x.md", "--writes", "--intents", "a; b ;", "--room", "demo", "--cec", "/dev/cec1"]);
+    expect(opts).toMatchObject({
+      report: true, out: "x.md", writes: true, intents: ["a", "b"], room: "demo", cec: "/dev/cec1",
+    });
+    expect(parseArgs([]).room).toBe("stored");
+    expect(parseArgs(["--no-cec"]).cec).toBe(false);
+  });
+
+  it("rejects a room mode it doesn't have", () => {
+    expect(parseArgs(["--room", "garage"]).errors[0]).toMatch(/--room must be/);
+  });
+
+  it("warns when report-only options are given to the agent", () => {
+    expect(parseArgs(["--out", "x.md", "mute"]).warnings[0]).toMatch(/--out.*hearth report/);
+  });
+
+  it("does not nag about --json without --yes for a report, which never prompts", () => {
+    expect(parseArgs(["report", "--json"]).warnings).toEqual([]);
+  });
+});

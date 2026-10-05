@@ -34,6 +34,22 @@ export interface CliOptions {
   asrModel?: string;
   /** The APA102 status ring on a ReSpeaker array, if this box has one. */
   leds: boolean;
+  /**
+   * `hearth report`: probe this box and whatever it can reach, run the four
+   * scenarios, and print a Hearth Report section instead of starting the agent.
+   * The `commands` list is empty when this is set — the word is consumed.
+   */
+  report: boolean;
+  /** `--out <file>`: write the report there as well as (or instead of) stdout. */
+  out?: string;
+  /** `--writes`: let the capability probe change things (a volume round-trip). */
+  writes: boolean;
+  /** `--intents "a;b"`: scenarios to put through goal mode instead of the default four. */
+  intents?: string[];
+  /** `--room demo|empty|stored`: how the room is seeded before discovery. */
+  room: "demo" | "empty" | "stored";
+  /** `--cec <device>`: the CEC adapter to try on linux. `--no-cec` leaves the bus alone. */
+  cec: string | false;
   /** Anything wrong with the invocation, in the order found. */
   errors: string[];
   /** Non-fatal things worth saying once. */
@@ -66,6 +82,10 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     yes: false,
     voice: false,
     leds: false,
+    report: false,
+    writes: false,
+    room: "stored",
+    cec: "/dev/cec0",
     json: false,
     help: false,
     version: false,
@@ -117,6 +137,25 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       }
       case "--voice": opts.voice = true; break;
       case "--leds": opts.leds = true; break;
+      case "--out": { const v = takeValue("--out"); if (v !== undefined) opts.out = v; break; }
+      case "--writes": opts.writes = true; break;
+      case "--no-cec": opts.cec = false; break;
+      case "--cec": { const v = takeValue("--cec"); if (v !== undefined) opts.cec = v; break; }
+      case "--intents": {
+        const v = takeValue("--intents");
+        if (v !== undefined) opts.intents = v.split(";").map((x) => x.trim()).filter(Boolean);
+        break;
+      }
+      case "--room": {
+        const v = takeValue("--room");
+        if (v === undefined) break;
+        if (v !== "demo" && v !== "empty" && v !== "stored") {
+          opts.errors.push(`--room must be demo, empty or stored (got "${v}")`);
+          break;
+        }
+        opts.room = v;
+        break;
+      }
       case "--asr": { const v = takeValue("--asr"); if (v !== undefined) opts.asrBaseUrl = v; break; }
       case "--asr-model": { const v = takeValue("--asr-model"); if (v !== undefined) opts.asrModel = v; break; }
       case "--llm": { const v = takeValue("--llm"); if (v !== undefined) opts.baseUrl = v; break; }
@@ -137,9 +176,26 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     }
   }
 
+  // `hearth report` is a subcommand, not an utterance. It is matched only as the
+  // first word so that `hearth "report the volume"` is still a sentence for the
+  // agent — and anything after it is a mistake worth saying, because a report
+  // takes a minute and silently ignoring a command would be a surprise.
+  if (opts.commands[0] === "report") {
+    opts.report = true;
+    const extra = opts.commands.slice(1);
+    opts.commands = [];
+    if (extra.length) opts.errors.push(`report takes no commands (got: ${extra.join(", ")})`);
+  }
+  if (!opts.report) {
+    const reportOnly = [
+      opts.out !== undefined && "--out", opts.writes && "--writes", opts.intents && "--intents",
+    ].filter(Boolean);
+    if (reportOnly.length) opts.warnings.push(`${reportOnly.join(", ")}: only used by \`hearth report\``);
+  }
+
   // `--json` exists so output can be piped somewhere; a tool trace interleaved
   // on stderr is fine, but a confirmation prompt nobody can answer is a hang.
-  if (opts.json && !opts.yes) {
+  if (opts.json && !opts.yes && !opts.report) {
     opts.warnings.push("--json without --yes: a tool that needs confirmation will still prompt");
   }
   // Said once, at startup, rather than discovered by standing in front of a
@@ -164,6 +220,8 @@ export const HELP = `hearth — the TV agent, in a terminal
 USAGE
   hearth [options] [command ...]     run each command, then exit
   hearth [options]                   interactive; one command per line
+  hearth report [options]            probe this box, run the scenarios, print a
+                                     Hearth Report section (markdown)
 
 OPTIONS
   --platform mock|linux   which TV to drive (default: mock, or $TV_PLATFORM)
@@ -173,6 +231,14 @@ OPTIONS
       --asr <url>         OpenAI-compatible transcription base URL (or $TV_AGENT_ASR)
       --asr-model <name>  transcription model (or $TV_AGENT_ASR_MODEL)
       --leds              show each outcome on the APA102 status ring (linux)
+      --cec <device>      CEC adapter to discover with (default /dev/cec0, linux)
+      --no-cec            do not touch the CEC bus
+      --room <mode>       demo|empty|stored — how the room is seeded (default: stored)
+
+REPORT OPTIONS
+      --out <file>        also write the report to this file
+      --writes            let the probe change things (one volume round-trip)
+      --intents "a;b"     scenarios for goal mode (default: the four P0 scenarios)
   -y, --yes               approve confirmation prompts without asking
   -q, --quiet             don't print the tool trace to stderr
       --json              print one JSON object per turn on stdout
@@ -189,6 +255,7 @@ NOTES
   understands a handful of commands and needs no network.
 
 EXAMPLES
+  hearth --platform linux report --out docs/platform/reports/my-pi.md
   hearth "set volume to 30"
   hearth --platform linux --voice --leds --asr http://192.168.1.104:9000/v1
   hearth --platform linux "mute"

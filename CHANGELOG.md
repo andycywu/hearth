@@ -6,7 +6,35 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`hearth report`** (`apps/cli`) — the Hub's half of the Hearth Report. Probes
+  the box, discovers the room over HDMI-CEC, puts the four P0 scenarios through
+  goal mode and prints one Hearth Report section, through the same
+  `collectDeviceReport` / `deviceReportToMarkdown` the television hosts use, so
+  a report from a Pi beside the TV and one from the TV itself are the same
+  shape. stdout is the report and nothing else; the room, the probe notes and
+  where to send it go to stderr. Gated steps run only with `--yes` and are
+  otherwise *declined and recorded*; the probe writes only with `--writes`.
+  No model is involved — a report that changed with whichever LLM was reachable
+  would be a report about the LLM.
+- **The CLI now wires HDMI-CEC into the agent** (`apps/cli/src/room.ts`): the
+  same `discoverRoom` → `attachTransports` sequence `@hearthkit/host` runs for a
+  television, so `hearth --platform linux "play ps5"` on a Pi reaches the
+  console. `--no-cec` leaves the bus alone; `--cec <device>` picks the adapter;
+  `--room demo|empty|stored` seeds the room. No `/dev/cec0` costs one failed
+  `cec-ctl` call and one note.
+- **The Linux adapter names the box** (`adapter-linux/src/host.ts`): model from
+  `/proc/device-tree/model`, distribution from `/etc/os-release`, kernel from
+  `uname`, SoC vendor from the device tree's `compatible`. A report headed
+  "Raspberry Pi 3 Model B Rev 1.2 — linux Debian GNU/Linux 13 (trixie) ·
+  6.18.50-v8" can be compared with the next one; the previous heading carried
+  the *Node* version in the `osVersion` field.
+
+### Fixed
+
+- README's HDMI-CEC status row still said "no real bus has run it", three weeks
+  after one had.
 
 ## [0.3.0] - 2026-10-04
 

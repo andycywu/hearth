@@ -3,7 +3,9 @@
 One file per television, generated rather than written:
 
 ```bash
-node tools/device-report.mjs            # Android TV / AOSP, over adb
+node tools/device-report.mjs                           # Android TV / AOSP, over adb
+node tools/device-report-tizen.mjs                     # Tizen, over the Web Inspector
+node apps/cli/dist/main.js --platform linux report     # a Pi or Linux box beside the TV
 ```
 
 Each file is a **Hearth Report section**, already formatted — the intended use is

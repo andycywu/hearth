@@ -21,6 +21,8 @@ import type { PlatformProvider } from "@hearthkit/platform-api";
 import type { RingState, StatusRing } from "@hearthkit/adapter-linux";
 import { parseArgs, HELP, type CliOptions } from "./args.js";
 import { readLines } from "./terminal.js";
+import { assembleRoom } from "./room.js";
+import { runReport } from "./report.js";
 
 const VERSION = "0.3.0";
 
@@ -34,8 +36,32 @@ async function main(): Promise<number> {
   for (const warning of opts.warnings) stderr.write(`hearth: ${warning}\n`);
 
   const platform = await openPlatform(opts);
+
+  // `hearth report`: the same platform and the same room, a different question.
+  if (opts.report) {
+    // stdout is the report and nothing else, so it can be redirected into a
+    // file or an issue body. Anything an adapter logs goes to stderr.
+    for (const level of ["log", "info", "warn", "debug"] as const) {
+      console[level] = (...a: unknown[]) => { stderr.write(a.map(String).join(" ") + "\n"); };
+    }
+    return runReport(opts, platform, {
+      out: (text) => { stdout.write(text); },
+      err: (text) => { stderr.write(text); },
+    });
+  }
+
+  // What is in the room, and what this box can reach past the television —
+  // HDMI-CEC on a Pi. A box with no bus gets an empty list and one note.
+  const room = await assembleRoom(opts, platform);
+  if (!opts.quiet && !opts.json) {
+    for (const note of [...room.notes, ...room.tree]) stderr.write(`hearth: ${note}\n`);
+  }
+
   const agent = new Agent({
     platform,
+    devices: room.devices,
+    ...(room.capabilities.length ? { capabilities: room.capabilities } : {}),
+    ...(room.tools.length ? { tools: room.tools } : {}),
     llm: opts.baseUrl
       ? createOpenAiCompatibleClient({
           baseUrl: opts.baseUrl,

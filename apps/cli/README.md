@@ -30,6 +30,39 @@ builds use.
 
 `--help` for the rest.
 
+## `hearth report` — the Hub's half of the Hearth Report
+
+```bash
+hearth --platform linux report                       # markdown on stdout
+hearth --platform linux report --yes --writes --out docs/platform/reports/my-pi.md
+```
+
+Probes this box, discovers the room (including whatever answers on the HDMI-CEC
+bus), puts the four P0 scenarios through goal mode, and prints **one Hearth
+Report section** — the same collector and the same markdown the television
+hosts produce through `window.__hearthReport()`, so a report from a Pi beside
+the TV sits next to one taken from the TV itself in
+[`docs/platform/capability-matrix.md`](../../docs/platform/capability-matrix.md).
+
+What a Pi adds that no television can: it sees the console, the AVR and the TV
+*from outside*. "The TV accepted the command and did nothing" is only visible
+from there, for every device at once.
+
+| | |
+| --- | --- |
+| stdout | the report, and nothing else — redirect it, or paste it into an issue |
+| stderr | the room, the probe notes, and where to send the result |
+| `--yes` | approve gated steps (waking a console, switching input). Without it they are **declined** and the report says so |
+| `--writes` | let the probe round-trip the volume. Read-only otherwise |
+| `--intents "a;b"` | scenarios instead of the default four |
+| `--room demo` | seed a console on HDMI2 when storage is empty, so the multi-device scenario has something to plan for |
+| `--no-cec` / `--cec /dev/cec1` | leave the bus alone, or use a different adapter |
+| `--json` | the structured report instead of markdown |
+
+No model is involved: the four scenarios are the deterministic planner's, and a
+report that changed with whichever LLM was reachable would be a report about the
+LLM. The *Planning cost* section records how many plans needed one regardless.
+
 ## The model
 
 With no `--llm` the built-in offline brain answers. It understands a handful of
@@ -65,6 +98,7 @@ someone's television.
 | Apps | `.desktop` entries from the XDG directories — the same list a launcher shows |
 | Network | From the kernel's interface list; no ping needed |
 | Storage | One JSON file under `$XDG_CONFIG_HOME/hearth/` |
+| HDMI-CEC | `cec-ctl` on `/dev/cec0` (`apt install v4l-utils`). Discovers the bus; a console that answers `<Give Device Power Status>` can be woken and **verified**. No adapter is the normal answer and costs one failed call |
 | Input switching | **Unsupported** — a Linux box has no tuner to switch to |
 | Key injection | **Unsupported** — needs `xdotool`/`ydotool` and permissions that vary per image |
 

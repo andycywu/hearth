@@ -2,7 +2,7 @@
   "name": "@hearthkit/cli",
   "version": "0.3.0",
   "private": true,
-  "description": "Run the TV agent from a terminal on the device itself \u2014 a set-top box, a Pi, any Linux box with Node. Same agent loop, same tools, no browser.",
+  "description": "Run the TV agent from a terminal on the device itself — a set-top box, a Pi, any Linux box with Node. Same agent loop, same tools, no browser.",
   "type": "module",
   "bin": {
     "hearth": "./dist/main.js"
@@ -13,11 +13,12 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@hearthkit/core": "workspace:*",
+    "@hearthkit/adapter-cec": "workspace:*",
+    "@hearthkit/adapter-linux": "workspace:*",
     "@hearthkit/adapter-web": "workspace:*",
+    "@hearthkit/core": "workspace:*",
     "@hearthkit/llm-connectors": "workspace:*",
-    "@hearthkit/platform-api": "workspace:*",
-    "@hearthkit/adapter-linux": "workspace:*"
+    "@hearthkit/platform-api": "workspace:*"
   },
   "license": "Apache-2.0",
   "devDependencies": {
