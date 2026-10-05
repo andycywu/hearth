@@ -24,6 +24,8 @@ Write-Host "== run on the Pi: $Command" -ForegroundColor Cyan
 ssh -t $Pi "export HEARTH_TV=$Tv PATH=`$HOME/.local/node/bin:`$HOME/.local/bin:`$PATH; cd $PiRepo && $Command"
 
 Write-Host "== pull reports back" -ForegroundColor Cyan
+# A glob that matches nothing is not an error worth stopping for.
+$ErrorActionPreference = "Continue"
 scp -q "${Pi}:$PiRepo/docs/platform/reports/pi*.md" "$Local\docs\platform\reports\" 2>$null
 scp -q "${Pi}:$PiRepo/docs/platform/reports/pi*.log" "$Local\docs\platform\reports\" 2>$null
 Get-ChildItem "$Local\docs\platform\reports\pi*" | Select-Object Name, Length, LastWriteTime
