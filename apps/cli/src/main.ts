@@ -18,13 +18,13 @@ import {
   createOpenAiCompatibleClient, createScriptedClient,
 } from "@hearthkit/llm-connectors";
 import type { PlatformProvider } from "@hearthkit/platform-api";
-import type { RingState, StatusRing } from "@hearthkit/adapter-linux";
+import type { StatusRing } from "@hearthkit/adapter-linux";
 import { parseArgs, HELP, type CliOptions } from "./args.js";
 import { readLines } from "./terminal.js";
 import { assembleRoom } from "./room.js";
 import { runReport } from "./report.js";
 import { runSetup } from "./setup.js";
-import { afterWakeWord } from "./wake.js";
+import { answer, listenForever, showOutcomes } from "./voice-loop.js";
 import { configAsEnv, loadConfig } from "./config.js";
 
 const VERSION = "0.3.0";
@@ -105,13 +105,23 @@ async function main(): Promise<number> {
   if (ring) showOutcomes(agent, ring);
 
   let failures = 0;
+  const voice = platform.has("voice") ? platform.voice : undefined;
   const handle = async (command: string): Promise<void> => {
     try {
       await ring?.show("thinking");
-      const output = await agent.run(command);
+      // Plan first, chat second — the same routing the television shell uses
+      // with `?plan`. A goal the deterministic planner knows ("turn it down")
+      // is planned, executed and read back without a model, and every step
+      // reaches the ring as verified / unverified / unsupported / failed; only
+      // what is not plan work costs a model call.
+      const output = await answer(agent, command);
       stdout.write(opts.json
         ? JSON.stringify({ ok: true, input: command, output }) + "\n"
         : output + "\n");
+      // Spoken to completion before the turn ends, so the microphone is not
+      // reopened mid-sentence — but a speech engine that fails is not a
+      // failed turn; the text already went to stdout.
+      if (voice && output.trim()) await Promise.resolve(voice.speak(output)).catch(() => {});
     } catch (err) {
       failures++;
       const message = err instanceof Error ? err.message : String(err);
@@ -124,12 +134,16 @@ async function main(): Promise<number> {
   // The microphone is a second source of the same commands, not a second agent:
   // a spoken "make it louder" continues the conversation a typed one started,
   // because both go through the one `agent` above.
-  const voice = platform.has("voice") ? platform.voice : undefined;
-  const spoken = opts.voice && voice ? listenForever(voice, ring, handle, opts) : undefined;
+  const spoken = opts.voice && voice
+    ? listenForever(voice, handle, {
+        ring,
+        wakeWord: opts.wakeWord,
+        trace: !opts.quiet && !opts.json ? (line) => stderr.write(line + "\n") : undefined,
+      })
+    : undefined;
   if (opts.voice && !spoken) {
     stderr.write("hearth: this platform reports no voice; carrying on with stdin only\n");
   }
-  if (voice) speakReplies(agent, voice);
 
 
   // One agent for the whole session, so "make it louder" after "set volume to
@@ -163,107 +177,6 @@ async function openRing(): Promise<StatusRing | undefined> {
     stderr.write(`hearth: no status ring (${err instanceof Error ? err.message : String(err)})\n`);
     return undefined;
   }
-}
-
-/**
- * Put each step's outcome on the ring, in the colour that outcome deserves.
- *
- * The television is probably showing a film. This is the one channel that can
- * answer "did that work?" without taking the picture away, so what it carries is
- * the distinction the whole runtime turns on — and `unverified` gets its own
- * colour, because amber and green mean different things to the person who asked.
- *
- * `satisfied` is green: the world was already how they wanted it, which is a
- * fine answer to "make it quieter". `denied` and `skipped` light nothing at all
- * — neither is a statement about the device, and the terminal already explains
- * them.
- */
-function showOutcomes(agent: Agent, ring: StatusRing): void {
-  agent.events.on("plan:step", ({ outcome }) => {
-    const state: RingState | undefined =
-      outcome.status === "verified" || outcome.status === "satisfied" ? "verified"
-      : outcome.status === "unverified" ? "unverified"
-      : outcome.status === "unsupported" ? "unsupported"
-      : outcome.status === "failed" ? "failed"
-      : undefined;
-    if (state) void ring.show(state);
-  });
-}
-
-/**
- * Say each reply out loud.
- *
- * `packages/ui` has a `speakReplies` already, and this is deliberately not it:
- * that module reaches for an overlay, an avatar and an on-screen keyboard, none
- * of which exist in a terminal. Ten lines here is a better trade than dragging
- * a DOM into a Node process — and it is the same ten lines, including the part
- * that matters: **speaking must never delay or fail a turn**, so this is
- * fire-and-forget and swallows its own errors.
- */
-function speakReplies(agent: Agent, voice: NonNullable<PlatformProvider["voice"]>): void {
-  agent.events.on("turn:end", ({ output }) => {
-    if (!output.trim()) return;
-    try {
-      void Promise.resolve(voice.speak(output)).catch(() => {});
-    } catch { /* an engine that throws synchronously is still not a failed turn */ }
-  });
-}
-
-/**
- * Listen, hand what was heard to the same agent stdin talks to, listen again.
- *
- * `startListening` records one bounded attempt and resolves; hands-free means
- * asking again as soon as it ends. There is no wake word on this adapter — it
- * declines to implement one rather than imitate one — so this is a room
- * microphone that is always attentive, which is a thing to know before leaving
- * it switched on.
- */
-function listenForever(
-  voice: NonNullable<PlatformProvider["voice"]>,
-  ring: StatusRing | undefined,
-  handle: (command: string) => Promise<void>,
-  opts: CliOptions,
-): { stop(): Promise<void> } {
-  let running = true;
-
-  voice.onTranscript((text, isFinal) => {
-    if (!isFinal || !text.trim()) return;
-    const heard = afterWakeWord(text, opts.wakeWord);
-    if (heard === undefined) {
-      // Heard, transcribed, dropped: the room was talking, not to us.
-      if (!opts.quiet && !opts.json) stderr.write(`  🎤 (not for me) ${text}\n`);
-      return;
-    }
-    if (!opts.quiet && !opts.json) stderr.write(`  🎤 ${text}\n`);
-    if (!heard) {
-      // The word alone. Acknowledge, so saying it and waiting is not silence.
-      void Promise.resolve(voice.speak("Yes?")).catch(() => {});
-      return;
-    }
-    void handle(heard);
-  });
-
-  const loop = async (): Promise<void> => {
-    while (running) {
-      try {
-        await ring?.show("listening");
-        await voice.startListening();
-      } catch (err) {
-        // One complaint, then stop: a microphone that cannot be opened will not
-        // heal itself, and a tight retry loop would bury the terminal.
-        stderr.write(`hearth: listening stopped — ${err instanceof Error ? err.message : String(err)}\n`);
-        running = false;
-      }
-    }
-  };
-  void loop();
-
-  return {
-    stop: async () => {
-      running = false;
-      await voice.stopListening();
-    },
-  };
 }
 
 /**

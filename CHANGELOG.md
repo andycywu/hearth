@@ -40,6 +40,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it also writes a `systemd --user` unit with Node's absolute path pinned,
   because a service has no `.profile` — the first Pi report lost its Node to
   exactly that. Installs nothing.
+- **The CLI answers plan-first** (`apps/cli/src/voice-loop.ts`, `answer()`):
+  the routing the television shell applies with `?plan`. A goal the
+  deterministic planner knows is planned, executed and read back with no
+  model; only what is not plan work costs a model call. Found by the
+  scripted-microphone test, not in a living room: `agent.run()` alone never
+  emits a `plan:step`, so a spoken "turn it down" set the volume and left the
+  ring on white.
+- **The voice loop waits for the turn before reopening the microphone.** It
+  did not, so the next five-second window would have recorded the agent's
+  own spoken reply and sent it to the transcriber — the box talking to
+  itself, at a per-request price — and a second "hearth" during a long step
+  got a "Yes?" over the first answer. The reply is now spoken to completion
+  as part of the turn.
+- **The ring listens dimly** (`idleBrightness`, 3/31 ≈ 10% by default):
+  `listening` is the state a room sees all evening, every quiet window being
+  another one; the four outcomes keep full brightness because they are meant
+  to be noticed.
 - **`--asr openai`** and a key that stays out of files people read: shorthand
   for `https://api.openai.com/v1`, key from `TV_AGENT_API_KEY` only; setup
   copies it to `~/.config/hearth/env` (0600) and the unit reads that through

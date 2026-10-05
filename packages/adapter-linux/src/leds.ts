@@ -70,6 +70,14 @@ export interface StatusRingOptions {
   powerPin?: number;
   /** 0-31. Low by default: this sits in a dark room, not on a desk. */
   brightness?: number;
+  /**
+   * 0-31, for `listening` only. The ring is in this state almost all the
+   * time — every quiet five-second window is another one — so it is the state
+   * a person sees out of the corner of their eye for an evening. About 10% of
+   * full (3/31) says "awake" without lighting the wall; the outcomes above
+   * keep the normal brightness because they are meant to be noticed.
+   */
+  idleBrightness?: number;
   run?: Runner;
   /** Injected in tests; defaults to writing the bytes to the spidev device. */
   write?: (device: string, bytes: Uint8Array) => Promise<void>;
@@ -109,6 +117,7 @@ export function createStatusRing(opts: StatusRingOptions = {}): StatusRing {
   const device = opts.device ?? "/dev/spidev0.1";
   const powerPin = opts.powerPin ?? 5;
   const brightness = opts.brightness ?? 10;
+  const idleBrightness = opts.idleBrightness ?? 3;
   const run = opts.run ?? systemRunner();
   const write = opts.write ?? defaultWrite;
   let powered = false;
@@ -124,8 +133,8 @@ export function createStatusRing(opts: StatusRingOptions = {}): StatusRing {
     powered = on;
   };
 
-  const paint = async (pixels: readonly Rgb[]): Promise<void> => {
-    await write(device, apa102Frame(pixels, brightness));
+  const paint = async (pixels: readonly Rgb[], level = brightness): Promise<void> => {
+    await write(device, apa102Frame(pixels, level));
   };
 
   return {
@@ -139,7 +148,7 @@ export function createStatusRing(opts: StatusRingOptions = {}): StatusRing {
       // succeeds and shows nothing — the exact failure this comment exists for.
       await power(true);
       const colour = RING_COLOURS[state];
-      await paint(Array.from({ length: count }, () => colour));
+      await paint(Array.from({ length: count }, () => colour), state === "listening" ? idleBrightness : brightness);
     },
     off: async () => {
       await paint(Array.from({ length: count }, () => [0, 0, 0] as Rgb));

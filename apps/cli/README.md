@@ -72,6 +72,11 @@ drops the quiet ones without sending them (`🎤 (silence …)` in the trace);
 `silenceThreshold` in `adapter-linux` is the knob, 0.01 of full scale by
 default, `0` to send everything.
 
+While it listens the ring sits at about 10% brightness — that is the state a
+room sees all evening — and comes up to full for an outcome. Between hearing
+a command and finishing the spoken reply the microphone stays closed, so the
+box never transcribes itself.
+
 ### The attention word
 
 A box that listens gets `--wake hearth` by default: everything the microphone

@@ -97,6 +97,20 @@ describe("the status ring", () => {
     }
   });
 
+  it("listens dimly and answers at full brightness", async () => {
+    // Listening is the state the room sees all evening; an outcome is the
+    // state it is meant to notice. About 10% versus the normal level.
+    const rec = recorder();
+    const ring = createStatusRing({ run: fakeRunner(), write: rec.write, count: 1, brightness: 10 });
+    await ring.show("listening");
+    expect(rec.frames.at(-1)![4]).toBe(0xe0 | 3);
+    await ring.show("verified");
+    expect(rec.frames.at(-1)![4]).toBe(0xe0 | 10);
+    const custom = createStatusRing({ run: fakeRunner(), write: rec.write, count: 1, idleBrightness: 1 });
+    await custom.show("listening");
+    expect(rec.frames.at(-1)![4]).toBe(0xe0 | 1);
+  });
+
   it("goes dark and then drops the power rail", async () => {
     const run = fakeRunner();
     const rec = recorder();

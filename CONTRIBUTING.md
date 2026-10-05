@@ -2,7 +2,7 @@
 
 Thanks for your interest. This is an **experimental project and a testbed**, not
 a product: Apache-2.0, no support hours, no roadmap promises. What it does have
-is a demo you can run in sixty seconds, 848 tests, and a boundary it takes
+is a demo you can run in sixty seconds, 854 tests, and a boundary it takes
 seriously.
 
 ## The most valuable contribution needs no code
