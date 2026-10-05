@@ -41,10 +41,10 @@
     "sbom": "node tools/sbom.mjs"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.69.0",
-    "@typescript-eslint/parser": "^8.69.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/parser": "^8.71.0",
     "esbuild": "^0.28.2",
-    "eslint": "^10.9.1",
+    "eslint": "^10.11.0",
     "typescript": "^6.0.3",
     "vitest": "^2.0.5"
   }
