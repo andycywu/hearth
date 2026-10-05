@@ -30,6 +30,42 @@ builds use.
 
 `--help` for the rest.
 
+## `hearth setup` — look at the box once
+
+```bash
+hearth --platform linux setup --asr http://192.168.1.104:9000/v1
+hearth "turn it down"        # from now on: no flags
+```
+
+Setup looks at what this box has — Node, an audio backend, `cec-ctl` and
+`/dev/cec0`, a microphone, `espeak-ng`, a ReSpeaker ring — says in plain words
+what `hearth` can therefore do here, names the one `apt install` that would
+change each ✗, and writes `~/.config/hearth/config.json`. It installs nothing.
+
+The config is the quietest voice: **flag > environment > config > default**.
+So after setup, plain `hearth "mute"` drives this box, with voice and the ring
+on if it has them; `--platform mock` still gets you the in-memory TV.
+
+When the box can listen (a microphone *and* `--asr`), setup also writes a
+`systemd --user` unit beside the config with Node's absolute path pinned in
+`ExecStart` — a service starts with no `.profile`, which is exactly how the
+first Pi lost its Node — and prints the two lines that enable it at boot.
+
+### The attention word
+
+A box that listens gets `--wake hearth` by default: everything the microphone
+hears is still recorded in fixed windows and transcribed, but only an utterance
+containing the word reaches the agent — "hearth, turn it down" acts, "pass the
+salt" is dropped (and shown as `🎤 (not for me)` in the trace). The word alone
+gets a "Yes?". `--wake <word>` changes it (`--wake 小爐` works), `--no-wake`
+acts on everything.
+
+This is deliberately *not* called a wake word. A wake word is an always-on
+detector that keeps audio on the device until it fires; this is a filter on the
+transcript, after the audio has already gone to the transcriber. The adapter
+declines to imitate the real thing (see `adapter-linux/src/voice.ts`); this is
+the honest version of the behaviour people actually want from it.
+
 ## `hearth report` — the Hub's half of the Hearth Report
 
 ```bash

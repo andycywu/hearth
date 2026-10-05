@@ -23,17 +23,31 @@ import { parseArgs, HELP, type CliOptions } from "./args.js";
 import { readLines } from "./terminal.js";
 import { assembleRoom } from "./room.js";
 import { runReport } from "./report.js";
+import { runSetup } from "./setup.js";
+import { afterWakeWord } from "./wake.js";
+import { configAsEnv, loadConfig } from "./config.js";
 
 const VERSION = "0.3.0";
 
 async function main(): Promise<number> {
-  const opts = parseArgs(argv.slice(2), env);
+  // What `hearth setup` wrote sits underneath the real environment, so the
+  // parser keeps its one rule — flag > env > default — and the file is the
+  // quietest voice of the three.
+  const opts = parseArgs(argv.slice(2), { ...configAsEnv(await loadConfig()), ...env });
 
   if (opts.help) { stdout.write(HELP); return 0; }
   if (opts.version) { stdout.write(`${VERSION}\n`); return 0; }
   for (const problem of opts.errors) stderr.write(`hearth: ${problem}\n`);
   if (opts.errors.length) { stderr.write("try --help\n"); return 2; }
   for (const warning of opts.warnings) stderr.write(`hearth: ${warning}\n`);
+
+  // `hearth setup` looks at the box directly; it does not need the agent.
+  if (opts.setup) {
+    return runSetup(opts, {
+      out: (text) => { stdout.write(text); },
+      err: (text) => { stderr.write(text); },
+    });
+  }
 
   const platform = await openPlatform(opts);
 
@@ -214,8 +228,19 @@ function listenForever(
 
   voice.onTranscript((text, isFinal) => {
     if (!isFinal || !text.trim()) return;
+    const heard = afterWakeWord(text, opts.wakeWord);
+    if (heard === undefined) {
+      // Heard, transcribed, dropped: the room was talking, not to us.
+      if (!opts.quiet && !opts.json) stderr.write(`  🎤 (not for me) ${text}\n`);
+      return;
+    }
     if (!opts.quiet && !opts.json) stderr.write(`  🎤 ${text}\n`);
-    void handle(text.trim());
+    if (!heard) {
+      // The word alone. Acknowledge, so saying it and waiting is not silence.
+      void Promise.resolve(voice.speak("Yes?")).catch(() => {});
+      return;
+    }
+    void handle(heard);
   });
 
   const loop = async (): Promise<void> => {

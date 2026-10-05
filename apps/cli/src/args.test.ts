@@ -112,3 +112,27 @@ describe("hearth report", () => {
     expect(parseArgs(["report", "--json"]).warnings).toEqual([]);
   });
 });
+
+describe("hearth setup and the config it writes", () => {
+  it("is a subcommand only as the first word", () => {
+    expect(parseArgs(["setup"])).toMatchObject({ setup: true, commands: [] });
+    expect(parseArgs(["setup", "mute"]).errors[0]).toMatch(/setup takes no commands/);
+  });
+
+  it("reads what setup wrote, expressed as environment, underneath the real environment", () => {
+    const fromConfig = { TV_PLATFORM: "linux", HEARTH_CEC: "/dev/cec1", HEARTH_VOICE: "1", HEARTH_LEDS: "1", HEARTH_WAKE: "hearth", TV_AGENT_ASR: "http://a/v1" };
+    expect(parseArgs([], fromConfig)).toMatchObject({
+      platform: "linux", cec: "/dev/cec1", voice: true, leds: true, wakeWord: "hearth", asrBaseUrl: "http://a/v1",
+    });
+    expect(parseArgs([], { ...fromConfig, HEARTH_CEC: "off" }).cec).toBe(false);
+    // Flags still win.
+    const overridden = parseArgs(["--no-cec", "--no-wake", "--platform", "mock"], fromConfig);
+    expect(overridden).toMatchObject({ cec: false, platform: "mock" });
+    expect(overridden.wakeWord).toBeUndefined();
+  });
+
+  it("takes --wake and --no-wake", () => {
+    expect(parseArgs(["--wake", "小爐"]).wakeWord).toBe("小爐");
+    expect(parseArgs(["--wake", "  "]).wakeWord).toBeUndefined();
+  });
+});

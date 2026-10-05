@@ -31,6 +31,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   6.18.50-v8" can be compared with the next one; the previous heading carried
   the *Node* version in the `osVersion` field.
 
+- **`hearth setup`** (`apps/cli/src/setup.ts`): look at the box once — Node,
+  audio backend, `cec-ctl` + `/dev/cec0` + the video group, microphone,
+  `espeak-ng`, ReSpeaker ring — say what `hearth` can do here and which single
+  `apt install` would change each ✗, and write `~/.config/hearth/config.json`.
+  The config sits underneath the environment (flag > env > config > default),
+  so plain `hearth "mute"` drives the box afterwards. When the box can listen
+  it also writes a `systemd --user` unit with Node's absolute path pinned,
+  because a service has no `.profile` — the first Pi report lost its Node to
+  exactly that. Installs nothing.
+- **An attention word** (`--wake <word>`, default `hearth` once a box can
+  listen): only an utterance containing the word reaches the agent; the rest
+  is transcribed and dropped, and the word alone gets a "Yes?". Named an
+  attention word rather than a wake word on purpose — audio still goes to the
+  transcriber; this filters the transcript. Chinese words and punctuation work.
 - **The first Hearth Report from beside a television**
   ([`docs/platform/reports/pi3b-titanos-mt9620.md`](docs/platform/reports/pi3b-titanos-mt9620.md)):
   a Raspberry Pi 3 Model B next to a **Titan OS set on a MediaTek MT9620** —

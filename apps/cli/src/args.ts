@@ -35,6 +35,17 @@ export interface CliOptions {
   /** The APA102 status ring on a ReSpeaker array, if this box has one. */
   leds: boolean;
   /**
+   * `--wake <word>`: act only on an utterance that contains this word.
+   *
+   * This is an attention word, not a wake-word detector: the microphone still
+   * records in fixed windows and every window still goes to the transcriber.
+   * What changes is that "pass the salt" in the same room is heard, transcribed,
+   * and then dropped — only "hearth, turn it down" reaches the agent. The
+   * adapter declines to imitate a real detector (see adapter-linux/voice.ts);
+   * this is the honest thing that can be done with the transcript instead.
+   */
+  wakeWord?: string;
+  /**
    * `hearth report`: probe this box and whatever it can reach, run the four
    * scenarios, and print a Hearth Report section instead of starting the agent.
    * The `commands` list is empty when this is set — the word is consumed.
@@ -50,6 +61,13 @@ export interface CliOptions {
   room: "demo" | "empty" | "stored";
   /** `--cec <device>`: the CEC adapter to try on linux. `--no-cec` leaves the bus alone. */
   cec: string | false;
+  /**
+   * `hearth setup`: look at this box, write `~/.config/hearth/config.json` so
+   * the next `hearth` needs no flags, and say what the box can do.
+   */
+  setup: boolean;
+  /** `--no-save`: setup prints what it would write and writes nothing. */
+  save: boolean;
   /** Anything wrong with the invocation, in the order found. */
   errors: string[];
   /** Non-fatal things worth saying once. */
@@ -83,6 +101,8 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     voice: false,
     leds: false,
     report: false,
+    setup: false,
+    save: true,
     writes: false,
     room: "stored",
     cec: "/dev/cec0",
@@ -106,6 +126,12 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (env.TV_AGENT_API_KEY) opts.apiKey = env.TV_AGENT_API_KEY;
   if (env.TV_AGENT_ASR) opts.asrBaseUrl = env.TV_AGENT_ASR;
   if (env.TV_AGENT_ASR_MODEL) opts.asrModel = env.TV_AGENT_ASR_MODEL;
+  // These three exist so `hearth setup` can write a config that stands in for
+  // flags (see config.ts); they are read from the environment the same way.
+  if (env.HEARTH_CEC) opts.cec = env.HEARTH_CEC === "off" ? false : env.HEARTH_CEC;
+  if (env.HEARTH_VOICE === "1") opts.voice = true;
+  if (env.HEARTH_LEDS === "1") opts.leds = true;
+  if (env.HEARTH_WAKE) opts.wakeWord = env.HEARTH_WAKE;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -137,9 +163,12 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       }
       case "--voice": opts.voice = true; break;
       case "--leds": opts.leds = true; break;
+      case "--wake": { const v = takeValue("--wake"); if (v !== undefined) opts.wakeWord = v.trim() || undefined; break; }
+      case "--no-wake": delete opts.wakeWord; break;
       case "--out": { const v = takeValue("--out"); if (v !== undefined) opts.out = v; break; }
       case "--writes": opts.writes = true; break;
       case "--no-cec": opts.cec = false; break;
+      case "--no-save": opts.save = false; break;
       case "--cec": { const v = takeValue("--cec"); if (v !== undefined) opts.cec = v; break; }
       case "--intents": {
         const v = takeValue("--intents");
@@ -186,6 +215,12 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     opts.commands = [];
     if (extra.length) opts.errors.push(`report takes no commands (got: ${extra.join(", ")})`);
   }
+  if (opts.commands[0] === "setup") {
+    opts.setup = true;
+    const extra = opts.commands.slice(1);
+    opts.commands = [];
+    if (extra.length) opts.errors.push(`setup takes no commands (got: ${extra.join(", ")})`);
+  }
   if (!opts.report) {
     const reportOnly = [
       opts.out !== undefined && "--out", opts.writes && "--writes", opts.intents && "--intents",
@@ -195,12 +230,13 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
 
   // `--json` exists so output can be piped somewhere; a tool trace interleaved
   // on stderr is fine, but a confirmation prompt nobody can answer is a hang.
-  if (opts.json && !opts.yes && !opts.report) {
+  if (opts.json && !opts.yes && !opts.report && !opts.setup) {
     opts.warnings.push("--json without --yes: a tool that needs confirmation will still prompt");
   }
   // Said once, at startup, rather than discovered by standing in front of a
   // microphone waiting for something that was never going to happen.
-  if (opts.voice && !opts.asrBaseUrl) {
+  // Not during setup, which says the same thing in context, with the fix.
+  if (opts.voice && !opts.asrBaseUrl && !opts.setup) {
     opts.warnings.push(
       "--voice without --asr: this build can speak but not listen. Point --asr at an " +
       "OpenAI-compatible /audio/transcriptions (a whisper server on the LAN will do).",
@@ -222,6 +258,8 @@ USAGE
   hearth [options]                   interactive; one command per line
   hearth report [options]            probe this box, run the scenarios, print a
                                      Hearth Report section (markdown)
+  hearth setup [options]             look at this box, write ~/.config/hearth/
+                                     config.json, say what it can do (linux)
 
 OPTIONS
   --platform mock|linux   which TV to drive (default: mock, or $TV_PLATFORM)
@@ -231,9 +269,17 @@ OPTIONS
       --asr <url>         OpenAI-compatible transcription base URL (or $TV_AGENT_ASR)
       --asr-model <name>  transcription model (or $TV_AGENT_ASR_MODEL)
       --leds              show each outcome on the APA102 status ring (linux)
+      --wake <word>       act only on what is said after this word is heard;
+                          everything else is transcribed and dropped
+      --no-wake           act on everything heard
       --cec <device>      CEC adapter to discover with (default /dev/cec0, linux)
       --no-cec            do not touch the CEC bus
       --room <mode>       demo|empty|stored — how the room is seeded (default: stored)
+
+SETUP OPTIONS
+      --asr <url>         remember this transcription endpoint
+      --llm <url>         remember this model endpoint (and --model)
+      --no-save           show what would be written, write nothing
 
 REPORT OPTIONS
       --out <file>        also write the report to this file
@@ -250,14 +296,18 @@ ENVIRONMENT
                           visible to every user on the machine.
 
 NOTES
+  Flags beat the environment, which beats ~/.config/hearth/config.json, which
+  \`hearth setup\` writes — so after setup, plain \`hearth "mute"\` drives this box.
   Replies go to stdout, the tool trace to stderr, so \`hearth "…" | …\` pipes
   the answer alone. With no --llm the built-in offline brain answers, which
   understands a handful of commands and needs no network.
 
 EXAMPLES
+  hearth --platform linux setup --asr http://192.168.1.104:9000/v1
+  hearth "turn it down"              # after setup: no flags needed
   hearth --platform linux report --out docs/platform/reports/my-pi.md
   hearth "set volume to 30"
-  hearth --platform linux --voice --leds --asr http://192.168.1.104:9000/v1
+  hearth --platform linux --voice --leds --wake hearth --asr http://192.168.1.104:9000/v1
   hearth --platform linux "mute"
   TV_AGENT_LLM=http://127.0.0.1:11434/v1 TV_AGENT_MODEL=llama3.2 hearth
   echo "what's the volume?" | hearth --json --yes
