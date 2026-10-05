@@ -24,7 +24,7 @@ has: webOS stubs audio and app management, no Samsung-branded set has run
 anything, and CEC, IR, an AVR, a console, a camera and a far-field microphone
 need a room rather than a television.
 
-**824 tests green**, across 18 packages.
+**826 tests green**, across 18 packages.
 
 ## At a glance
 
@@ -48,7 +48,7 @@ need a room rather than a television.
 | Voice (ASR/TTS + wake word) | ✅ Web Speech on web/Tizen/webOS, native bridge on Android, and **ALSA + espeak-ng on Linux, verified on a Pi 3B with a ReSpeaker 4-Mic array 2026-09-16**. Recognition on Linux is an *injected* `Transcriber` — a build without one reports `unsupported` rather than listening to a microphone it cannot understand. No wake word there: that needs an always-on detector, and `VoicePipeline` makes it optional so an adapter can decline instead of imitating one |
 | CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 824 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 826 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
@@ -57,14 +57,14 @@ need a room rather than a television.
 | **Linux platform** | ✅ all three backends against real tooling — `pactl`/`wpctl` in CI, `amixer` on a real sound card |
 | **Tizen audio (volume, mute)** | ✅ **verified on a real TV 2026-09-14** — through the *standard* `tizen.tvaudiocontrol`, whose first execution found `getMute()` missing from it (it is `isMute()`). Still unexercised on Samsung's `webapis.audiocontrol`, which that set does not carry |
 | **Tizen on retail hardware** | ✅ HKC TTQ55UQ1CS, Tizen 7.0 — 16 ok / 0 error, acceptance script PASS, installed with a plain `tizen-dev` certificate. [Report](platform/reports/tizen-ttq55uq1cs.md) |
-| **HDMI-CEC** | 🟡 **discovery verified on a real bus 2026-09-16** — a Pi 3B on HDMI 3 of the HKC set: adapter answered, `0.0.0.0 · TV` discovered as `tv, internal`, the topology parser agreed with the raw output. Two defects found getting there, one of them on an *empty* bus. Still open: `verified` for a power change needs a **second device** on the bus — the TV is the platform's own, so `0/0` devices answer `<Give Device Power Status>`. [`cec.md`](cec.md) |
+| **HDMI-CEC** | 🟡 **discovery verified on a real bus 2026-09-16** — a Pi 3B on HDMI 3 of the HKC set: adapter answered, `0.0.0.0 · TV` discovered as `tv, internal`, the topology parser agreed with the raw output. Two defects found getting there, one of them on an *empty* bus. Still open: `verified` for a power change needs a **second device** on the bus — the TV is the platform's own, so `0/0` devices answer `<Give Device Power Status>`. [`cec.md`](cec.md) **2026-10-05**: a second bus, a second television — a Titan OS set on MediaTek MT9620 answered the Pi (`Philips`, CEC 1.4, power `On`), the first Titan OS hardware this project has reached, over `hearth report` with nothing installed on the set. [`reports/pi3b-titanos-mt9620.md`](platform/reports/pi3b-titanos-mt9620.md) |
 | **Real MTK/NVT device bring-up** | 🟡 one licensed NVT-firmware Tizen set is done (above). No Samsung-branded set, no MTK set, no AOSP board |
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (824 tests)
+## Test coverage (826 tests)
 
-core 197 · ui 167 · adapter-linux 77 · modelpilot 69 · llm-connectors 61 ·
+core 199 · ui 167 · adapter-linux 77 · modelpilot 69 · llm-connectors 61 ·
 skill-manifest 56 · adapter-cec 37 · cli 33 · adapter-aosp 28 · acceptance 20 ·
 adapter-tizen 16 · perception-mock 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.

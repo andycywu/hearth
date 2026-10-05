@@ -69,6 +69,8 @@ export interface CollectOptions {
   intents?: string[];
   /** Let the diagnostics probe write (volume round-trip, a key press). */
   allowWrites?: boolean;
+  /** See `DiagnosticsOptions.speechEngines`. */
+  speechEngines?: () => string[] | Promise<string[]>;
   notes?: string[];
   now?: () => Date;
 }
@@ -80,7 +82,10 @@ export async function collectDeviceReport(opts: CollectOptions): Promise<DeviceR
   const { agent, platform } = opts;
   const now = opts.now ?? (() => new Date());
 
-  const diagnostics = await runDiagnostics(platform, { allowWrites: opts.allowWrites ?? false });
+  const diagnostics = await runDiagnostics(platform, {
+    allowWrites: opts.allowWrites ?? false,
+    ...(opts.speechEngines ? { speechEngines: opts.speechEngines } : {}),
+  });
 
   const intents: ReportedIntent[] = [];
   for (const intent of opts.intents ?? DEFAULT_INTENTS) {

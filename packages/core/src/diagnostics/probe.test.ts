@@ -56,10 +56,22 @@ describe("runDiagnostics", () => {
     // service, so the report must point at the fix instead of erroring.
     const platform = createWebAdapter();
     platform.navigation.isAvailable = async () => false;
+    platform.navigation.requestSetup = async () => {};
     const report = await runDiagnostics(platform);
     expect(status(report, "navigation.available")).toBe("skipped");
     expect(detail(report, "navigation.available")).toMatch(/accessibility service/i);
     expect(report.summary.error).toBe(0);
+  });
+
+  it("does not send a Linux box looking for an Android setting", async () => {
+    // The first Pi report said "enable the accessibility service" about a
+    // Raspberry Pi. Without a `requestSetup` there is nothing to enable.
+    const platform = createWebAdapter();
+    platform.navigation.isAvailable = async () => false;
+    delete platform.navigation.requestSetup;
+    const report = await runDiagnostics(platform);
+    expect(status(report, "navigation.available")).toBe("skipped");
+    expect(detail(report, "navigation.available")).toBe("not available on this device");
   });
 
   it("assumes navigation works when the adapter can't tell (no isAvailable)", async () => {
@@ -149,6 +161,13 @@ describe("runDiagnostics", () => {
     it("reports none when the runtime has no speech APIs", async () => {
       const report = await runDiagnostics(createWebAdapter());
       expect(detail(report, "voice.engines")).toBe("none detected");
+    });
+
+    it("lets a host that knows its engines say so — a Pi has arecord and espeak-ng, not window.speechSynthesis", async () => {
+      const report = await runDiagnostics(createWebAdapter(), {
+        speechEngines: async () => ["arecord (capture)", "espeak-ng (TTS)"],
+      });
+      expect(detail(report, "voice.engines")).toBe("arecord (capture), espeak-ng (TTS)");
     });
 
     it("names Web Speech when it's there — then voice needs no native code", async () => {

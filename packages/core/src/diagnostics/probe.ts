@@ -45,6 +45,14 @@ export interface DiagnosticsOptions {
   reachUrls?: readonly string[];
   /** Per-URL budget for the above. Default 5000ms. */
   reachTimeoutMs?: number;
+  /**
+   * What speech engines this device could use, when the host knows better than
+   * `detectSpeechEngines()` — which looks for browser APIs and, in a Node
+   * process on a Pi, truthfully finds none while `arecord` and `espeak-ng` sit
+   * on the PATH. A report that said "none detected" about that box was wrong
+   * about the box, not about the browser.
+   */
+  speechEngines?: () => string[] | Promise<string[]>;
 }
 
 export async function runDiagnostics(
@@ -97,9 +105,14 @@ export async function runDiagnostics(
   await probe(results, "navigation.available", async () => {
     if (!platform.navigation.isAvailable) return "assumed (always available)";
     const ready = await platform.navigation.isAvailable();
-    return ready
-      ? "ready"
-      : skip("not ready — enable the accessibility service (navigation.requestSetup)");
+    if (ready) return "ready";
+    // Only point at the accessibility service when the adapter has one to
+    // point at. On a Linux box the honest answer is that key injection is not
+    // available, and "enable the accessibility service" sends someone looking
+    // for an Android setting on a Raspberry Pi.
+    return platform.navigation.requestSetup
+      ? skip("not ready — enable the accessibility service (navigation.requestSetup)")
+      : skip("not available on this device");
   });
   await probe(results, "navigation.sendKey", async () => {
     if (!allowWrites) return skip("write-guarded (pass allowWrites)");
@@ -152,7 +165,7 @@ export async function runDiagnostics(
   // whether voice needs native code, a vendor agreement, or nothing at all — so
   // it's worth reporting rather than rediscovering per platform.
   await probe(results, "voice.engines", async () => {
-    const found = detectSpeechEngines();
+    const found = await (opts.speechEngines ?? detectSpeechEngines)();
     return found.length ? found.join(", ") : "none detected";
   });
 

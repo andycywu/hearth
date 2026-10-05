@@ -31,10 +31,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   6.18.50-v8" can be compared with the next one; the previous heading carried
   the *Node* version in the `osVersion` field.
 
+- **The first Hearth Report from beside a television**
+  ([`docs/platform/reports/pi3b-titanos-mt9620.md`](docs/platform/reports/pi3b-titanos-mt9620.md)):
+  a Raspberry Pi 3 Model B next to a **Titan OS set on a MediaTek MT9620** —
+  the first Titan OS television this project has touched, from the bus, with
+  nothing installed on it. 12 ok on the Pi, volume verified through PipeWire,
+  no inputs and said so, bus holding only the TV (`Philips`, CEC 1.4).
+  `tools/pi-first-report.sh` is the run, logged end to end; `tools/pi.ps1`
+  drives it from Windows.
+
 ### Fixed
 
 - README's HDMI-CEC status row still said "no real bus has run it", three weeks
   after one had.
+- The first Pi report was wrong about the Pi twice. `voice.engines: none
+  detected` — core's detection looks for browser speech APIs, which a Node
+  process never has; `runDiagnostics` now takes a `speechEngines` provider and
+  the CLI supplies the Linux adapter's own (`arecord`, `espeak-ng`), and
+  `hearth report` wires the voice pipeline so the adapter goes looking even
+  without `--voice`. `navigation.available: enable the accessibility service`
+  — an Android instruction on a Raspberry Pi; the hint now appears only when
+  the adapter has a `requestSetup` to point at.
 
 ## [0.3.0] - 2026-10-04
 

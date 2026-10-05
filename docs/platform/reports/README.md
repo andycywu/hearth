@@ -6,7 +6,11 @@ One file per television, generated rather than written:
 node tools/device-report.mjs                           # Android TV / AOSP, over adb
 node tools/device-report-tizen.mjs                     # Tizen, over the Web Inspector
 node apps/cli/dist/main.js --platform linux report     # a Pi or Linux box beside the TV
+bash tools/pi-first-report.sh                          # the same, plus everything around it, logged
 ```
+
+From Windows, `tools/pi.ps1` pushes the script to the Pi over ssh, runs it, and
+pulls the report back into this directory.
 
 Each file is a **Hearth Report section**, already formatted — the intended use is
 to paste it into an issue, or open a PR that adds it to

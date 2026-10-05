@@ -17,6 +17,7 @@ people with different televisions in different living rooms can.
 | webOS TV 26 simulator | install + boot | Network is real; audio and app management are Luna stubs. Found that `webOS.service.request` is not a platform global. |
 | Ubuntu 26.04 (real machine, real sound card) | CI + by hand | All three audio backends verified. No TV inputs, and it says so. |
 | **Raspberry Pi 3B → the HKC set, over HDMI-CEC** | `tools/verify-cec.mjs` | The first real CEC bus. Discovery works and the topology parser agrees with the hardware. `cec-ctl` never prints `NACK` and **exits 0** on an unanswered transmit, so the check for it had never fired. The TV answers `Vendor ID: 0x0000f0 (Samsung)` although it is not Samsung-branded. |
+| **Raspberry Pi 3 Model B Rev 1.2 → a Titan OS television (MediaTek MT9620), over HDMI-CEC** | `hearth report`, 2026-10-05 | **The first report from outside a television, and the first Titan OS set this project has touched** — from the bus, with nothing installed on it. 12 ok · 3 unsupported · 0 error on the Pi. Volume round-trips through PipeWire and `turn it down` is **verified**; the Pi has no inputs and says so, so `switch to hdmi2` is `unsupported` and `play ps5` is out of reach — the bus holds only the TV, which answers `0x00903e (Philips)`, CEC 1.4, power `On`. The report itself was wrong twice about the box (voice, navigation wording) and both were fixed from it. See [the report](reports/pi3b-titanos-mt9620.md). |
 | **Your TV** | see below | — |
 
 Nothing in the table below is claimed for hardware that has not run it. `❔`

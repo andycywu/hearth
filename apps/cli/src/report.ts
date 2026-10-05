@@ -18,6 +18,7 @@ import {
   type DeviceReport,
 } from "@hearthkit/core";
 import { createScriptedClient } from "@hearthkit/llm-connectors";
+import { detectVoice, systemRunner } from "@hearthkit/adapter-linux";
 import type { PlatformProvider } from "@hearthkit/platform-api";
 import type { CliOptions } from "./args.js";
 import { assembleRoom, type RoomDeps } from "./room.js";
@@ -30,6 +31,15 @@ export interface ReportIo {
 export interface ReportResult {
   report: DeviceReport;
   markdown: string;
+}
+
+/** `arecord (capture), espeak-ng (TTS)` — or nothing, which is also an answer. */
+async function linuxSpeechEngines(): Promise<string[]> {
+  const found = await detectVoice(systemRunner());
+  return [
+    ...(found.capture ? ["arecord (capture)"] : []),
+    ...(found.tts ? ["espeak-ng (TTS)"] : []),
+  ];
 }
 
 export async function runReport(
@@ -77,6 +87,9 @@ export async function runReport(
     agent, platform,
     intents: opts.intents ?? DEFAULT_INTENTS,
     allowWrites: opts.writes,
+    // core's engine detection looks for browser speech APIs, which a Node
+    // process never has. On linux the adapter knows what is actually here.
+    ...(opts.platform === "linux" ? { speechEngines: linuxSpeechEngines } : {}),
     notes,
   });
   const markdown = deviceReportToMarkdown(report);

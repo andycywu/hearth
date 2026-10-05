@@ -274,8 +274,13 @@ async function openPlatform(opts: CliOptions): Promise<PlatformProvider> {
     // "it ran and did nothing to my TV" is a much worse afternoon than "that
     // adapter isn't here yet".
     const linux = await import("@hearthkit/adapter-linux");
+    // A report asks what the box *has*, not what this run was started with. So
+    // the voice pipeline is wired for `hearth report` even without --voice: it
+    // is the only way `init()` goes looking for arecord and espeak-ng, and the
+    // first Pi report said "voice unsupported" about a box with both.
+    const wantVoice = opts.voice || opts.report;
     const platform = linux.createLinuxAdapter({
-      ...(opts.voice
+      ...(wantVoice
         ? {
             voice: {
               // No endpoint means no transcriber, and the adapter then answers
