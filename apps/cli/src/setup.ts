@@ -109,9 +109,14 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
   // --- voice -------------------------------------------------------------------
   const heard = await detectVoice(run);
   const asr = opts.asrBaseUrl;
+  const hosted = asr !== undefined && /^https:\/\/api\.openai\.com\b/.test(asr);
+  const keyMissing = hosted && !opts.apiKey;
   if (heard.capture && heard.tts) {
     findings.push(asr
-      ? { what: "Voice", ok: true, detail: `microphone (arecord) and speech (espeak-ng); transcription at ${asr}` }
+      ? keyMissing
+        ? { what: "Voice", ok: "partial", detail: `microphone (arecord) and speech (espeak-ng); transcription at ${asr}, but no key`,
+            fix: "Put the key in the environment, never on the command line: `export TV_AGENT_API_KEY=sk-…` — or in ~/.config/hearth/env (see below), which the service reads." }
+        : { what: "Voice", ok: true, detail: `microphone (arecord) and speech (espeak-ng); transcription at ${asr}${hosted ? " (hosted — only windows with sound in them are sent)" : ""}` }
       : { what: "Voice", ok: "partial", detail: "microphone (arecord) and speech (espeak-ng) are here, but nothing turns speech into text",
           fix: "Re-run with `--asr http://<host>:<port>/v1` pointing at an OpenAI-compatible /audio/transcriptions (a whisper server on the LAN will do)." });
   } else if (heard.tts) {
@@ -137,14 +142,17 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
     ...previous,
     platform: "linux",
     cec: cecDevice === null ? false : cec.ok === true ? cecDevice : previous.cec ?? cecDevice,
-    voice: Boolean(heard.capture && asr),
+    // Listening needs a microphone, a transcriber, and — for a hosted one — a
+    // key. Without all three the box would record and then have nowhere to
+    // send it, so it does not start listening at all.
+    voice: Boolean(heard.capture && asr && !keyMissing),
     ...(asr ? { asrBaseUrl: asr } : {}),
     ...(opts.asrModel ? { asrModel: opts.asrModel } : {}),
     leds: hasSpi,
     // Default to an attention word whenever this box will listen: a room
     // microphone that acts on everything it hears is a thing to opt into, not
     // to discover.
-    ...(heard.capture && asr ? { wakeWord: opts.wakeWord ?? previous.wakeWord ?? "hearth" } : {}),
+    ...(heard.capture && asr && !keyMissing ? { wakeWord: opts.wakeWord ?? previous.wakeWord ?? "hearth" } : {}),
     ...(opts.baseUrl ? { llmBaseUrl: opts.baseUrl } : {}),
     ...(opts.baseUrl && opts.model ? { llmModel: opts.model } : {}),
     writtenBy: `hearth setup, Node ${node}`,
@@ -181,8 +189,18 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
 
   // --- write --------------------------------------------------------------------
   const unitPath = deps.unitPath ?? join(dirname(path), "hearth.service");
+  const envPath = join(dirname(path), "env");
   if (opts.save) {
     await saveConfig(config, path);
+    // The key goes in a 0600 file beside the config — never in config.json,
+    // which is written as JSON for people to read and copy around, and never
+    // in a unit file, which `systemctl cat` prints to anyone who asks.
+    if (!(await exists(envPath))) {
+      await writeFile(envPath, opts.apiKey
+        ? `# Read by the hearth user service (EnvironmentFile). Keep this file 0600.\nTV_AGENT_API_KEY=${opts.apiKey}\n`
+        : "# Read by the hearth user service (EnvironmentFile). Keep this file 0600.\n# TV_AGENT_API_KEY=sk-…\n", { encoding: "utf8", mode: 0o600 });
+      if (!opts.json) io.out(opts.apiKey ? `Wrote ${envPath} (0600) with the API key from the environment.\n` : `Wrote ${envPath} (0600) — put TV_AGENT_API_KEY there for the service.\n`);
+    }
     if (!opts.json) {
       io.out(`Wrote ${path}\n`);
       io.out("Next `hearth \"turn it down\"` needs no flags.\n");
@@ -238,6 +256,8 @@ export function systemdUnit(o: { node: string; cli: string; voice: boolean; leds
     "Wants=network-online.target",
     "",
     "[Service]",
+    "# Secrets live here, 0600, not in this file: `systemctl cat` shows this file to anyone.",
+    "EnvironmentFile=-%h/.config/hearth/env",
     `ExecStart=${o.node} ${o.cli} ${flags}`,
     "Restart=on-failure",
     "RestartSec=5",

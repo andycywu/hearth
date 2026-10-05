@@ -163,7 +163,7 @@ export {
   type Rgb, type RingState, type StatusRing, type StatusRingOptions,
 } from "./leds.js";
 export {
-  createLinuxVoicePipeline, createOpenAiTranscriber, detectVoice,
+  createLinuxVoicePipeline, createOpenAiTranscriber, detectVoice, rmsOfWav,
   type Transcriber, type CaptureFormat, type LinuxVoiceOptions, type OpenAiTranscriberOptions,
 } from "./voice.js";
 export {

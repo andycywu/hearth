@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mkdtemp, readFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Runner, RunResult } from "@hearthkit/adapter-linux";
@@ -167,5 +168,44 @@ describe("the systemd unit", () => {
     expect(unit).toContain("ExecStart=/home/pi/.local/node/bin/node /home/pi/hearth/apps/cli/dist/main.js --platform linux --yes --voice");
     expect(unit).not.toContain("--leds");
     expect(unit).toContain("WantedBy=default.target");
+  });
+});
+
+describe("a hosted transcriber", () => {
+  const PI = { "/proc/device-tree/model": "Raspberry Pi 3 Model B Rev 1.2\0" };
+  const piRun: Runner = async (cmd, args) => {
+    switch (cmd) {
+      case "wpctl": return ok("Volume: 0.20\n");
+      case "cec-ctl": return args.includes("--version") ? ok("cec-ctl 1.30.1\n") : ok("Topology:\n    0.0.0.0: TV\n");
+      case "id": return ok("pi video\n");
+      case "arecord": return ok("card 1: seeed4micvoicec\n");
+      case "espeak-ng": return ok("eSpeak NG 1.52\n");
+      default: return missing;
+    }
+  };
+
+  it("expands --asr openai, insists on a key, and keeps the key out of config.json", async () => {
+    const p = await paths();
+    let { out, sink } = await io();
+    await runSetup(parseArgs(["--platform", "linux", "setup", "--asr", "openai"]), sink,
+      { ...p, run: piRun, readFile: async (f) => PI[f as keyof typeof PI] ?? "", exists: async (f) => f === "/dev/cec0", nodeVersion: "v26.8.2" });
+    expect(out.join("")).toMatch(/~ Voice .*https:\/\/api\.openai\.com\/v1, but no key[\s\S]*TV_AGENT_API_KEY/);
+    // No key → it will not listen → no service, and the env file is a template.
+    expect((await loadConfig(p.configPath)).voice).toBe(false);
+    expect(await readFile(join(dirname(p.configPath), "env"), "utf8")).toMatch(/^# .*\n# TV_AGENT_API_KEY=/);
+
+    const p2 = await paths();
+    ({ out, sink } = await io());
+    await runSetup(parseArgs(["--platform", "linux", "setup", "--asr", "openai"], { TV_AGENT_API_KEY: "sk-test" }), sink,
+      { ...p2, run: piRun, readFile: async (f) => PI[f as keyof typeof PI] ?? "", exists: async (f) => f === "/dev/cec0", nodeVersion: "v26.8.2", nodePath: "/n", cliPath: "/c" });
+    const page = out.join("");
+    expect(page).toMatch(/✓ Voice .*hosted — only windows with sound in them are sent/);
+    const config = await loadConfig(p2.configPath);
+    expect(config).toMatchObject({ voice: true, wakeWord: "hearth", asrBaseUrl: "https://api.openai.com/v1" });
+    expect(JSON.stringify(config)).not.toContain("sk-test");
+    expect(await readFile(join(dirname(p2.configPath), "env"), "utf8")).toContain("TV_AGENT_API_KEY=sk-test");
+    const unit = await readFile(p2.unitPath, "utf8");
+    expect(unit).toContain("EnvironmentFile=-%h/.config/hearth/env");
+    expect(unit).not.toContain("sk-test");
   });
 });

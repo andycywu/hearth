@@ -66,6 +66,21 @@ export interface LinuxVoiceOptions {
   capturePath?: string;
   /** Injected in tests; defaults to reading the captured file from disk. */
   readCapture?: (path: string) => Promise<Uint8Array>;
+  /**
+   * Below this loudness a recording is dropped without being transcribed.
+   *
+   * RMS of the samples as a fraction of full scale; `0.01` is about -40 dBFS,
+   * which on a ReSpeaker in a quiet room is above the noise floor and well
+   * below anyone speaking at it. The gate exists because the listen loop
+   * records in fixed windows whether or not anyone is talking, and once the
+   * transcriber is a paid endpoint on the other side of the internet, sending
+   * it an empty living room every five seconds is both a bill and a thing
+   * people should not have to accept. `0` turns the gate off. Only 16-bit WAV
+   * is measured; anything else passes through unmeasured.
+   */
+  silenceThreshold?: number;
+  /** Told when a window was dropped as silence, so a trace can show it. */
+  onDropped?: (reason: string) => void;
 }
 
 /**
@@ -101,6 +116,7 @@ export function createLinuxVoicePipeline(opts: LinuxVoiceOptions = {}): VoicePip
   };
   const capturePath = opts.capturePath ?? "/tmp/hearth-capture.wav";
   const readCapture = opts.readCapture ?? defaultReadCapture;
+  const silenceThreshold = opts.silenceThreshold ?? 0.01;
 
   const transcriptListeners = new Set<(text: string, isFinal: boolean) => void>();
   const endListeners = new Set<() => void>();
@@ -151,7 +167,16 @@ export function createLinuxVoicePipeline(opts: LinuxVoiceOptions = {}): VoicePip
 
       let text: string;
       try {
-        text = await opts.transcribe(await readCapture(capturePath), format);
+        const audio = await readCapture(capturePath);
+        const loudness = silenceThreshold > 0 ? rmsOfWav(audio) : undefined;
+        if (loudness !== undefined && loudness < silenceThreshold) {
+          // Nobody spoke. Not a transcript of "", which would be a claim about
+          // what was said; a window that was never worth asking about.
+          opts.onDropped?.(`silence (rms ${loudness.toFixed(4)} < ${silenceThreshold})`);
+          text = "";
+        } else {
+          text = await opts.transcribe(audio, format);
+        }
       } finally {
         // The attempt is over whether or not it produced words. Anything else
         // leaves a caller listening forever to a microphone that already closed.
@@ -191,6 +216,44 @@ export function createLinuxVoicePipeline(opts: LinuxVoiceOptions = {}): VoicePip
       }
     },
   };
+}
+
+/**
+ * RMS of a 16-bit PCM WAV, 0..1, or `undefined` for anything that is not one.
+ *
+ * Walks the RIFF chunks rather than assuming the data starts at byte 44: ALSA's
+ * `arecord` writes a plain header, but a LIST chunk from another tool would
+ * otherwise be measured as very loud noise.
+ */
+export function rmsOfWav(bytes: Uint8Array): number | undefined {
+  if (bytes.length < 44) return undefined;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const tag = (at: number) => String.fromCharCode(bytes[at]!, bytes[at + 1]!, bytes[at + 2]!, bytes[at + 3]!);
+  if (tag(0) !== "RIFF" || tag(8) !== "WAVE") return undefined;
+
+  let bitsPerSample = 0;
+  let at = 12;
+  while (at + 8 <= bytes.length) {
+    const id = tag(at);
+    const size = view.getUint32(at + 4, true);
+    const body = at + 8;
+    if (id === "fmt " && body + 16 <= bytes.length) {
+      bitsPerSample = view.getUint16(body + 14, true);
+    } else if (id === "data") {
+      if (bitsPerSample !== 16) return undefined;
+      const end = Math.min(bytes.length, body + size);
+      const samples = Math.floor((end - body) / 2);
+      if (!samples) return 0;
+      let sum = 0;
+      for (let i = 0; i < samples; i++) {
+        const s = view.getInt16(body + i * 2, true) / 32768;
+        sum += s * s;
+      }
+      return Math.sqrt(sum / samples);
+    }
+    at = body + size + (size % 2);
+  }
+  return undefined;
 }
 
 async function defaultReadCapture(path: string): Promise<Uint8Array> {

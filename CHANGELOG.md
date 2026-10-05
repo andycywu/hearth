@@ -40,6 +40,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it also writes a `systemd --user` unit with Node's absolute path pinned,
   because a service has no `.profile` — the first Pi report lost its Node to
   exactly that. Installs nothing.
+- **`--asr openai`** and a key that stays out of files people read: shorthand
+  for `https://api.openai.com/v1`, key from `TV_AGENT_API_KEY` only; setup
+  copies it to `~/.config/hearth/env` (0600) and the unit reads that through
+  `EnvironmentFile`, so neither `config.json` nor `systemctl cat` ever shows it.
+  A box with a hosted transcriber and no key does not start listening.
+- **A silence gate in the Linux voice pipeline** (`silenceThreshold`, 0.01 of
+  full scale ≈ −40 dBFS by default): each recorded window is measured and the
+  quiet ones are dropped before transcription, shown as `🎤 (silence …)`.
+  Without it a hosted transcriber would be sent an empty room every five
+  seconds — a bill, and a privacy model nobody should have to accept. `rmsOfWav`
+  walks the RIFF chunks rather than assuming byte 44, and anything that is not
+  16-bit WAV passes through unmeasured.
 - **An attention word** (`--wake <word>`, default `hearth` once a box can
   listen): only an utterance containing the word reaches the agent; the rest
   is transcribed and dropped, and the word alone gets a "Yes?". Named an

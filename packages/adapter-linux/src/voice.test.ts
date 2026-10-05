@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { isTvUnsupported } from "@hearthkit/platform-api";
 import {
   createLinuxVoicePipeline, createOpenAiTranscriber, detectVoice, type Transcriber,
+  rmsOfWav,
 } from "./voice.js";
 import type { Runner } from "./run.js";
 
@@ -182,5 +183,67 @@ describe("the OpenAI-schema transcriber", () => {
     const transcribe = createOpenAiTranscriber({ baseUrl: "http://x/v1", fetchImpl });
     await expect(transcribe(new Uint8Array([0]), { encoding: "S16_LE", rate: 16_000, channels: 1 }))
       .rejects.toThrow(/404.*model not found/s);
+  });
+});
+
+describe("the silence gate", () => {
+  /** A minimal 16-bit mono WAV around the given samples. */
+  function wav(samples: number[], extraChunk = false): Uint8Array {
+    const data = new Uint8Array(samples.length * 2);
+    const dv = new DataView(data.buffer);
+    samples.forEach((s, i) => dv.setInt16(i * 2, s, true));
+    const list = extraChunk ? [..."LIST", 4, 0, 0, 0, 0x7f, 0x7f, 0x7f, 0x7f] : [];
+    const header = [
+      ..."RIFF", 0, 0, 0, 0, ..."WAVE",
+      ..."fmt ", 16, 0, 0, 0, 1, 0, 1, 0, 0x80, 0x3e, 0, 0, 0, 0x7d, 0, 0, 2, 0, 16, 0,
+      ...list,
+      ..."data", data.length & 0xff, (data.length >> 8) & 0xff, 0, 0,
+    ].map((c) => (typeof c === "string" ? c.charCodeAt(0) : c));
+    return new Uint8Array([...header, ...data]);
+  }
+
+  it("measures loudness as RMS of full scale, walking the chunks", () => {
+    expect(rmsOfWav(wav([0, 0, 0, 0]))).toBe(0);
+    expect(rmsOfWav(wav([16384, -16384, 16384, -16384]))).toBeCloseTo(0.5, 5);
+    // A LIST chunk before the data must not be read as samples.
+    expect(rmsOfWav(wav([0, 0], true))).toBe(0);
+    expect(rmsOfWav(new Uint8Array([1, 2, 3, 4]))).toBeUndefined();
+  });
+
+  it("drops a quiet window without asking the transcriber, and says so", async () => {
+    const transcribe = vi.fn<Transcriber>(async () => "should not be called");
+    const dropped: string[] = [];
+    const voice = createLinuxVoicePipeline({
+      run: fakeRunner(ok), transcribe, onDropped: (r) => dropped.push(r),
+      readCapture: async () => wav(Array.from({ length: 1600 }, () => 50)),   // ≈ -56 dBFS
+    });
+    const heard: string[] = [];
+    voice.onTranscript((t) => heard.push(t));
+    await voice.startListening();
+    expect(transcribe).not.toHaveBeenCalled();
+    expect(heard).toEqual([]);
+    expect(dropped[0]).toMatch(/^silence \(rms 0\.0015 < 0\.01\)/);
+  });
+
+  it("sends a window with speech in it", async () => {
+    const transcribe = vi.fn<Transcriber>(async () => "turn it down");
+    const voice = createLinuxVoicePipeline({
+      run: fakeRunner(ok), transcribe,
+      readCapture: async () => wav(Array.from({ length: 1600 }, (_, i) => (i % 2 ? 8000 : -8000))),
+    });
+    const heard: string[] = [];
+    voice.onTranscript((t) => heard.push(t));
+    await voice.startListening();
+    expect(transcribe).toHaveBeenCalledTimes(1);
+    expect(heard).toEqual(["turn it down"]);
+  });
+
+  it("can be switched off, and never measures what is not a WAV", async () => {
+    const transcribe = vi.fn<Transcriber>(async () => "x");
+    const off = createLinuxVoicePipeline({
+      run: fakeRunner(ok), transcribe, silenceThreshold: 0, readCapture: async () => wav([0, 0, 0, 0]),
+    });
+    await off.startListening();
+    expect(transcribe).toHaveBeenCalledTimes(1);
   });
 });

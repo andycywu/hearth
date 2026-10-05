@@ -124,7 +124,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (env.TV_AGENT_LLM) opts.baseUrl = env.TV_AGENT_LLM;
   if (env.TV_AGENT_MODEL) opts.model = env.TV_AGENT_MODEL;
   if (env.TV_AGENT_API_KEY) opts.apiKey = env.TV_AGENT_API_KEY;
-  if (env.TV_AGENT_ASR) opts.asrBaseUrl = env.TV_AGENT_ASR;
+  if (env.TV_AGENT_ASR) opts.asrBaseUrl = expandAsr(env.TV_AGENT_ASR);
   if (env.TV_AGENT_ASR_MODEL) opts.asrModel = env.TV_AGENT_ASR_MODEL;
   // These three exist so `hearth setup` can write a config that stands in for
   // flags (see config.ts); they are read from the environment the same way.
@@ -185,7 +185,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
         opts.room = v;
         break;
       }
-      case "--asr": { const v = takeValue("--asr"); if (v !== undefined) opts.asrBaseUrl = v; break; }
+      case "--asr": { const v = takeValue("--asr"); if (v !== undefined) opts.asrBaseUrl = expandAsr(v); break; }
       case "--asr-model": { const v = takeValue("--asr-model"); if (v !== undefined) opts.asrModel = v; break; }
       case "--llm": { const v = takeValue("--llm"); if (v !== undefined) opts.baseUrl = v; break; }
       case "--model": { const v = takeValue("--model"); if (v !== undefined) opts.model = v; break; }
@@ -251,6 +251,15 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   return opts;
 }
 
+/**
+ * `--asr openai` for the one hosted endpoint most people already have a key
+ * for. Anything else is a URL and is passed through — a whisper server on the
+ * LAN, a different vendor's OpenAI-compatible route, whatever it is.
+ */
+export function expandAsr(value: string): string {
+  return value.trim().toLowerCase() === "openai" ? "https://api.openai.com/v1" : value;
+}
+
 export const HELP = `hearth — the TV agent, in a terminal
 
 USAGE
@@ -266,7 +275,8 @@ OPTIONS
   --llm <url>             OpenAI-compatible base URL (or $TV_AGENT_LLM)
   --model <name>          model name (or $TV_AGENT_MODEL)
       --voice             listen on the microphone too (linux)
-      --asr <url>         OpenAI-compatible transcription base URL (or $TV_AGENT_ASR)
+      --asr <url>         OpenAI-compatible transcription base URL (or $TV_AGENT_ASR);
+                          \`openai\` means https://api.openai.com/v1 (key in $TV_AGENT_API_KEY)
       --asr-model <name>  transcription model (or $TV_AGENT_ASR_MODEL)
       --leds              show each outcome on the APA102 status ring (linux)
       --wake <word>       act only on what is said after this word is heard;
@@ -303,7 +313,8 @@ NOTES
   understands a handful of commands and needs no network.
 
 EXAMPLES
-  hearth --platform linux setup --asr http://192.168.1.104:9000/v1
+  TV_AGENT_API_KEY=sk-… hearth --platform linux setup --asr openai
+  hearth --platform linux setup --asr http://192.168.1.104:9000/v1   # a whisper server on the LAN
   hearth "turn it down"              # after setup: no flags needed
   hearth --platform linux report --out docs/platform/reports/my-pi.md
   hearth "set volume to 30"

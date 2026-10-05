@@ -308,6 +308,11 @@ async function openPlatform(opts: CliOptions): Promise<PlatformProvider> {
       ...(wantVoice
         ? {
             voice: {
+              // Dropped windows are worth one line in the trace: a microphone
+              // that seems deaf and a room that is quiet look the same otherwise.
+              ...(!opts.quiet && !opts.json
+                ? { onDropped: (reason: string) => { stderr.write(`  🎤 (${reason})\n`); } }
+                : {}),
               // No endpoint means no transcriber, and the adapter then answers
               // `unsupported` for listening rather than recording audio it has
               // no way to read. `parseArgs` has already said so out loud.

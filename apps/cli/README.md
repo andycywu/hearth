@@ -51,6 +51,27 @@ When the box can listen (a microphone *and* `--asr`), setup also writes a
 `ExecStart` — a service starts with no `.profile`, which is exactly how the
 first Pi lost its Node — and prints the two lines that enable it at boot.
 
+### Where speech becomes text
+
+Nothing on a Pi 3B turns speech into text fast enough to talk to, so the
+transcriber is an endpoint. Two that work today:
+
+```bash
+TV_AGENT_API_KEY=sk-… hearth --platform linux setup --asr openai     # hosted; whisper-1
+hearth --platform linux setup --asr http://192.168.1.104:9000/v1   # a whisper server on the LAN
+```
+
+`openai` is shorthand for `https://api.openai.com/v1`; anything else is a URL.
+The key is read from `TV_AGENT_API_KEY` **only** — setup copies it into
+`~/.config/hearth/env` (mode 0600) for the service to read, and never into
+`config.json` or the unit file, both of which are meant to be looked at.
+
+With a hosted transcriber the listen loop would otherwise ship an empty living
+room upstream every five seconds. So the adapter measures each window first and
+drops the quiet ones without sending them (`🎤 (silence …)` in the trace);
+`silenceThreshold` in `adapter-linux` is the knob, 0.01 of full scale by
+default, `0` to send everything.
+
 ### The attention word
 
 A box that listens gets `--wake hearth` by default: everything the microphone
