@@ -17,6 +17,7 @@
     "@hearthkit/adapter-linux": "workspace:*",
     "@hearthkit/adapter-web": "workspace:*",
     "@hearthkit/core": "workspace:*",
+    "@hearthkit/edge-voice": "workspace:*",
     "@hearthkit/llm-connectors": "workspace:*",
     "@hearthkit/platform-api": "workspace:*"
   },

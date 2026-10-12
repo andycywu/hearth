@@ -8,6 +8,47 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Edge speech-to-text** — `hearth stt`, `hearth stt bench`, `packages/edge-voice`,
+  `adapter-linux/src/stt`. Microphone → VAD → offline recogniser → a normalised
+  `Transcript`, with every stage an interface and the engine chosen by
+  `HEARTH_STT_BACKEND`. sherpa-onnx is the first backend, driven as a long-lived
+  child process over its websocket server rather than as an addon, because this
+  repo carries no runtime dependencies and the prebuilt aarch64 release has the
+  server in it. The benchmark runs the same recordings through any backend and
+  reports expected against actual, character error rate, real-time factor,
+  end-of-audio latency and the engine's own resident memory, as JSON and CSV;
+  a recording that has not been made yet is `missing_audio`, not a failure. The
+  dataset *format* is in `bench/stt/`; the recordings are not, and none were
+  fabricated. **Run on the living-room Pi 3B (small bilingual zipformer, int8)
+  and not yet heard speaking.** On clean power (`get_throttled` = `0x0` before,
+  after and between runs, no under-voltage in the kernel log; 2026-10-12, over
+  the model's four bundled human clips, five passes through one server): the
+  server holds 111–115 MB resident and does not move across 20 utterances; it
+  takes 16–20 s to load; it decodes at real-time factor 0.43–0.48; and the final
+  text arrives 0.26–0.39 s after the audio ends (p95 391 ms). The first run,
+  six days earlier, had read `0x50005` throughout — a USB cable that could not
+  carry the board's current — and showed RTF 0.79–0.94 and 0.5–0.7 s: about
+  twice as slow, and a reminder that an inference number taken while the board
+  throttles is a number about the cable. What was learned, not just added:
+  - the server's `is_final` is set by its *endpointing* on a segment
+    mid-utterance, not at the end of the stream. The first backend treated it as
+    the end, and `finish()` took 1 ms on real speech where a probe had seen
+    500 ms. Only the `Done!` frame ends an utterance, and an utterance's text
+    is its segments joined;
+  - a robot voice (`espeak-ng`) is not a test set: six synthetic TV commands
+    came back mostly wrong while the model's own human clips came back sensible,
+    which is a statement about the synthesiser;
+  - end-to-end from the last word is the server's tail decode (~0.3 s) plus the
+    VAD hangover (0.6 s) — about 0.9–1.0 s, the sum of two measured parts, right
+    at the 1 s goal with neither knob turned;
+  - the VAD is an energy gate, because a neural one needs an ONNX runtime inside
+    Node. It cannot tell a television from a person.
+
+  `HEARTH_WAKE_WORD_ENABLED` and `HEARTH_AUDIO_PREPROCESSING_ENABLED` are
+  accepted and say that nothing implements them yet. `IntentRouter` and
+  `AiTaskClient` (solved / escalate) are interfaces with no implementation.
+  See [`docs/edge-voice.md`](docs/edge-voice.md).
+
 - **`hearth report`** (`apps/cli`) — the Hub's half of the Hearth Report. Probes
   the box, discovers the room over HDMI-CEC, puts the four P0 scenarios through
   goal mode and prints one Hearth Report section, through the same

@@ -50,6 +50,9 @@ importers:
       '@hearthkit/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@hearthkit/edge-voice':
+        specifier: workspace:*
+        version: link:../../packages/edge-voice
       '@hearthkit/llm-connectors':
         specifier: workspace:*
         version: link:../../packages/llm-connectors
@@ -169,6 +172,9 @@ importers:
       '@hearthkit/adapter-cec':
         specifier: workspace:*
         version: link:../adapter-cec
+      '@hearthkit/edge-voice':
+        specifier: workspace:*
+        version: link:../edge-voice
       '@hearthkit/platform-api':
         specifier: workspace:*
         version: link:../platform-api
@@ -218,6 +224,12 @@ importers:
         version: link:../adapter-web
 
   packages/create-skill: {}
+
+  packages/edge-voice:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.4.1
+        version: 26.4.1
 
   packages/host:
     dependencies:

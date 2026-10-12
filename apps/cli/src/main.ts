@@ -24,6 +24,7 @@ import { readLines } from "./terminal.js";
 import { assembleRoom } from "./room.js";
 import { runReport } from "./report.js";
 import { runSetup } from "./setup.js";
+import { runStt } from "./stt.js";
 import { answer, listenForever, showOutcomes } from "./voice-loop.js";
 import { configAsEnv, loadConfig } from "./config.js";
 
@@ -46,6 +47,17 @@ async function main(): Promise<number> {
     return runSetup(opts, {
       out: (text) => { stdout.write(text); },
       err: (text) => { stderr.write(text); },
+    });
+  }
+
+  // `hearth stt` is the voice pipeline alone: no platform, no room, no agent.
+  if (opts.stt) {
+    const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
+    return runStt(opts, {
+      env: { ...env },
+      io: { out: (text) => { stdout.write(text); }, err: (text) => { stderr.write(text); } },
+      interrupted,
+      rssMb: () => Math.round(process.memoryUsage.rss() / 1048576),
     });
   }
 

@@ -66,6 +66,15 @@ export interface CliOptions {
    * the next `hearth` needs no flags, and say what the box can do.
    */
   setup: boolean;
+  /**
+   * `hearth stt`: microphone → speech-to-text → transcripts on stdout, with no
+   * agent behind it. For measuring the recogniser on its own.
+   */
+  stt: boolean;
+  /** `hearth stt bench <manifest>`: run the recogniser over a dataset instead of the microphone. */
+  sttBench?: string;
+  /** `--realtime`: pace a benchmark to the audio's own clock, so latency means something. */
+  realtime: boolean;
   /** `--no-save`: setup prints what it would write and writes nothing. */
   save: boolean;
   /** Anything wrong with the invocation, in the order found. */
@@ -102,6 +111,8 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     leds: false,
     report: false,
     setup: false,
+    stt: false,
+    realtime: false,
     save: true,
     writes: false,
     room: "stored",
@@ -167,6 +178,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       case "--no-wake": delete opts.wakeWord; break;
       case "--out": { const v = takeValue("--out"); if (v !== undefined) opts.out = v; break; }
       case "--writes": opts.writes = true; break;
+      case "--realtime": opts.realtime = true; break;
       case "--no-cec": opts.cec = false; break;
       case "--no-save": opts.save = false; break;
       case "--cec": { const v = takeValue("--cec"); if (v !== undefined) opts.cec = v; break; }
@@ -221,16 +233,29 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     opts.commands = [];
     if (extra.length) opts.errors.push(`setup takes no commands (got: ${extra.join(", ")})`);
   }
+  if (opts.commands[0] === "stt") {
+    opts.stt = true;
+    const rest = opts.commands.slice(1);
+    opts.commands = [];
+    if (rest[0] === "bench") {
+      if (!rest[1]) opts.errors.push("stt bench needs a manifest: hearth stt bench <manifest.json>");
+      else opts.sttBench = rest[1];
+      if (rest.length > 2) opts.errors.push(`stt bench takes one manifest (got: ${rest.slice(2).join(", ")})`);
+    } else if (rest.length) {
+      opts.errors.push(`stt takes no commands (got: ${rest.join(", ")}); did you mean "stt bench <manifest>"?`);
+    }
+  }
+  if (opts.realtime && !opts.sttBench) opts.warnings.push("--realtime: only used by `hearth stt bench`");
   if (!opts.report) {
     const reportOnly = [
-      opts.out !== undefined && "--out", opts.writes && "--writes", opts.intents && "--intents",
+      opts.out !== undefined && !opts.sttBench && "--out", opts.writes && "--writes", opts.intents && "--intents",
     ].filter(Boolean);
     if (reportOnly.length) opts.warnings.push(`${reportOnly.join(", ")}: only used by \`hearth report\``);
   }
 
   // `--json` exists so output can be piped somewhere; a tool trace interleaved
   // on stderr is fine, but a confirmation prompt nobody can answer is a hang.
-  if (opts.json && !opts.yes && !opts.report && !opts.setup) {
+  if (opts.json && !opts.yes && !opts.report && !opts.setup && !opts.stt) {
     opts.warnings.push("--json without --yes: a tool that needs confirmation will still prompt");
   }
   // Said once, at startup, rather than discovered by standing in front of a
@@ -269,6 +294,12 @@ USAGE
                                      Hearth Report section (markdown)
   hearth setup [options]             look at this box, write ~/.config/hearth/
                                      config.json, say what it can do (linux)
+  hearth stt bench <manifest> [--realtime] [--out <base>]
+                                     the same recogniser over a dataset: expected vs actual,
+                                     latency, real-time factor, memory (JSON + CSV)
+  hearth stt [--json] [--quiet]      microphone → offline speech-to-text → transcripts
+                                     on stdout; no agent. Configured by HEARTH_STT_*
+                                     (see docs/edge-voice.md)
 
 OPTIONS
   --platform mock|linux   which TV to drive (default: mock, or $TV_PLATFORM)

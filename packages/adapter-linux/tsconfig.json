@@ -7,6 +7,6 @@
     "types": ["node"]
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../platform-api" }, { "path": "../adapter-cec" }],
+  "references": [{ "path": "../platform-api" }, { "path": "../adapter-cec" }, { "path": "../edge-voice" }],
   "exclude": ["dist", "src/**/*.test.ts"]
 }

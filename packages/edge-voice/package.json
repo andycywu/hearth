@@ -1,0 +1,19 @@
+{
+  "name": "@hearthkit/edge-voice",
+  "version": "0.3.0",
+  "private": true,
+  "description": "The edge voice pipeline's contracts and its orchestration: audio in, transcripts out, no engine named. Backends live in the adapters.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1"
+  },
+  "license": "Apache-2.0"
+}

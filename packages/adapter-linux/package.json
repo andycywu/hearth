@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@hearthkit/adapter-cec": "workspace:*",
+    "@hearthkit/edge-voice": "workspace:*",
     "@hearthkit/platform-api": "workspace:*"
   },
   "devDependencies": {

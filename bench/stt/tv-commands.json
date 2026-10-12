@@ -1,0 +1,148 @@
+{
+  "name": "tv-commands",
+  "description": "Spoken TV commands for comparing speech-to-text backends. The recordings are not in the repository; see README.md.",
+  "items": [
+    {
+      "id": "zh-001",
+      "audio": "recordings/zh-001.wav",
+      "expected": "打開電視",
+      "language": "zh",
+      "tags": [
+        "power"
+      ]
+    },
+    {
+      "id": "zh-002",
+      "audio": "recordings/zh-002.wav",
+      "expected": "關閉電視",
+      "language": "zh",
+      "tags": [
+        "power"
+      ]
+    },
+    {
+      "id": "zh-003",
+      "audio": "recordings/zh-003.wav",
+      "expected": "音量調到二十",
+      "language": "zh",
+      "tags": [
+        "volume",
+        "number"
+      ]
+    },
+    {
+      "id": "zh-004",
+      "audio": "recordings/zh-004.wav",
+      "expected": "音量大一點",
+      "language": "zh",
+      "tags": [
+        "volume"
+      ]
+    },
+    {
+      "id": "zh-005",
+      "audio": "recordings/zh-005.wav",
+      "expected": "切換到 HDMI 一",
+      "language": "zh",
+      "tags": [
+        "input",
+        "number"
+      ]
+    },
+    {
+      "id": "zh-006",
+      "audio": "recordings/zh-006.wav",
+      "expected": "幫我打開 Netflix",
+      "language": "zh",
+      "tags": [
+        "app"
+      ]
+    },
+    {
+      "id": "zh-007",
+      "audio": "recordings/zh-007.wav",
+      "expected": "把 Picture Mode 設成 Movie",
+      "language": "zh",
+      "tags": [
+        "picture",
+        "mixed-term"
+      ]
+    },
+    {
+      "id": "en-001",
+      "audio": "recordings/en-001.wav",
+      "expected": "Turn on the TV",
+      "language": "en",
+      "tags": [
+        "power"
+      ]
+    },
+    {
+      "id": "en-002",
+      "audio": "recordings/en-002.wav",
+      "expected": "Set volume to twenty",
+      "language": "en",
+      "tags": [
+        "volume",
+        "number"
+      ]
+    },
+    {
+      "id": "en-003",
+      "audio": "recordings/en-003.wav",
+      "expected": "Switch to HDMI two",
+      "language": "en",
+      "tags": [
+        "input",
+        "number"
+      ]
+    },
+    {
+      "id": "en-004",
+      "audio": "recordings/en-004.wav",
+      "expected": "Open Netflix",
+      "language": "en",
+      "tags": [
+        "app"
+      ]
+    },
+    {
+      "id": "mixed-001",
+      "audio": "recordings/mixed-001.wav",
+      "expected": "幫我 switch 到 HDMI two",
+      "language": "mixed",
+      "tags": [
+        "input",
+        "number"
+      ]
+    },
+    {
+      "id": "mixed-002",
+      "audio": "recordings/mixed-002.wav",
+      "expected": "把 Picture Mode 設成 Movie",
+      "language": "mixed",
+      "tags": [
+        "picture"
+      ]
+    },
+    {
+      "id": "mixed-003",
+      "audio": "recordings/mixed-003.wav",
+      "expected": "Netflix 打開",
+      "language": "mixed",
+      "tags": [
+        "app"
+      ]
+    },
+    {
+      "id": "mixed-004",
+      "audio": "recordings/mixed-004.wav",
+      "expected": "Switch 到 HDMI one",
+      "language": "mixed",
+      "tags": [
+        "input",
+        "number"
+      ]
+    }
+  ]
+}

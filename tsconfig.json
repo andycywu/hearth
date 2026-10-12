@@ -9,6 +9,7 @@
     { "path": "packages/adapter-web" },
     { "path": "packages/adapter-webos" },
     { "path": "packages/adapter-cec" },
+    { "path": "packages/edge-voice" },
     { "path": "packages/llm-connectors" },
     { "path": "packages/ui" },
     { "path": "packages/modelpilot" },

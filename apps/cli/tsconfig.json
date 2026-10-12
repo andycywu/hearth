@@ -12,6 +12,7 @@
     { "path": "../../packages/adapter-web" },
     { "path": "../../packages/adapter-linux" },
     { "path": "../../packages/adapter-cec" },
+    { "path": "../../packages/edge-voice" },
     { "path": "../../packages/llm-connectors" },
     { "path": "../../packages/platform-api" }
   ],
