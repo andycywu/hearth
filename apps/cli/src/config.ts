@@ -29,6 +29,12 @@ export interface HearthConfig {
   wakeWord?: string;
   llmBaseUrl?: string;
   llmModel?: string;
+  /** The face shown in `hearth lab`: one of the ids in `lab-avatars.ts`. */
+  avatar?: string;
+  /** The voice replies are spoken in: an espeak-ng voice (`en-us`, `cmn+f3`), words per minute, pitch 0–99. */
+  ttsVoice?: string;
+  ttsSpeed?: number;
+  ttsPitch?: number;
   /** When and by what this was written — for the person reading the file, not the code. */
   writtenBy?: string;
   writtenAt?: string;
@@ -71,5 +77,9 @@ export function configAsEnv(config: HearthConfig): Record<string, string> {
   if (config.voice) env.HEARTH_VOICE = "1";
   if (config.leds) env.HEARTH_LEDS = "1";
   if (config.wakeWord) env.HEARTH_WAKE = config.wakeWord;
+  if (config.avatar) env.HEARTH_AVATAR = config.avatar;
+  if (config.ttsVoice) env.HEARTH_TTS_VOICE = config.ttsVoice;
+  if (config.ttsSpeed !== undefined) env.HEARTH_TTS_SPEED = String(config.ttsSpeed);
+  if (config.ttsPitch !== undefined) env.HEARTH_TTS_PITCH = String(config.ttsPitch);
   return env;
 }

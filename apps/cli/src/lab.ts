@@ -17,9 +17,12 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomBytes } from "node:crypto";
 import {
   CEC_COMMANDS, createAudioLab, createLinuxCecTransport, diagnoseCec, findCommand, labContext, readAdapter,
-  ringStateForCec, ringStateForDiagnosis, runCecCommand, runCecRaw, systemSpawner,
-  type AudioLab, type CecContext, type RingState, type Spawner, type StatusRing,
+  listTtsVoices, readRingState, ringStateForCec, ringStateForDiagnosis, runCecCommand, runCecRaw, systemSpawner, TTS_VARIANTS,
+  validateTtsChoice,
+  type AudioLab, type CecContext, type RingState, type RingStateRecord, type Spawner, type StatusRing, type TtsVoice,
 } from "@hearthkit/adapter-linux";
+import { loadConfig, saveConfig, type HearthConfig } from "./config.js";
+import { AVATAR_IDS, isAvatarId } from "./lab-avatars.js";
 import type { CecTransport } from "@hearthkit/adapter-cec";
 import { LAB_PAGE } from "./lab-page.js";
 
@@ -37,6 +40,14 @@ export interface LabOptions {
   throttled?: () => Promise<string | undefined>;
   /** The status ring: it moves while a command is on the bus and shows the answer, so the room can see the lab work. */
   ring?: StatusRing | undefined;
+  /** Where the avatar and the voice are remembered: the Hearth config file. Substituted in tests. */
+  settings?: { load(): Promise<HearthConfig>; save(config: HearthConfig): Promise<void> };
+  /** What the ring is showing in whichever process owns it. Substituted in tests. */
+  ringState?: () => Promise<RingStateRecord>;
+  /** The voices espeak-ng offers. Substituted in tests. */
+  voices?: () => Promise<TtsVoice[]>;
+  /** How often the ring-state stream looks at the state file. Default 300 ms. */
+  pollMs?: number;
 }
 
 export interface Lab {
@@ -81,6 +92,8 @@ export function createLab(o: LabOptions = {}): Lab {
   });
   let monitor: ReturnType<Spawner> | undefined;
   let port = 0;
+  let voices: TtsVoice[] | undefined;
+  const settings = o.settings ?? { load: () => loadConfig(), save: (c: HearthConfig) => saveConfig(c) };
   // A ring that cannot be written must never fail a CEC command: it is a courtesy.
   const lit = (state: RingState): Promise<void> => (o.ring ? o.ring.show(state).catch(() => {}) : Promise.resolve());
 
@@ -119,6 +132,18 @@ export function createLab(o: LabOptions = {}): Lab {
     }
 
     if (req.method === "GET" && url.pathname === "/api/monitor") return startMonitor(req, res);
+
+    if (req.method === "GET" && url.pathname === "/api/voices") {
+      try {
+        voices ??= await (o.voices ?? (() => listTtsVoices(cec.run)))();
+        return send(res, 200, { voices, variants: TTS_VARIANTS });
+      } catch (err) {
+        return send(res, 200, { voices: [], variants: TTS_VARIANTS, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    if (req.method === "GET" && url.pathname === "/api/settings") return send(res, 200, await settingsView());
+    if (req.method === "GET" && url.pathname === "/api/ring-state") return send(res, 200, await readState());
+    if (req.method === "GET" && url.pathname === "/api/ring-stream") return startRingStream(req, res);
 
     if (req.method !== "POST") return send(res, 404, { error: "not found" });
     const body = await readJson(req);
@@ -175,14 +200,63 @@ export function createLab(o: LabOptions = {}): Lab {
         const played = await audio.play();
         await lit(played.ok ? "listening" : "failed");
         return send(res, 200, played);
+      case "/api/settings": {
+        const config = await settings.load();
+        if (body.avatar !== undefined) {
+          if (!isAvatarId(body.avatar)) return send(res, 400, { error: `unknown avatar "${String(body.avatar)}"` });
+          config.avatar = body.avatar;
+        }
+        if (body.tts !== undefined) {
+          const checked = validateTtsChoice(body.tts);
+          if (!checked.ok) return send(res, 400, { error: checked.error });
+          const c = checked.choice;
+          // An empty choice is "back to the default": the keys are removed, not set to nothing.
+          if (c.voice) config.ttsVoice = c.voice; else delete config.ttsVoice;
+          if (c.speed !== undefined) config.ttsSpeed = c.speed; else delete config.ttsSpeed;
+          if (c.pitch !== undefined) config.ttsPitch = c.pitch; else delete config.ttsPitch;
+        }
+        await settings.save(config);
+        return send(res, 200, await settingsView());
+      }
       case "/api/audio/say":
         await lit("speaking");
-        const said = await audio.say(String(body.text ?? ""), typeof body.voice === "string" ? body.voice : undefined);
+        const said = await audio.say(String(body.text ?? ""), { voice: body.voice, speed: body.speed, pitch: body.pitch });
         await lit(said.ok ? "listening" : "failed");
         return send(res, 200, said);
       default:
         return send(res, 404, { error: "not found" });
     }
+  }
+
+  async function settingsView(): Promise<Record<string, unknown>> {
+    const c = await settings.load();
+    return {
+      avatar: isAvatarId(c.avatar) ? c.avatar : "orb",
+      avatars: AVATAR_IDS,
+      tts: { voice: c.ttsVoice ?? null, speed: c.ttsSpeed ?? null, pitch: c.ttsPitch ?? null },
+    };
+  }
+
+  /** What the ring is showing now, in whichever Hearth process owns it. */
+  const readState = (): Promise<RingStateRecord> => (o.ringState ?? (() => readRingState()))();
+
+  /**
+   * The ring's state as a stream, so the avatar in the window is the real thing's face: hearing when the box
+   * hears, thinking when it thinks. Polls the small state file the ring writes; sends only changes.
+   */
+  function startRingStream(req: IncomingMessage, res: ServerResponse): void {
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
+    let last = "";
+    const look = async (): Promise<void> => {
+      const r = await readState().catch(() => undefined);
+      if (!r || r.state === last) return;
+      last = r.state;
+      res.write(`data: ${JSON.stringify(r)}\n\n`);
+    };
+    void look();
+    const timer = setInterval(() => { void look(); }, o.pollMs ?? 300);
+    timer.unref();
+    req.on("close", () => clearInterval(timer));
   }
 
   function startMonitor(req: IncomingMessage, res: ServerResponse): void {

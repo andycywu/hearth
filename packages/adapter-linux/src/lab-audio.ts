@@ -12,6 +12,7 @@ import { readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { systemRunner, type Runner } from "./run.js";
+import { espeakArgs, validateTtsChoice } from "./tts-voices.js";
 
 export interface WavLevels {
   seconds: number;
@@ -63,7 +64,8 @@ export interface AudioLab {
   /** The last recording, for playback in the page or through the speaker. */
   last(): Uint8Array | undefined;
   play(): Promise<{ ok: boolean; error?: string; cmdline: string }>;
-  say(text: string, voice?: string): Promise<{ ok: boolean; error?: string; cmdline: string }>;
+  /** `choice` is a `TtsChoice` from outside (a web page); it is validated before it reaches a command line. */
+  say(text: string, choice?: unknown): Promise<{ ok: boolean; error?: string; cmdline: string }>;
 }
 
 export function createAudioLab(o: { device?: string; run?: Runner; readCapture?: (p: string) => Promise<Uint8Array>; path?: string } = {}): AudioLab {
@@ -103,10 +105,13 @@ export function createAudioLab(o: { device?: string; run?: Runner; readCapture?:
       return r.code === 0 ? { ok: true, cmdline: `aplay -q ${playPath}` } : { ok: false, error: fail(r, "aplay"), cmdline: `aplay -q ${playPath}` };
     },
 
-    async say(text, voice) {
+    async say(text, choice) {
       const t = text.trim().slice(0, 200);
       if (!t) return { ok: false, error: "nothing to say", cmdline: "espeak-ng" };
-      const args = voice && /^[a-z0-9+-]{2,20}$/i.test(voice) ? ["-v", voice, "--", t] : ["--", t];
+      // Checked here, not only where it came from: this is the last stop before a command line.
+      const checked = validateTtsChoice(choice ?? {});
+      if (!checked.ok) return { ok: false, error: checked.error, cmdline: "espeak-ng" };
+      const args = espeakArgs(checked.choice, t);
       const r = await run("espeak-ng", args);
       const cmdline = ["espeak-ng", ...args.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a))].join(" ");
       return r.code === 0 ? { ok: true, cmdline } : { ok: false, error: fail(r, "espeak-ng"), cmdline };

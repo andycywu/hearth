@@ -8,6 +8,8 @@
  * `textContent`, never as HTML — it is text from a device on the other end of a
  * cable.
  */
+import { AVATAR_CSS, AVATAR_JS } from "./lab-avatars.js";
+
 export const LAB_PAGE = `<!doctype html>
 <html lang="en">
 <head>
@@ -59,10 +61,20 @@ export const LAB_PAGE = `<!doctype html>
   .layer:last-child { border-bottom:0; } .mark { font-weight:700; } .layer.ok .mark { color:var(--ok); } .layer.warn .mark { color:var(--warn); } .layer.fail .mark { color:var(--bad); } .layer.skipped .mark { color:var(--dim); }
   #monitor { height:200px; }
   .hidden { display:none; }
+  ${AVATAR_CSS}
+  .faces { display:grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap:10px; }
+  .faces button { padding:8px 6px 6px; text-align:center; }
+  .faces button[aria-pressed="true"] { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  .faces .avatar { max-width:84px; margin:0 auto; }
+  #avatarBig { max-width:240px; margin:4px auto 10px; }
+  #headAvatar .avatar { width:46px; }
+  .row.wide label { min-width:120px; } input[type=range] { flex:1; min-width:160px; accent-color:var(--accent); }
+  select.long { min-width:260px; max-width:100%; }
 </style>
 </head>
 <body>
 <header>
+  <div id="headAvatar" style="width:46px;flex:none" title="Hearth, as it is right now"></div>
   <h1>Hearth Lab</h1>
   <span class="chip" id="chipAdapter">adapter <b>…</b></span>
   <span class="chip" id="chipLogical">logical address <b>…</b></span>
@@ -75,6 +87,8 @@ export const LAB_PAGE = `<!doctype html>
 <nav role="tablist">
   <button role="tab" aria-selected="true" data-tab="cec">CEC</button>
   <button role="tab" aria-selected="false" data-tab="audio">Audio</button>
+  <button role="tab" aria-selected="false" data-tab="avatar">Avatar</button>
+  <button role="tab" aria-selected="false" data-tab="voice">Voice</button>
   <button role="tab" aria-selected="false" data-tab="hearth">Hearth's view</button>
 </nav>
 <main>
@@ -117,6 +131,40 @@ export const LAB_PAGE = `<!doctype html>
       </section>
     </div>
 
+    <div data-pane="avatar" class="hidden">
+      <section class="panel">
+        <h2>Hearth's face</h2>
+        <div id="avatarBig"></div>
+        <div class="muted" style="text-align:center">Wears the same colours as the status ring: green done, amber unconfirmed, violet cannot, red failed.</div>
+        <div class="row" style="justify-content:center"><label><input type="checkbox" id="follow" checked> follow the real Hearth (the ring's state, from whichever Hearth is running)</label></div>
+      </section>
+      <section class="panel">
+        <h2>Choose a face</h2>
+        <div class="faces" id="faces"></div>
+        <div class="muted" style="margin-top:6px">Saved as Hearth's face in <span class="cmd">~/.config/hearth/config.json</span>.</div>
+      </section>
+      <section class="panel">
+        <h2>Try its expressions</h2>
+        <div class="grid" id="expressions"></div>
+      </section>
+    </div>
+
+    <div data-pane="voice" class="hidden">
+      <section class="panel">
+        <h2>Voice</h2>
+        <div class="muted">espeak-ng ships with over a hundred languages and accents, each with a dozen timbres: thousands of voices, all of them plainly a machine. A neural voice would sit behind the same choice.</div>
+        <div class="row wide"><label for="vFilter">find a language</label><input id="vFilter" placeholder="english, chinese, de, fr-fr…" autocomplete="off" style="flex:1"></div>
+        <div class="row wide"><label for="vLang">language / accent</label><select id="vLang" class="long"></select></div>
+        <div class="row wide"><label for="vVar">timbre</label><select id="vVar"></select></div>
+        <div class="row wide"><label for="vSpeed">speed <b id="vSpeedN">175</b> wpm</label><input type="range" id="vSpeed" min="80" max="450" value="175"></div>
+        <div class="row wide"><label for="vPitch">pitch <b id="vPitchN">50</b></label><input type="range" id="vPitch" min="0" max="99" value="50"></div>
+        <input class="wide" id="vText" value="Hello, I am Hearth. I turned the volume down." autocomplete="off">
+        <div class="row"><button class="primary" id="vSay">Speak</button><button id="vRandom">Surprise me</button></div>
+        <div class="row"><button id="vSave">Use this voice for Hearth</button><button id="vReset">Back to the default</button></div>
+        <div class="muted" id="vNow" style="margin-top:6px"></div>
+      </section>
+    </div>
+
     <div data-pane="hearth" class="hidden">
       <section class="panel">
         <h2>What Hearth's own code sees</h2>
@@ -132,6 +180,7 @@ export const LAB_PAGE = `<!doctype html>
 <script>
 (function () {
   "use strict";
+  ${AVATAR_JS}
   var token = new URLSearchParams(location.search).get("t") || "";
   var $ = function (id) { return document.getElementById(id); };
   var log = $("log"), state = null;
@@ -139,7 +188,10 @@ export const LAB_PAGE = `<!doctype html>
   function api(path, body) {
     var url = path + (path.indexOf("?") < 0 ? "?" : "&") + "t=" + encodeURIComponent(token);
     var opts = body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
-    return fetch(url, opts).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.statusText); return j; }); });
+    if (body !== undefined && WORKING[path]) { clearTimeout(flashTimer); flashTimer = null; paintAvatars(WORKING[path]); }
+    return fetch(url, opts).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.statusText); return j; }); }).then(
+      function (j) { if (body !== undefined && WORKING[path]) afterWork(path, j); return j; },
+      function (e) { if (body !== undefined && WORKING[path]) flash("failed", 2500); throw e; });
   }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
   function put(card) { var empty = $("empty"); if (empty) empty.remove(); log.insertBefore(card, log.firstChild); }
@@ -276,15 +328,156 @@ export const LAB_PAGE = `<!doctype html>
     }, fail).then(function () { busy(b, false); });
   };
 
+  // ---- avatar: Hearth's face, in the ring's colours, following the real thing ----
+  var AVATAR_STATES = [["listening", "Ready"], ["loading", "Loading"], ["hearing", "Hearing"], ["recognizing", "Recognising"], ["thinking", "Thinking"], ["acting", "Acting"], ["speaking", "Speaking"], ["verified", "Done"], ["unverified", "Unconfirmed"], ["unsupported", "Cannot"], ["failed", "Failed"], ["error", "Error"], ["off", "Asleep"]];
+  var prefs = { avatar: "orb", tts: { voice: null, speed: null, pitch: null } };
+  var live = "off", flashTimer = null;
+
+  function paintAvatars(state) {
+    ["headAvatar", "avatarBig"].forEach(function (id) {
+      var host = $(id); if (!host) return;
+      var svg = host.firstChild;
+      if (svg && svg.getAttribute("data-avatar") === prefs.avatar) svg.setAttribute("data-state", state);
+      else { host.innerHTML = avatarSvg(prefs.avatar, state); host.firstChild.setAttribute("data-avatar", prefs.avatar); }
+    });
+  }
+  function resting() { return live === "off" ? "listening" : live; }     // the lab being open is "awake"; only real work moves it
+  function flash(state, ms) {
+    paintAvatars(state); clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () { flashTimer = null; paintAvatars(resting()); }, ms || 2500);
+  }
+  var WORKING = { "/api/run": "acting", "/api/raw": "acting", "/api/diagnose": "acting", "/api/hearth-view": "acting", "/api/audio/record": "hearing", "/api/audio/say": "speaking", "/api/audio/play": "speaking" };
+  function verdictAvatar(r) {
+    if (r.readBack) return r.readBack.reached ? "verified" : "failed";
+    return { "reply": "verified", "sent": "unverified", "no-reply": "unverified", "feature-abort": "unsupported" }[r.verdict] || "failed";
+  }
+  function afterWork(path, r) {
+    var s = "listening";
+    if (path === "/api/run" || path === "/api/raw") s = verdictAvatar(r);
+    else if (path === "/api/diagnose") s = r.firstProblem ? (r.firstProblem.status === "fail" ? "failed" : "unverified") : "verified";
+    else if (path === "/api/hearth-view") s = r.ok ? "verified" : "failed";
+    else if (r && r.ok === false) s = "failed";
+    if (s === "listening") { paintAvatars(resting()); } else flash(s, 2500);
+  }
+
+  function buildFaces() {
+    var host = $("faces"); host.textContent = "";
+    AVATAR_ORDER.forEach(function (id) {
+      var b = el("button"); b.setAttribute("aria-pressed", String(id === prefs.avatar)); b.title = AVATARS[id].name;
+      b.innerHTML = avatarSvg(id, "listening");
+      b.append(el("div", "muted", AVATARS[id].name));
+      b.onclick = function () {
+        prefs.avatar = id; paintAvatars(resting()); buildFaces();
+        api("/api/settings", { avatar: id }).then(function () { showSimple("Face saved", "ok", ["Hearth is now the " + AVATARS[id].name + "."]); }, fail);
+      };
+      host.append(b);
+    });
+  }
+  function buildExpressions() {
+    var host = $("expressions");
+    AVATAR_STATES.forEach(function (s) {
+      var b = el("button", "", s[1]); b.onclick = function () { $("follow").checked = false; clearTimeout(flashTimer); flashTimer = null; paintAvatars(s[0]); };
+      host.append(b);
+    });
+  }
+  function followLive() {
+    var es2 = new EventSource("/api/ring-stream?t=" + encodeURIComponent(token));
+    es2.onmessage = function (m) { live = JSON.parse(m.data).state; if (!flashTimer && $("follow").checked) paintAvatars(resting()); };
+  }
+  $("follow").onchange = function () { if (this.checked) paintAvatars(resting()); };
+
+  // ---- voice: espeak-ng's languages and timbres, speed and pitch ----
+  var voices = null;
+  var SAMPLE = { "cmn": "你好，我是 Hearth。已經幫你把音量調小了。", "yue": "你好，我係 Hearth。", "ja": "こんにちは、Hearthです。音量を下げました。", "ko": "안녕하세요, Hearth입니다.", "de": "Hallo, ich bin Hearth. Ich habe die Lautstärke verringert.", "fr": "Bonjour, je suis Hearth. J'ai baissé le volume.", "es": "Hola, soy Hearth. He bajado el volumen.", "it": "Ciao, sono Hearth. Ho abbassato il volume.", "ru": "Привет, я Hearth. Я убавил громкость.", "pt": "Olá, eu sou o Hearth. Baixei o volume." };
+  function sampleFor(id) { var k = id.split("-")[0]; return SAMPLE[id] || SAMPLE[k] || "Hello, I am Hearth. I turned the volume down."; }
+  function currentVoice() { var l = $("vLang").value, v = $("vVar").value; return l ? l + (v ? "+" + v : "") : ""; }
+  function fillLanguages() {
+    var sel = $("vLang"), q = $("vFilter").value.trim().toLowerCase(), keep = sel.value;
+    sel.textContent = "";
+    (voices || []).filter(function (v) { return !q || v.id.toLowerCase().indexOf(q) >= 0 || v.name.toLowerCase().indexOf(q) >= 0; }).forEach(function (v) {
+      var o = el("option", "", v.name + "  (" + v.id + ")"); o.value = v.id; sel.append(o);
+    });
+    if (keep) sel.value = keep;
+  }
+  function showVoiceNow() {
+    var t = prefs.tts;
+    $("vNow").textContent = t.voice || t.speed || t.pitch
+      ? "Hearth's voice now: " + (t.voice || "default") + (t.speed ? ", " + t.speed + " wpm" : "") + (t.pitch !== null && t.pitch !== undefined ? ", pitch " + t.pitch : "") + ". The voice app picks it up the next time it starts."
+      : "Hearth is using espeak-ng's default voice.";
+  }
+  function loadVoices() {
+    if (voices) return;
+    api("/api/voices").then(function (d) {
+      voices = d.voices || [];
+      if (d.error) showSimple("Could not list the voices", "error", [d.error]);
+      var vs = $("vVar"); vs.textContent = "";
+      d.variants.forEach(function (x) { var o = el("option", "", x.label); o.value = x.id; vs.append(o); });
+      fillLanguages();
+      var cur = prefs.tts.voice || "en-us", parts = cur.split("+");
+      $("vLang").value = parts[0]; $("vVar").value = parts[1] || "";
+      if (prefs.tts.speed) { $("vSpeed").value = prefs.tts.speed; $("vSpeedN").textContent = prefs.tts.speed; }
+      if (prefs.tts.pitch !== null && prefs.tts.pitch !== undefined) { $("vPitch").value = prefs.tts.pitch; $("vPitchN").textContent = prefs.tts.pitch; }
+      showVoiceNow();
+    }, fail);
+  }
+  function speakNow(btn) {
+    busy(btn, true);
+    api("/api/audio/say", { text: $("vText").value, voice: currentVoice(), speed: Number($("vSpeed").value), pitch: Number($("vPitch").value) }).then(function (r) {
+      showSimple("Voice test: " + (currentVoice() || "default"), r.ok ? "ok" : "error", [r.ok ? "Spoken. Did you hear it? (nothing reads this back)" : r.error, el("div", "cmd", "$ " + r.cmdline)]);
+    }, fail).then(function () { busy(btn, false); });
+  }
+  $("vFilter").oninput = fillLanguages;
+  $("vLang").onchange = function () { $("vText").value = sampleFor(this.value); };
+  $("vSpeed").oninput = function () { $("vSpeedN").textContent = this.value; };
+  $("vPitch").oninput = function () { $("vPitchN").textContent = this.value; };
+  $("vSay").onclick = function () { speakNow(this); };
+  $("vRandom").onclick = function () {
+    if (!voices || !voices.length) return;
+    var v = voices[Math.floor(Math.random() * voices.length)], opts = $("vVar").options, o = opts[Math.floor(Math.random() * opts.length)];
+    $("vFilter").value = ""; fillLanguages();
+    $("vLang").value = v.id; $("vVar").value = o.value;
+    $("vSpeed").value = 130 + Math.floor(Math.random() * 90); $("vSpeedN").textContent = $("vSpeed").value;
+    $("vPitch").value = 30 + Math.floor(Math.random() * 45); $("vPitchN").textContent = $("vPitch").value;
+    $("vText").value = sampleFor(v.id);
+    speakNow(this);
+  };
+  $("vSave").onclick = function () {
+    var b = this; busy(b, true);
+    api("/api/settings", { tts: { voice: currentVoice(), speed: Number($("vSpeed").value), pitch: Number($("vPitch").value) } }).then(function (s) {
+      prefs.tts = s.tts; showVoiceNow(); showSimple("Voice saved", "ok", ["Hearth will speak as " + (s.tts.voice || "default") + " the next time the voice app starts."]);
+    }, fail).then(function () { busy(b, false); });
+  };
+  $("vReset").onclick = function () {
+    api("/api/settings", { tts: {} }).then(function (s) {
+      prefs.tts = s.tts; $("vSpeed").value = 175; $("vSpeedN").textContent = "175"; $("vPitch").value = 50; $("vPitchN").textContent = "50"; showVoiceNow();
+      showSimple("Voice reset", "ok", ["Back to espeak-ng's default."]);
+    }, fail);
+  };
+
+  function loadPrefs() {
+    return api("/api/settings").then(function (s) { prefs = s; paintAvatars(resting()); buildFaces(); showVoiceNow(); }, fail);
+  }
+  buildExpressions(); paintAvatars("listening"); loadPrefs(); followLive();
+
   // tabs
   Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (t) {
     t.onclick = function () {
+      if (t.dataset.tab === "voice") loadVoices();
       Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (x) { x.setAttribute("aria-selected", String(x === t)); });
       Array.prototype.forEach.call(document.querySelectorAll("[data-pane]"), function (p) { p.classList.toggle("hidden", p.dataset.pane !== t.dataset.tab); });
     };
   });
 
   refresh();
+
+  // ?tab=avatar&face=fox&state=thinking opens a tab and pins a face and an expression, without saving anything:
+  // for a link, a screenshot, a demo. Applied once the saved settings have arrived, or they would overwrite it.
+  var q = new URLSearchParams(location.search), wantTab = q.get("tab"), wantState = q.get("state"), wantFace = q.get("face");
+  loadPrefs().then(function () {
+    if (wantFace && AVATARS[wantFace]) { prefs.avatar = wantFace; buildFaces(); }
+    if (wantTab) { var tabButton = document.querySelector('nav button[data-tab="' + wantTab.replace(/[^a-z]/g, "") + '"]'); if (tabButton) tabButton.click(); }
+    if (wantState) { $("follow").checked = false; paintAvatars(wantState.replace(/[^a-z]/g, "")); } else if (wantFace) paintAvatars(resting());
+  });
 })();
 </script>
 </body>

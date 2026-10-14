@@ -95,6 +95,10 @@ export interface CliOptions {
   cecTool?: string[];
   /** `hearth ring demo|off|<state>`: the words after `ring` — the status ring on its own. */
   ringTool?: string[];
+  /** The voice replies are spoken in (`HEARTH_TTS_VOICE`, `_SPEED`, `_PITCH`; the lab's Voice tab writes them to the config). */
+  ttsVoice?: string;
+  ttsSpeed?: number;
+  ttsPitch?: number;
   /** `--target N`: the CEC logical address a `hearth cec` command is aimed at. */
   target?: number;
   /** `--no-save`: setup prints what it would write and writes nothing. */
@@ -170,6 +174,9 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (env.HEARTH_VOICE === "1") opts.voice = true;
   if (env.HEARTH_LEDS === "1") opts.leds = true;
   if (env.HEARTH_WAKE) opts.wakeWord = env.HEARTH_WAKE;
+  if (env.HEARTH_TTS_VOICE) opts.ttsVoice = env.HEARTH_TTS_VOICE;
+  if (env.HEARTH_TTS_SPEED) opts.ttsSpeed = Number(env.HEARTH_TTS_SPEED);
+  if (env.HEARTH_TTS_PITCH) opts.ttsPitch = Number(env.HEARTH_TTS_PITCH);
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;

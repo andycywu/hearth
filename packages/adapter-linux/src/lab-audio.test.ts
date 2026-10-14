@@ -85,10 +85,19 @@ describe("audio lab", () => {
   it("speaks with espeak-ng, passing the text after -- so it can never be read as a flag", async () => {
     const calls: string[][] = [];
     const lab = createAudioLab({ run: async (c, a) => { calls.push([c, ...a]); return { code: 0, stdout: "", stderr: "" }; } });
-    await lab.say("--stdout hello", "cmn");
+    await lab.say("--stdout hello", { voice: "cmn" });
     expect(calls[0]).toEqual(["espeak-ng", "-v", "cmn", "--", "--stdout hello"]);
     expect((await lab.say("   "))).toMatchObject({ ok: false });
-    await lab.say("x", "not a voice; rm");
-    expect(calls[1]).toEqual(["espeak-ng", "--", "x"]);
+    // A voice that is not a voice name is refused, not quietly dropped: the page is told, and nothing runs.
+    expect(await lab.say("x", { voice: "not a voice; rm" })).toMatchObject({ ok: false });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("speaks at the speed and pitch it is given", async () => {
+    const calls: string[][] = [];
+    const lab = createAudioLab({ run: async (c, a) => { calls.push([c, ...a]); return { code: 0, stdout: "", stderr: "" }; } });
+    await lab.say("hi", { voice: "en-us+f3", speed: 140, pitch: 70 });
+    expect(calls[0]).toEqual(["espeak-ng", "-v", "en-us+f3", "-s", "140", "-p", "70", "--", "hi"]);
+    expect(await lab.say("hi", { speed: 9_000 })).toMatchObject({ ok: false });
   });
 });

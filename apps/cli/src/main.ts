@@ -246,8 +246,9 @@ async function finishRing(ring: StatusRing | undefined): Promise<void> {
  */
 async function openRing(): Promise<StatusRing | undefined> {
   try {
-    const { createStatusRing } = await import("@hearthkit/adapter-linux");
-    const ring = createStatusRing();
+    const { createStatusRing, withStateFile } = await import("@hearthkit/adapter-linux");
+    // Wrapped so the lab's avatar can look like the real ring: each state change is also written to a small file on the tmpfs.
+    const ring = withStateFile(createStatusRing());
     await ring.off();          // proves the power gate and the bus before relying on them
     return ring;
   } catch (err) {
@@ -307,6 +308,7 @@ async function openPlatform(opts: CliOptions, local?: LocalListener): Promise<Pl
               // `unsupported` for listening rather than recording audio it has
               // no way to read. `parseArgs` has already said so out loud.
               ...(local ? { listener: local.listener } : {}),
+              ...ttsOptions(linux, opts),
               ...(opts.asrBaseUrl && !local
                 ? {
                     transcribe: linux.createOpenAiTranscriber({
@@ -326,6 +328,27 @@ async function openPlatform(opts: CliOptions, local?: LocalListener): Promise<Pl
   const platform = createWebAdapter();
   await platform.init();
   return platform;
+}
+
+/**
+ * The voice replies are spoken in, from the config / environment, checked before it reaches a command line.
+ * A bad value is said and ignored: a typo in a config file should not leave the box mute.
+ */
+function ttsOptions(
+  linux: typeof import("@hearthkit/adapter-linux"),
+  opts: CliOptions,
+): { voiceName?: string; speed?: number; pitch?: number } {
+  const checked = linux.validateTtsChoice({ voice: opts.ttsVoice, speed: opts.ttsSpeed, pitch: opts.ttsPitch });
+  if (!checked.ok) {
+    stderr.write(`hearth: ignoring the configured voice: ${checked.error}\n`);
+    return {};
+  }
+  const c = checked.choice;
+  return {
+    ...(c.voice ? { voiceName: c.voice } : {}),
+    ...(c.speed !== undefined ? { speed: c.speed } : {}),
+    ...(c.pitch !== undefined ? { pitch: c.pitch } : {}),
+  };
 }
 
 /** Tool arguments on one line, short enough to scan in a trace. */

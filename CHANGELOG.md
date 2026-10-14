@@ -8,6 +8,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Hearth has a face and a voice you can change** — the Avatar and Voice tabs of
+  `hearth lab`. Six faces (orb, robot, cat, owl, fox, ghost) drawn in SVG, with an
+  expression for every state the status ring can be in, in the ring's own colours: the
+  face and the ring are two views of one fact. The face **follows the real Hearth**:
+  each ring state change is also written to a small file on the runtime tmpfs and the
+  lab streams it, so the face is hearing when the box is hearing, from whichever
+  process owns the ring. 141 espeak-ng languages and accents × 16 timbres, with speed
+  and pitch, a filter, a sample sentence per language and "surprise me"; both are
+  saved to `config.json` (`avatar`, `ttsVoice`, `ttsSpeed`, `ttsPitch`) and the voice
+  app speaks with the saved voice. A voice name is validated before it reaches an
+  `espeak-ng` command line, a bad saved one is reported and ignored rather than
+  leaving the box mute, and the text always follows `--`. Checked by photographing
+  the Pi's screen: the avatar and voice tabs render, and "done" is a smiling cat with
+  a green halo. What this is not: the voices are all plainly a machine; a neural one
+  (sherpa-onnx's offline TTS is already in the release on the Pi) has **not** been
+  tried on a Pi 3B and is the thing to measure next. See
+  [`docs/avatar-and-voice.md`](docs/avatar-and-voice.md).
+
 - **The status ring shows all the work, and is still when there is none.** Until now
   the ReSpeaker ring painted four answers (green, amber, red, violet) and a dim blue
   "listening"; everything before an answer — the model loading, a voice heard, words

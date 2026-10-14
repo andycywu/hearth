@@ -180,3 +180,8 @@ export {
   type CecLabResult, type CecCommandDef, type CecVerdict, type CecContext, type CecGroup, type DiagStep, type DiagnoseIo, type AdapterInfo,
 } from "./lab-cec.js";
 export { createAudioLab, levelsOfWav, type AudioLab, type WavLevels } from "./lab-audio.js";
+export {
+  parseEspeakVoices, listTtsVoices, validateTtsChoice, espeakArgs, TTS_VARIANTS,
+  type TtsVoice, type TtsVariant, type TtsChoice,
+} from "./tts-voices.js";
+export { withStateFile, readRingState, ringStatePath, type RingStateRecord } from "./ring-state.js";

@@ -24,6 +24,7 @@
  */
 import { TvUnsupportedError, type VoicePipeline } from "@hearthkit/platform-api";
 import { systemRunner, type Runner } from "./run.js";
+import { espeakArgs } from "./tts-voices.js";
 
 /** Long enough for a sentence, and for the transcription that follows it. */
 const VOICE_TIMEOUT_MS = 60_000;
@@ -80,6 +81,10 @@ export interface LinuxVoiceOptions {
   listener?: SpeechListener;
   /** espeak-ng voice, e.g. `cmn` for Mandarin. */
   voiceName?: string;
+  /** Words per minute, 80–450; espeak-ng's own default if omitted. */
+  speed?: number;
+  /** 0–99; espeak-ng's own default if omitted. */
+  pitch?: number;
   /** Where a recording is written before it is read back. */
   capturePath?: string;
   /** Injected in tests; defaults to reading the captured file from disk. */
@@ -242,7 +247,7 @@ export function createLinuxVoicePipeline(opts: LinuxVoiceOptions = {}): VoicePip
     speak: async (text) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const args = opts.voiceName ? ["-v", opts.voiceName, "--", trimmed] : ["--", trimmed];
+      const args = espeakArgs({ voice: opts.voiceName, speed: opts.speed, pitch: opts.pitch }, trimmed);
       const said = await run("espeak-ng", args);
       if (said.code !== 0) {
         throw new TvUnsupportedError(
