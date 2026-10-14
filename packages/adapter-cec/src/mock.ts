@@ -110,6 +110,13 @@ export function createMockCecBus(
       if (target.wakesOnStreamPath) target.power = "on";
     },
 
+    imageViewOn: async (logical) => {
+      requireBus();
+      sent.push(`image_view_on ${logical}`);
+      const target = find(logical);
+      if (target?.wakesOnStreamPath) target.power = "on";
+    },
+
     standby: async (logical) => {
       requireBus();
       sent.push(`standby ${logical}`);

@@ -285,6 +285,16 @@ describe("the Linux CEC transport", () => {
     expect(run.calls).toContain("cec-ctl -d /dev/cec0 --to 8 --standby");
   });
 
+  it("wakes a television with Image View On, addressed — the message that took a real set from standby to on", async () => {
+    const run = fakeRunner({});
+    const cec = createLinuxCecTransport({ run });
+
+    await cec.imageViewOn!(0);
+    expect(run.calls).toContain("cec-ctl -d /dev/cec0 --to 0 --image-view-on");
+    // And it claimed an address first, as every transmit does on a freshly booted adapter.
+    expect(run.calls[0]).toBe("cec-ctl -d /dev/cec0 --playback");
+  });
+
   it("treats a NACK as a failure, not as a device that is switched off", async () => {
     // NACK means nothing answered at that address — the device is not there.
     // Reporting it as a successful transmit would leave the planner believing a

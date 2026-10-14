@@ -66,5 +66,7 @@ async function defaultTransports(opts: CliOptions): Promise<DeviceTransport[]> {
     import("@hearthkit/adapter-linux"),
     import("@hearthkit/adapter-cec"),
   ]);
-  return [createCecTransport(createLinuxCecTransport({ device: opts.cec }))];
+  // `remoteTv`: this box is a playback device on one of the TV's HDMI ports, not the TV, so the TV at CEC
+  // address 0 is a device to drive — and its power is what "turn off the tv" means.
+  return [createCecTransport(createLinuxCecTransport({ device: opts.cec }), { remoteTv: true })];
 }

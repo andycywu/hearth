@@ -2,3 +2,4 @@ export { createSherpaStt, sherpaServerCommand, joinSegments, modelLabel, type Sh
 export { createArecordInput, type ArecordInputOptions } from "./arecord-input.js";
 export { systemSpawner, type Spawner, type SpawnedProcess, type SpawnOptions } from "./process.js";
 export { createEdgeListener, gateInput, type EdgeListenerOptions } from "./listener.js";
+export { createWavFileInput, type WavFileInputOptions } from "./wav-input.js";

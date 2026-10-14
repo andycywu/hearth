@@ -170,7 +170,7 @@ export {
   createLinuxCecTransport, parseTopology, parsePowerStatus, type LinuxCecOptions,
 } from "./cec.js";
 export {
-  createSherpaStt, sherpaServerCommand, createArecordInput, createEdgeListener, gateInput, systemSpawner,
+  createSherpaStt, sherpaServerCommand, createArecordInput, createWavFileInput, createEdgeListener, gateInput, systemSpawner,
   type SherpaSttOptions, type SherpaServerCommand, type Spawner, type SpawnedProcess,
 } from "./stt/index.js";
 export {

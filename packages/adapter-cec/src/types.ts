@@ -125,6 +125,18 @@ export interface CecTransport {
   /** `<Standby>` (0x36), addressed to one device — never broadcast, which would put the whole room to sleep. */
   standby(logical: CecLogicalAddress): Promise<void>;
 
+  /**
+   * `<Image View On>` (0x04), addressed — the message that wakes a *television*.
+   *
+   * Optional because only a box sitting beside a TV needs it. `wake()` above is
+   * `<Set Stream Path>`, which asks the bus to show a device, and aimed at the TV
+   * itself (physical address 0.0.0.0) it names the TV as the thing to show — not
+   * a wake-up. Verified on a real set 2026-10-12: `<Image View On>` took it from
+   * `standby` to `on` in about a second. As with `wake`, resolving means the bus
+   * accepted the message and nothing more; the read-back settles it.
+   */
+  imageViewOn?(logical: CecLogicalAddress): Promise<void>;
+
   /** `<Set Stream Path>` (0x86) without the power intent: route the TV to this device. */
   selectSource(device: CecDevice): Promise<void>;
 }

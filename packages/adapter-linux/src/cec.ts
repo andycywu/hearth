@@ -126,6 +126,11 @@ export function createLinuxCecTransport(opts: LinuxCecOptions = {}): CecTranspor
       await transmit(["--set-stream-path", `phys-addr=${target.physical}`]);
     },
 
+    imageViewOn: async (logical) => {
+      // The message that wakes a television (verified 2026-10-12: standby -> on in about a second).
+      await transmit(["--to", String(logical), "--image-view-on"]);
+    },
+
     standby: async (logical) => {
       // Addressed, never broadcast. A broadcast `<Standby>` puts every device in
       // the room to sleep, which is a spectacular way to answer "turn off the

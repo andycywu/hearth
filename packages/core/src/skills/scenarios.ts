@@ -99,6 +99,38 @@ export const SKILLS: Skill[] = [
     }),
   },
   {
+    id: "tv_power_off",
+    description: "Put the television in standby",
+    triggers: [
+      "turn off the tv", "turn the tv off", "switch off the tv", "switch the tv off", "turn off tv",
+      "關電視", "關閉電視", "關掉電視", "把電視關掉", "電視關掉",
+    ],
+    blocked: "I can't tell whether the television is on.",
+    // Ask first, as `quieter` asks for the volume: if the TV already says it is in standby the goal is
+    // met and nothing is sent, and if it says it is on the read-back later has something to compare with.
+    // On a host with no way to reach the TV's power this read does nothing and the plan is unsupported.
+    resolve: async (params, ctx) => { await ctx.observe("tv.power.status"); return params; },
+    goal: (params) => ({
+      id: "tv_standby",
+      params,
+      desiredState: [{ path: W.device("tv", "power"), equals: "standby" }],
+    }),
+  },
+  {
+    id: "tv_power_on",
+    description: "Wake the television",
+    triggers: [
+      "turn on the tv", "turn the tv on", "switch on the tv", "switch the tv on", "turn on tv",
+      "開電視", "打開電視", "開啟電視", "把電視打開", "電視打開",
+    ],
+    resolve: async (params, ctx) => { await ctx.observe("tv.power.status"); return params; },
+    goal: (params) => ({
+      id: "tv_awake",
+      params,
+      desiredState: [{ path: W.device("tv", "power"), equals: "on" }],
+    }),
+  },
+  {
     id: "movie_night",
     description: "Set the room up for a film",
     triggers: ["movie night", "看電影", "我要看電影", "watch a film"],

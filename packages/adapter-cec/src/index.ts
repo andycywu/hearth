@@ -9,7 +9,7 @@ export { createCecSource } from "./source.js";
 export { createCecTransport } from "./transport-binding.js";
 export {
   createCecCapabilities, createCecTools, cecHandlers, cecTargets, toolSuffix,
-  type CecCapabilityOptions,
+  type CecCapabilityOptions, type CecTargetOptions,
 } from "./capabilities.js";
 export {
   createMockCecBus, MOCK_LIVING_ROOM,

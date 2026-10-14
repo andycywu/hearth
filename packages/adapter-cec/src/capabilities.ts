@@ -3,7 +3,7 @@ import {
   type Capability, type CapabilityHandler, type DeviceGraph, type Tool,
 } from "@hearthkit/core";
 import { TvUnsupportedError } from "@hearthkit/platform-api";
-import type { CecDevice, CecTransport } from "./types.js";
+import { CEC_ADDRESS_TV, type CecDevice, type CecTransport } from "./types.js";
 
 /**
  * What CEC adds to the Capability Graph, and the one thing it changes.
@@ -36,6 +36,13 @@ import type { CecDevice, CecTransport } from "./types.js";
  *  - there is no CEC on this platform → **unsupported**, withdrawn, never
  *    offered to a model again
  */
+
+export interface CecTargetOptions {
+  /** This transport's host is a separate box beside the TV, so the TV at address 0 is a device to drive. */
+  remoteTv?: boolean;
+  /** The graph node the TV's power belongs to. Default `tv`. */
+  tvNodeId?: string;
+}
 
 export interface CecCapabilityOptions {
   /** The Device Graph node id this capability acts on — `cec-2-0-0-0`, `ps5`. */
@@ -141,6 +148,12 @@ export function cecHandlers(
     };
 
     handlers[`${deviceId}.power.on`] = async () => {
+      // The television wakes on <Image View On>. <Set Stream Path> at its own address is "show the
+      // TV", which is not a wake-up; everything else on the bus wakes on that.
+      if (device.logical === CEC_ADDRESS_TV && transport.imageViewOn) {
+        await transport.imageViewOn(device.logical);
+        return {};
+      }
       if (!device.physical) {
         // `<Set Stream Path>` is addressed by physical address. Without one
         // there is no message to send — that is absence, not failure.
@@ -175,12 +188,19 @@ export function cecHandlers(
  * are both simply absent from the result: one is a device we cannot name, the
  * other a device we cannot reach.
  */
-export function cecTargets(graph: DeviceGraph, found: CecDevice[]): CecCapabilityOptions[] {
+export function cecTargets(graph: DeviceGraph, found: CecDevice[], opts: CecTargetOptions = {}): CecCapabilityOptions[] {
   const byPhysical = new Map<string, CecDevice>();
   for (const device of found) {
     if (device.physical) byPhysical.set(device.physical, device);
   }
   const targets: CecCapabilityOptions[] = [];
+  // A box *beside* the television — a Pi on one of its HDMI ports — is not the television, and the TV it
+  // answers to at address 0 is a real, separate device with its own power state. The graph's `tv` node is
+  // the screen the room watches, so that is the node the TV's power belongs to.
+  if (opts.remoteTv) {
+    const tv = found.find((d) => d.logical === CEC_ADDRESS_TV);
+    if (tv && graph.get(opts.tvNodeId ?? "tv")) targets.push({ deviceId: opts.tvNodeId ?? "tv", device: tv });
+  }
   for (const node of graph.list()) {
     const address = node.cecAddress;
     if (!address) continue;

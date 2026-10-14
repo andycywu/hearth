@@ -9,7 +9,7 @@
 import {
   createEnergyVad, createPipeline, resolveEdgeVoiceConfig, type LogEvent,
 } from "@hearthkit/edge-voice";
-import { createArecordInput, createEdgeListener, gateInput, type SpeechListener } from "@hearthkit/adapter-linux";
+import { createArecordInput, createEdgeListener, createWavFileInput, gateInput, type SpeechListener } from "@hearthkit/adapter-linux";
 import { defaultEngine } from "./stt.js";
 
 export interface LocalListener {
@@ -29,7 +29,13 @@ export async function createLocalListener(
   // Fails here, before the agent starts, if there is no model to listen with.
   const engine = await defaultEngine(config);
   const format = { sampleRate: config.sampleRate, channels: config.channels };
-  const gated = gateInput(createArecordInput({ device: config.audioDevice, format }));
+  // `HEARTH_AUDIO_DEVICE=file:/path/to.wav` plays a recording into the whole voice path as if it were the
+  // microphone, paced to its own clock: the same speech every time, for testing without anyone in the room.
+  const fromFile = config.audioDevice.startsWith("file:");
+  const gated = gateInput(fromFile
+    ? createWavFileInput({ path: config.audioDevice.slice("file:".length), format })
+    : createArecordInput({ device: config.audioDevice, format }));
+  if (fromFile) io.err(`hearth: listening to ${config.audioDevice.slice("file:".length)}, not a microphone\n`);
   const pipeline = createPipeline({
     input: gated, stt: engine,
     ...(config.vadEnabled ? { vad: createEnergyVad({ format }) } : {}),

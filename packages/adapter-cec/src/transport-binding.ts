@@ -1,5 +1,5 @@
 import type { DeviceGraph, DeviceTransport, TransportAttachment } from "@hearthkit/core";
-import { cecTargets, createCecCapabilities, createCecTools } from "./capabilities.js";
+import { cecTargets, createCecCapabilities, createCecTools, type CecTargetOptions } from "./capabilities.js";
 import { createCecSource } from "./source.js";
 import type { CecTransport } from "./types.js";
 
@@ -22,7 +22,7 @@ import type { CecTransport } from "./types.js";
  * holding a topology from before `discoverRoom` merged anything, which is
  * exactly the stale-id bug this arrangement exists to avoid.
  */
-export function createCecTransport(bus: CecTransport): DeviceTransport {
+export function createCecTransport(bus: CecTransport, opts: CecTargetOptions = {}): DeviceTransport {
   return {
     id: "cec",
     sources: [createCecSource(bus)],
@@ -33,7 +33,7 @@ export function createCecTransport(bus: CecTransport): DeviceTransport {
       // holding promises this device cannot keep.
       if (!(await bus.available())) return { note: "no bus on this platform" };
 
-      const targets = cecTargets(devices, await bus.scan());
+      const targets = cecTargets(devices, await bus.scan(), opts);
       if (!targets.length) {
         // A bus with nothing on it is a real and unremarkable state: an HDMI
         // port with nothing plugged into it, or devices that do not speak CEC.
