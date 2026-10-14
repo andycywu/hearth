@@ -136,3 +136,17 @@ describe("hearth setup and the config it writes", () => {
     expect(parseArgs(["--wake", "  "]).wakeWord).toBeUndefined();
   });
 });
+
+describe("--serve and --asr local", () => {
+  it("--serve is parsed, and warns when there is no microphone to keep listening to", () => {
+    expect(parseArgs(["--serve", "--voice", "--platform", "linux", "--asr", "local"]).warnings).toEqual([]);
+    expect(parseArgs(["--serve"]).warnings.join("")).toMatch(/--serve without --voice/);
+  });
+
+  it("--asr local is passed through as \"local\", not turned into a URL, and counts as an ASR for --voice", () => {
+    const o = parseArgs(["--voice", "--platform", "linux", "--asr", "local"]);
+    expect(o.asrBaseUrl).toBe("local");
+    expect(o.warnings.join("")).not.toMatch(/without --asr/);
+    expect(parseArgs(["--voice", "--platform", "linux"], { TV_AGENT_ASR: "local" }).asrBaseUrl).toBe("local");
+  });
+});

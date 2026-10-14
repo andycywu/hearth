@@ -164,12 +164,18 @@ export {
 } from "./leds.js";
 export {
   createLinuxVoicePipeline, createOpenAiTranscriber, detectVoice, rmsOfWav,
-  type Transcriber, type CaptureFormat, type LinuxVoiceOptions, type OpenAiTranscriberOptions,
+  type Transcriber, type CaptureFormat, type SpeechListener, type LinuxVoiceOptions, type OpenAiTranscriberOptions,
 } from "./voice.js";
 export {
   createLinuxCecTransport, parseTopology, parsePowerStatus, type LinuxCecOptions,
 } from "./cec.js";
 export {
-  createSherpaStt, sherpaServerCommand, createArecordInput, systemSpawner,
+  createSherpaStt, sherpaServerCommand, createArecordInput, createEdgeListener, gateInput, systemSpawner,
   type SherpaSttOptions, type SherpaServerCommand, type Spawner, type SpawnedProcess,
 } from "./stt/index.js";
+export {
+  CEC_COMMANDS, CEC_LAB_TIMEOUT_MS, labContext, findCommand, runCecCommand, runCecRaw, diagnoseCec, validateRawArgs,
+  parseAdapterInfo, parseReplyFacts, parseTopologyFacts, interpretTransmit, readAdapter, ensureClaimed,
+  type CecLabResult, type CecCommandDef, type CecVerdict, type CecContext, type CecGroup, type DiagStep, type DiagnoseIo, type AdapterInfo,
+} from "./lab-cec.js";
+export { createAudioLab, levelsOfWav, type AudioLab, type WavLevels } from "./lab-audio.js";

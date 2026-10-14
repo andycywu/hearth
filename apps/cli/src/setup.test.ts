@@ -82,7 +82,43 @@ describe("hearth setup", () => {
     expect(next.warnings).toEqual([]);
 
     const unit = await readFile(p.unitPath, "utf8");
-    expect(unit).toContain("ExecStart=/home/andycywu/.local/node/bin/node /home/andycywu/hearth/apps/cli/dist/main.js --platform linux --yes --voice --leds");
+    expect(unit).toContain("ExecStart=/home/andycywu/.local/node/bin/node /home/andycywu/hearth/apps/cli/dist/main.js --platform linux --yes --voice --leds --serve");
+  });
+
+  it("--asr local: recognition on the box, the model settings go into the service, and no key is needed", async () => {
+    const { out, sink } = await io();
+    const p = await paths();
+    const opts = parseArgs(["--platform", "linux", "setup", "--asr", "local"], {});
+    const code = await runSetup(opts, sink, {
+      ...p, run: piRunner, readFile: async (f) => PI_FILES[f] ?? "",
+      exists: async (f) => f === "/dev/cec0" || f === "/dev/spidev0.1",
+      nodeVersion: "v26.8.2", nodePath: "/home/pi/.local/node/bin/node", cliPath: "/home/pi/hearth/apps/cli/dist/main.js",
+      env: { HEARTH_STT_MODEL_PATH: "/home/pi/stt/model", HEARTH_STT_RUNTIME_PATH: "/home/pi/stt/release", TV_AGENT_API_KEY: "sk-must-not-be-copied" },
+    });
+    expect(code).toBe(0);
+    expect(out.join("")).toMatch(/✓ Voice\s+microphone \(arecord\) and speech \(espeak-ng\); recognition on this box/);
+    expect(await loadConfig(p.configPath)).toMatchObject({ voice: true, asrBaseUrl: "local" });
+
+    const unit = await readFile(p.unitPath, "utf8");
+    expect(unit).toContain("--voice --leds --serve");
+    expect(unit).toContain('Environment=HEARTH_STT_MODEL_PATH="/home/pi/stt/model"');
+    expect(unit).toContain('Environment=HEARTH_STT_RUNTIME_PATH="/home/pi/stt/release"');
+    // Paths may sit in a unit file; the key may not.
+    expect(unit).not.toContain("sk-must-not-be-copied");
+  });
+
+  it("--asr local with no model configured says so, and does not start a service that cannot listen", async () => {
+    const { out, sink } = await io();
+    const p = await paths();
+    const opts = parseArgs(["--platform", "linux", "setup", "--asr", "local"], {});
+    await runSetup(opts, sink, {
+      ...p, run: piRunner, readFile: async (f) => PI_FILES[f] ?? "", exists: async () => false,
+      nodeVersion: "v26.8.2", env: {},
+    });
+    expect(out.join("")).toMatch(/no speech model is configured/);
+    expect(out.join("")).toMatch(/HEARTH_STT_MODEL_PATH and HEARTH_STT_RUNTIME_PATH/);
+    expect(await loadConfig(p.configPath)).toMatchObject({ voice: false });
+    await expect(readFile(p.unitPath, "utf8")).rejects.toThrow();
   });
 
   it("says plainly what a box without voice can and cannot do, and writes no service for it", async () => {

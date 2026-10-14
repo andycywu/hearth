@@ -240,3 +240,79 @@ owning a Pi is not a test failure.
   IR blaster). The executor already tries fallbacks in order and withdraws a
   provider that answers `unsupported`; what is missing is a second transport to
   fall back *to*.
+
+## Testing it by hand: `hearth lab` and `hearth cec`
+
+`tools/verify-cec.mjs` runs a fixed sequence and prints a transcript. When
+"the TV does not respond" and nobody can say where the break is, what is wanted
+is the opposite: send *one* command, see the exact `cec-ctl` line that went out,
+and see what the bus said about it in words that separate the cases. That is what
+these are.
+
+```sh
+hearth cec diagnose            # the layers, cable up, stopping at the first that is not working
+hearth cec list                # every command (⚠ = changes the TV)
+hearth cec tv-power-status     # one read-only question
+hearth cec tv-standby --yes    # a state change; refused without --yes, and read back afterwards
+hearth cec send "--to 0 --give-device-power-status"   # any plain cec-ctl flags
+
+hearth lab                     # the same, as a window on the Pi's own desktop
+hearth lab --install-launcher  # a "Hearth Lab" icon on the desktop
+hearth lab --listen lan        # also reachable from another machine's browser
+```
+
+The window has a button for every command, a **Diagnose** button, a raw box, a
+live bus monitor, a microphone level meter with playback, a speaker test, and a
+"Hearth's view" button that runs Hearth's own transport so its answer can be set
+beside the raw bus. Each result shows the command line, the raw output, and a
+verdict:
+
+| Verdict | What it means | Usually |
+|---|---|---|
+| `reply` | the target answered | — |
+| `sent` | the bus acknowledged; nothing says it was acted on | a key press, a standby — read it back |
+| `no-reply` | acknowledged, and silent | the TV ignores that question |
+| `not-acknowledged` | nobody is listening at that address | TV off, CEC disabled in its settings, or a cable without the CEC pin |
+| `feature-abort` | "I do not support that" | a TV asked for its audio status |
+| `unconfigured` | this adapter has no logical address | a reboot — see below |
+| `error` | `cec-ctl` itself failed | not installed, no permission, a flag it does not know |
+
+A command that changes the TV and has a state to read back (standby, wake, the
+power keys) ends with the read-back: `verified` only if the TV itself then
+reported the state, and "accepted the message and did not do it" if it did not.
+Volume and navigation keys have no read-back and no acknowledgement of effect;
+those are `sent`, and the screen is the only witness.
+
+It serves on `127.0.0.1` only, behind a random token printed at start-up, and
+refuses a request whose `Host` is not the loopback. It controls a television; it
+is not a page for a neighbour. `--listen lan` removes the first guard and keeps
+the token.
+
+### What it found on the first day (2026-10-14, Pi 3B beside a Titan OS set)
+
+- **A rebooted Pi has an unconfigured CEC adapter.** `Logical Address Mask:
+  0x0000`, and every transmit prints `Adapter is unconfigured, please configure
+  it first.` — **and `cec-ctl` exits 0.** The I/O walk-through script, which did
+  not claim an address, reported "TV answers on CEC: FAILED" and the TV looked
+  dead; it was fine, and answered the moment `cec-ctl --playback` ran. Hearth's
+  own transport claims one on its first transmit; a hand-written script has to.
+  `hearth cec diagnose` names this case, and the lab claims an address before it
+  transmits and shows that it did.
+- **Standby and wake over CEC work on this TV, with read-back** (2026-10-12): the
+  Titan OS set reported `standby` about a second after `<Standby>` and `on` about a
+  second after `<Image View On>`. That is the question 2026-10-05's report left
+  open. It is a fact about the bus, read from outside, with nothing installed on
+  the set.
+- **The TV aborts `<Give Audio Status>`** — only audio systems answer it — so
+  there is no way to read the TV's volume back over CEC, and a volume key is
+  `sent`, not `verified`.
+- **`cec-ctl --monitor` needs root**, even to listen. The lab tries `sudo -n` once
+  and otherwise prints the command to run in a terminal.
+- **On the Pi's Wayland desktop Chromium must be told `--ozone-platform=wayland`.**
+  It defaults to X11 and exits with `Missing X server or $DISPLAY`;
+  `--ozone-platform-hint=auto` did not help.
+- **Hearth cannot yet turn the TV on or off by voice.** The agent treats the Pi as
+  the television and uses CEC only for devices *past* it, so "turn off the tv"
+  gets "I can set volume, mute, switch input, or open an app" even though the bus
+  has just been shown to do it. The lab shows the gap from both sides; closing it
+  means treating the TV as a CEC target when the box is a playback device beside it.

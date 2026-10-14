@@ -38,6 +38,8 @@ export interface SetupDeps {
   /** Name of the user running setup, for the unit's `User=` hint. */
   user?: string;
   readFile?: (path: string) => Promise<string>;
+  /** Where `HEARTH_STT_*` are read from for `--asr local`. Default `process.env`. */
+  env?: Record<string, string | undefined>;
 }
 
 interface Finding {
@@ -109,10 +111,18 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
   // --- voice -------------------------------------------------------------------
   const heard = await detectVoice(run);
   const asr = opts.asrBaseUrl;
+  const local = asr === "local";
+  const sttEnv = local ? localSttEnv(deps.env ?? process.env) : {};
+  const localReady = Boolean(sttEnv.HEARTH_STT_SERVER_URL || (sttEnv.HEARTH_STT_MODEL_PATH && sttEnv.HEARTH_STT_RUNTIME_PATH));
   const hosted = asr !== undefined && /^https:\/\/api\.openai\.com\b/.test(asr);
   const keyMissing = hosted && !opts.apiKey;
   if (heard.capture && heard.tts) {
-    findings.push(asr
+    findings.push(local
+      ? localReady
+        ? { what: "Voice", ok: true, detail: "microphone (arecord) and speech (espeak-ng); recognition on this box (sherpa-onnx), nothing sent anywhere" }
+        : { what: "Voice", ok: "partial", detail: "microphone and speech are here and `--asr local` is set, but no speech model is configured",
+            fix: "Set HEARTH_STT_MODEL_PATH and HEARTH_STT_RUNTIME_PATH (see docs/edge-voice.md) in the environment you run setup in; setup copies them into the service." }
+      : asr
       ? keyMissing
         ? { what: "Voice", ok: "partial", detail: `microphone (arecord) and speech (espeak-ng); transcription at ${asr}, but no key`,
             fix: "Put the key in the environment, never on the command line: `export TV_AGENT_API_KEY=sk-…` — or in ~/.config/hearth/env (see below), which the service reads." }
@@ -145,14 +155,14 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
     // Listening needs a microphone, a transcriber, and — for a hosted one — a
     // key. Without all three the box would record and then have nowhere to
     // send it, so it does not start listening at all.
-    voice: Boolean(heard.capture && asr && !keyMissing),
+    voice: Boolean(heard.capture && asr && !keyMissing && (!local || localReady)),
     ...(asr ? { asrBaseUrl: asr } : {}),
     ...(opts.asrModel ? { asrModel: opts.asrModel } : {}),
     leds: hasSpi,
     // Default to an attention word whenever this box will listen: a room
     // microphone that acts on everything it hears is a thing to opt into, not
     // to discover.
-    ...(heard.capture && asr && !keyMissing ? { wakeWord: opts.wakeWord ?? previous.wakeWord ?? "hearth" } : {}),
+    ...(heard.capture && asr && !keyMissing && (!local || localReady) ? { wakeWord: opts.wakeWord ?? previous.wakeWord ?? "hearth" } : {}),
     ...(opts.baseUrl ? { llmBaseUrl: opts.baseUrl } : {}),
     ...(opts.baseUrl && opts.model ? { llmModel: opts.model } : {}),
     writtenBy: `hearth setup, Node ${node}`,
@@ -218,6 +228,7 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
         voice: true,
         leds: config.leds ?? false,
         ...(config.wakeWord ? { wakeWord: config.wakeWord } : {}),
+        ...(local ? { env: sttEnv } : {}),
       }), "utf8");
       if (!opts.json) {
         io.out(`\nA user service template is at ${unitPath} — to run Hearth at boot:\n`);
@@ -244,9 +255,15 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
  * could not find it. A unit that said `node` would fail at boot with a message
  * nobody would connect to their shell profile.
  */
-export function systemdUnit(o: { node: string; cli: string; voice: boolean; leds: boolean; wakeWord?: string }): string {
+export function systemdUnit(o: {
+  node: string; cli: string; voice: boolean; leds: boolean; wakeWord?: string;
+  /** Plain settings (paths, never secrets) the service needs; written as Environment= lines. */
+  env?: Record<string, string>;
+}): string {
   const flags = [
     "--platform linux", "--yes", o.voice ? "--voice" : "", o.leds ? "--leds" : "",
+    // A service's stdin is /dev/null, which ends the command loop at once; --serve is what keeps it listening.
+    o.voice ? "--serve" : "",
     o.wakeWord ? `--wake ${JSON.stringify(o.wakeWord)}` : "",
   ].filter(Boolean).join(" ");
   return [
@@ -258,6 +275,7 @@ export function systemdUnit(o: { node: string; cli: string; voice: boolean; leds
     "[Service]",
     "# Secrets live here, 0600, not in this file: `systemctl cat` shows this file to anyone.",
     "EnvironmentFile=-%h/.config/hearth/env",
+    ...Object.entries(o.env ?? {}).map(([k, v]) => `Environment=${k}=${JSON.stringify(v)}`),
     `ExecStart=${o.node} ${o.cli} ${flags}`,
     "Restart=on-failure",
     "RestartSec=5",
@@ -269,6 +287,20 @@ export function systemdUnit(o: { node: string; cli: string; voice: boolean; leds
     "WantedBy=default.target",
     "",
   ].join("\n");
+}
+
+/**
+ * The speech-model settings `--asr local` needs, for a service that starts with
+ * no shell profile. Paths and URLs only: nothing here is a secret, which is why
+ * these may sit in a unit file when the API key may not.
+ */
+export function localSttEnv(env: Record<string, string | undefined>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of ["HEARTH_STT_MODEL_PATH", "HEARTH_STT_RUNTIME_PATH", "HEARTH_STT_SERVER_URL", "HEARTH_AUDIO_DEVICE", "HEARTH_LOG_LEVEL"]) {
+    const v = env[k]?.trim();
+    if (v) out[k] = v;
+  }
+  return out;
 }
 
 function defaultCliPath(): string {

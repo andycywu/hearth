@@ -75,6 +75,26 @@ export interface CliOptions {
   sttBench?: string;
   /** `--realtime`: pace a benchmark to the audio's own clock, so latency means something. */
   realtime: boolean;
+  /**
+   * `--serve`: with a microphone, keep listening until stopped (SIGINT/SIGTERM) even
+   * when there is no terminal. Without it, end of stdin ends the program — which
+   * is right for `echo … | hearth` and fatal for a service, whose stdin is /dev/null.
+   */
+  serve: boolean;
+  /** `hearth lab`: the CEC / audio test window, served from this box. */
+  lab: boolean;
+  /** `--port N` for the lab. Default 8420. */
+  labPort?: number;
+  /** `--listen lan`: let the lab answer on the network too (token still required). */
+  labLan: boolean;
+  /** `--no-open`: start the lab without opening a window. */
+  noOpen: boolean;
+  /** `--install-launcher`: put a "Hearth Lab" icon on the desktop. */
+  installLauncher: boolean;
+  /** `hearth cec <command>`: the words after `cec`. */
+  cecTool?: string[];
+  /** `--target N`: the CEC logical address a `hearth cec` command is aimed at. */
+  target?: number;
   /** `--no-save`: setup prints what it would write and writes nothing. */
   save: boolean;
   /** Anything wrong with the invocation, in the order found. */
@@ -113,6 +133,11 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     setup: false,
     stt: false,
     realtime: false,
+    serve: false,
+    lab: false,
+    labLan: false,
+    noOpen: false,
+    installLauncher: false,
     save: true,
     writes: false,
     room: "stored",
@@ -179,6 +204,32 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       case "--out": { const v = takeValue("--out"); if (v !== undefined) opts.out = v; break; }
       case "--writes": opts.writes = true; break;
       case "--realtime": opts.realtime = true; break;
+      case "--serve": opts.serve = true; break;
+      case "--no-open": opts.noOpen = true; break;
+      case "--install-launcher": opts.installLauncher = true; break;
+      case "--port": {
+        const v = takeValue("--port");
+        if (v === undefined) break;
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 1 || n > 65535) opts.errors.push(`--port must be 1–65535 (got "${v}")`);
+        else opts.labPort = n;
+        break;
+      }
+      case "--listen": {
+        const v = takeValue("--listen");
+        if (v === undefined) break;
+        if (v !== "lan" && v !== "local") opts.errors.push(`--listen must be lan or local (got "${v}")`);
+        else opts.labLan = v === "lan";
+        break;
+      }
+      case "--target": {
+        const v = takeValue("--target");
+        if (v === undefined) break;
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 0 || n > 14) opts.errors.push(`--target must be a CEC logical address 0–14 (got "${v}")`);
+        else opts.target = n;
+        break;
+      }
       case "--no-cec": opts.cec = false; break;
       case "--no-save": opts.save = false; break;
       case "--cec": { const v = takeValue("--cec"); if (v !== undefined) opts.cec = v; break; }
@@ -233,6 +284,16 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     opts.commands = [];
     if (extra.length) opts.errors.push(`setup takes no commands (got: ${extra.join(", ")})`);
   }
+  if (opts.commands[0] === "lab") {
+    opts.lab = true;
+    const extra = opts.commands.slice(1);
+    opts.commands = [];
+    if (extra.length) opts.errors.push(`lab takes no commands (got: ${extra.join(", ")})`);
+  }
+  if (opts.commands[0] === "cec") {
+    opts.cecTool = opts.commands.slice(1);
+    opts.commands = [];
+  }
   if (opts.commands[0] === "stt") {
     opts.stt = true;
     const rest = opts.commands.slice(1);
@@ -270,6 +331,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (opts.voice && opts.platform !== "linux") {
     opts.warnings.push(`--voice needs --platform linux; the ${opts.platform} adapter has no microphone`);
   }
+  if (opts.serve && !opts.voice) opts.warnings.push("--serve without --voice: there is nothing to keep listening to");
   if (opts.leds && opts.platform !== "linux") {
     opts.warnings.push(`--leds needs --platform linux; the ${opts.platform} adapter has no ring`);
   }
@@ -294,6 +356,14 @@ USAGE
                                      Hearth Report section (markdown)
   hearth setup [options]             look at this box, write ~/.config/hearth/
                                      config.json, say what it can do (linux)
+  hearth lab [--listen lan] [--port N] [--no-open]
+                                     a window on this box's desktop: send any CEC command
+                                     and see what the bus did, test the mic and speaker.
+                                     --install-launcher puts a "Hearth Lab" icon on the desktop
+  hearth cec <command> [--target N] [--yes]
+                                     the same CEC commands in a terminal: hearth cec list,
+                                     hearth cec diagnose, hearth cec tv-power-status,
+                                     hearth cec send "--to 0 --give-device-power-status"
   hearth stt bench <manifest> [--realtime] [--out <base>]
                                      the same recogniser over a dataset: expected vs actual,
                                      latency, real-time factor, memory (JSON + CSV)
@@ -309,6 +379,7 @@ OPTIONS
       --asr <url>         OpenAI-compatible transcription base URL (or $TV_AGENT_ASR);
                           \`openai\` means https://api.openai.com/v1 (key in $TV_AGENT_API_KEY)
       --asr-model <name>  transcription model (or $TV_AGENT_ASR_MODEL)
+      --serve             keep listening until stopped, even with no terminal (a service)
       --leds              show each outcome on the APA102 status ring (linux)
       --wake <word>       act only on what is said after this word is heard;
                           everything else is transcribed and dropped

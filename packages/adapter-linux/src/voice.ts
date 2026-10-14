@@ -31,6 +31,19 @@ const VOICE_TIMEOUT_MS = 60_000;
 /** How one recorded utterance is turned into words. */
 export type Transcriber = (audio: Uint8Array, format: CaptureFormat) => Promise<string>;
 
+/**
+ * Something that waits for one utterance and returns its words — the streaming
+ * counterpart of "record a window, transcribe it". The edge recogniser is one
+ * (`stt/listener.ts`): it endpoints speech itself, so there is no fixed window
+ * and nothing is sent anywhere. `''` means nothing was said before it was
+ * stopped; a rejection means it cannot listen any more.
+ */
+export interface SpeechListener {
+  listen(): Promise<string>;
+  /** Make a pending `listen()` resolve with `''`; the listener may be used again. */
+  cancel(): void;
+}
+
 export interface CaptureFormat {
   /** ALSA sample format, e.g. `S16_LE`. */
   readonly encoding: string;
@@ -60,6 +73,11 @@ export interface LinuxVoiceOptions {
   /** `S16_LE` by default: the format every transcription service accepts. */
   encoding?: string;
   transcribe?: Transcriber;
+  /**
+   * Listen through this instead of `arecord` + `transcribe`. When set, the
+   * fixed window, the silence gate and the transcriber are not used at all.
+   */
+  listener?: SpeechListener;
   /** espeak-ng voice, e.g. `cmn` for Mandarin. */
   voiceName?: string;
   /** Where a recording is written before it is read back. */
@@ -138,7 +156,7 @@ export function createLinuxVoicePipeline(opts: LinuxVoiceOptions = {}): VoicePip
 
   return {
     startListening: async () => {
-      if (!opts.transcribe) {
+      if (!opts.transcribe && !opts.listener) {
         throw new TvUnsupportedError(
           "no transcriber configured — this build can record audio but has nothing to turn it " +
           "into text. Pass `transcribe` (see createOpenAiTranscriber) or point the host at a " +
@@ -148,6 +166,22 @@ export function createLinuxVoicePipeline(opts: LinuxVoiceOptions = {}): VoicePip
       if (listening) return;
       listening = true;
       const mine = ++attempt;
+
+      if (opts.listener) {
+        let heard: string;
+        try {
+          heard = await opts.listener.listen();
+        } catch (err) {
+          endAttempt();
+          // The loop above treats a throw as "cannot listen" and stops, saying why.
+          throw err;
+        }
+        if (mine === attempt) endAttempt();
+        if (mine !== attempt) return;
+        const said = heard.trim();
+        if (said) for (const cb of transcriptListeners) cb(said, true);
+        return;
+      }
 
       const rec = await run("arecord", [
         "-D", device,
@@ -175,7 +209,7 @@ export function createLinuxVoicePipeline(opts: LinuxVoiceOptions = {}): VoicePip
           opts.onDropped?.(`silence (rms ${loudness.toFixed(4)} < ${silenceThreshold})`);
           text = "";
         } else {
-          text = await opts.transcribe(audio, format);
+          text = await opts.transcribe!(audio, format);
         }
       } finally {
         // The attempt is over whether or not it produced words. Anything else
@@ -191,6 +225,7 @@ export function createLinuxVoicePipeline(opts: LinuxVoiceOptions = {}): VoicePip
     stopListening: async () => {
       if (!listening) return;
       attempt++;                       // anything in flight is now unwanted
+      opts.listener?.cancel();
       endAttempt();
     },
 

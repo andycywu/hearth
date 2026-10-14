@@ -8,6 +8,48 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`hearth lab` and `hearth cec` — send any HDMI-CEC command and see what the bus
+  did.** A window on the Pi's own desktop (a small local web app, nothing to build,
+  zero dependencies) with a button for every CEC command, a **Diagnose** button
+  that walks the layers from the cable up and stops at the first one that is not
+  working, a raw `cec-ctl` box, a live bus monitor, a microphone level meter with
+  playback, a speaker test, and a "Hearth's view" button that runs Hearth's own
+  transport so its answer can be set beside the raw bus. `hearth cec <command>`
+  is the same set in a terminal. Every result carries the exact `cec-ctl` line,
+  the raw output, and a verdict that separates the cases that all look like "the
+  TV does not respond" — reply, sent, no-reply, not-acknowledged, feature-abort,
+  unconfigured, error — and a command with a state to read back (standby, wake,
+  the power keys) ends with the read-back, `verified` only if the TV itself said
+  so. Served on 127.0.0.1 behind a random token; `--listen lan` opens it to the
+  network and keeps the token. It exists because on 2026-10-14 the TV looked dead
+  and nobody could say where. What was learned, not just added:
+  - **a rebooted Pi's CEC adapter is unconfigured** (`Logical Address Mask:
+    0x0000`): every transmit prints "Adapter is unconfigured" and gets no answer,
+    and `cec-ctl` exits 0. The I/O walk-through script did not claim an address and
+    reported "TV answers on CEC: FAILED" about a TV that answered the moment
+    `cec-ctl --playback` ran. Fixed in the script; the lab claims one and says so;
+  - **the Titan OS set accepts CEC standby and wake and reports both back**, about a
+    second each (2026-10-12, over the bus, nothing installed on the set) — the
+    question 2026-10-05's report left open. It aborts `<Give Audio Status>`, so its
+    volume cannot be read back over CEC and a volume key is `sent`, not `verified`;
+  - `cec-ctl --monitor` needs root even to listen; the lab tries `sudo -n` once and
+    otherwise says what to type;
+  - Chromium on the Pi's Wayland desktop exits with "Missing X server or $DISPLAY"
+    unless given `--ozone-platform=wayland` (`--ozone-platform-hint=auto` did not
+    help);
+  - **Hearth cannot yet turn the TV on or off by voice**: it treats the Pi as the
+    television and uses CEC only for devices past it, so "turn off the tv" is not
+    understood even though the bus has just been shown to do it. The lab shows the
+    gap from both sides; closing it is the next piece of work.
+  See [`docs/cec.md`](docs/cec.md).
+- **`--asr local`, `--serve`** — the voice loop listens through the on-box recogniser
+  (`hearth --voice --asr local --leds --wake hearth --serve`), with the microphone
+  gated shut while the agent thinks and speaks so it cannot hear itself.
+  `--serve` keeps the process alive when there is no terminal: a service's stdin is
+  /dev/null, which ended the command loop at once, so the unit `hearth setup` wrote
+  could never have stayed up. `hearth setup --asr local` copies the model paths
+  (never the key) into the unit.
+
 - **Edge speech-to-text** — `hearth stt`, `hearth stt bench`, `packages/edge-voice`,
   `adapter-linux/src/stt`. Microphone → VAD → offline recogniser → a normalised
   `Transcript`, with every stage an interface and the engine chosen by

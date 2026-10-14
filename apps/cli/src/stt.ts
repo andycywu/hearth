@@ -94,7 +94,7 @@ export async function runStt(opts: CliOptions, deps: SttDeps): Promise<number> {
   return 0;
 }
 
-async function defaultEngine(config: EdgeVoiceConfig): Promise<SpeechToTextEngine> {
+export async function defaultEngine(config: EdgeVoiceConfig): Promise<SpeechToTextEngine> {
   if (!(BACKENDS as readonly string[]).includes(config.sttBackend)) {
     throw new Error(
       `HEARTH_STT_BACKEND=${config.sttBackend}: this build has only ${BACKENDS.join(", ")}. ` +

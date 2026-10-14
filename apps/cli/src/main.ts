@@ -25,6 +25,8 @@ import { assembleRoom } from "./room.js";
 import { runReport } from "./report.js";
 import { runSetup } from "./setup.js";
 import { runStt } from "./stt.js";
+import { createLocalListener, type LocalListener } from "./local-listener.js";
+import { runCecTool, runLab } from "./lab-run.js";
 import { answer, listenForever, showOutcomes } from "./voice-loop.js";
 import { configAsEnv, loadConfig } from "./config.js";
 
@@ -50,6 +52,15 @@ async function main(): Promise<number> {
     });
   }
 
+  // `hearth lab` and `hearth cec` talk to the adapter directly: no agent, no room.
+  if (opts.lab) {
+    const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
+    return runLab(opts, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, { env: { ...env }, interrupted });
+  }
+  if (opts.cecTool) {
+    return runCecTool(opts, opts.cecTool, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } });
+  }
+
   // `hearth stt` is the voice pipeline alone: no platform, no room, no agent.
   if (opts.stt) {
     const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
@@ -61,7 +72,19 @@ async function main(): Promise<number> {
     });
   }
 
-  const platform = await openPlatform(opts);
+  // `--asr local`: recognition on this box. Built before the platform so a missing
+  // model is the first thing said, not the thing found after the agent is up.
+  let local: LocalListener | undefined;
+  if (opts.voice && opts.platform === "linux" && opts.asrBaseUrl === "local") {
+    try {
+      local = await createLocalListener({ ...env }, { err: (t) => { stderr.write(t); } }, { quiet: opts.quiet || opts.json });
+    } catch (err) {
+      stderr.write(`hearth: ${err instanceof Error ? err.message : String(err)}\n`);
+      return 2;
+    }
+  }
+
+  const platform = await openPlatform(opts, local);
 
   // `hearth report`: the same platform and the same room, a different question.
   if (opts.report) {
@@ -166,7 +189,12 @@ async function main(): Promise<number> {
     if (!command.trim()) continue;
     await handle(command);
   }
+  // A service has no terminal: stdin is /dev/null and ends at once. --serve says "stay".
+  if (spoken && opts.serve && !opts.commands.length) {
+    await new Promise<void>((resolve) => { process.once("SIGINT", resolve); process.once("SIGTERM", resolve); });
+  }
   await spoken?.stop();
+  await local?.stop();            // waits for the model server to be shut down, or it outlives us
   await ring?.off();
   // A non-zero exit for a failed turn, so this composes in a shell script.
   return failures ? 1 : 0;
@@ -218,7 +246,7 @@ function confirmer(opts: CliOptions): (req: { name: string; args: Record<string,
   };
 }
 
-async function openPlatform(opts: CliOptions): Promise<PlatformProvider> {
+async function openPlatform(opts: CliOptions, local?: LocalListener): Promise<PlatformProvider> {
   if (opts.platform === "linux") {
     // Deliberately a clear error rather than a silent fall back to the mock:
     // "it ran and did nothing to my TV" is a much worse afternoon than "that
@@ -241,7 +269,8 @@ async function openPlatform(opts: CliOptions): Promise<PlatformProvider> {
               // No endpoint means no transcriber, and the adapter then answers
               // `unsupported` for listening rather than recording audio it has
               // no way to read. `parseArgs` has already said so out loud.
-              ...(opts.asrBaseUrl
+              ...(local ? { listener: local.listener } : {}),
+              ...(opts.asrBaseUrl && !local
                 ? {
                     transcribe: linux.createOpenAiTranscriber({
                       baseUrl: opts.asrBaseUrl,
