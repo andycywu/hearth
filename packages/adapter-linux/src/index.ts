@@ -159,8 +159,8 @@ export {
 } from "./audio.js";
 export { parseDesktopEntry, execArgv, applicationDirs, listDesktopEntries } from "./apps.js";
 export {
-  apa102Frame, createStatusRing, RING_COLOURS,
-  type Rgb, type RingState, type StatusRing, type StatusRingOptions,
+  apa102Frame, createStatusRing, ringFrame, RING_COLOURS, ANIMATED_STATES, OUTCOME_STATES,
+  type Rgb, type RingState, type StatusRing, type StatusRingOptions, type RingScheduler,
 } from "./leds.js";
 export {
   createLinuxVoicePipeline, createOpenAiTranscriber, detectVoice, rmsOfWav,
@@ -175,6 +175,7 @@ export {
 } from "./stt/index.js";
 export {
   CEC_COMMANDS, CEC_LAB_TIMEOUT_MS, labContext, findCommand, runCecCommand, runCecRaw, diagnoseCec, validateRawArgs,
+  ringStateForCec, ringStateForDiagnosis,
   parseAdapterInfo, parseReplyFacts, parseTopologyFacts, interpretTransmit, readAdapter, ensureClaimed,
   type CecLabResult, type CecCommandDef, type CecVerdict, type CecContext, type CecGroup, type DiagStep, type DiagnoseIo, type AdapterInfo,
 } from "./lab-cec.js";

@@ -11,7 +11,8 @@ import {
   createEnergyVad, createPipeline, resolveEdgeVoiceConfig,
   type AudioInput, type EdgeVoiceConfig, type LogEvent, type SpeechToTextEngine, type Transcript,
 } from "@hearthkit/edge-voice";
-import { createArecordInput, createSherpaStt, sherpaServerCommand } from "@hearthkit/adapter-linux";
+import { createArecordInput, createSherpaStt, sherpaServerCommand, type StatusRing } from "@hearthkit/adapter-linux";
+import { ringForPipelineEvent } from "./voice-ring.js";
 import type { CliOptions } from "./args.js";
 import { runSttBench } from "./stt-bench.js";
 
@@ -32,6 +33,8 @@ export interface SttDeps {
   /** Benchmark file access, substituted in tests. */
   readFile?: (path: string) => Promise<Uint8Array>;
   writeFile?: (path: string, data: string) => Promise<void>;
+  /** The status ring: loading, hearing, recognising, and still when idle. */
+  ring?: StatusRing | undefined;
 }
 
 const LEVEL_ORDER = { debug: 0, info: 1, warn: 2, error: 3 } as const;
@@ -55,6 +58,8 @@ export async function runStt(opts: CliOptions, deps: SttDeps): Promise<number> {
   const quiet = opts.quiet;
   const wanted = LEVEL_ORDER[config.logLevel];
   const log = (e: LogEvent): void => {
+    const state = ringForPipelineEvent(e);
+    if (state) void deps.ring?.show(state).catch(() => {});
     if (quiet) return;
     const level = EVENT_LEVEL[e.event] ?? "info";
     if (LEVEL_ORDER[level] >= wanted) io.err(JSON.stringify(e) + "\n");

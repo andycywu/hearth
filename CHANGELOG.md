@@ -8,6 +8,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The status ring shows all the work, and is still when there is none.** Until now
+  the ReSpeaker ring painted four answers (green, amber, red, violet) and a dim blue
+  "listening"; everything before an answer — the model loading, a voice heard, words
+  worked out, a plan, a command on the HDMI bus, the box talking — happened in the
+  dark, and on 2026-10-14 "the lights don't change" could not be told from a broken
+  ring. The rule is now **moving means work is happening, still means nothing is**:
+  seven moving states (`loading`, `hearing`, `recognizing`, `thinking`, `acting`,
+  `speaking`, `error`), each with its own colour and motion, the four answers held
+  still for 2.5 s so they can be read (and not clobbered by the voice loop asking for
+  "ready" a moment later), and a resting state that never moves. Driven by the
+  speech pipeline's own events (it now reports `pipeline_loading`, `speech_started`
+  and `speech_ended`), the agent's tool calls, the reply being spoken, and — for
+  `hearth cec …` and `hearth lab` — each CEC command and its verdict, with the same
+  honesty as everywhere else: a TV that accepted standby and stayed on is red, a
+  message with nothing to read back is amber. `hearth ring demo` walks every state
+  with what it means, to see the lights without running anything else. See
+  [`docs/status-ring.md`](docs/status-ring.md). Found while checking it on the Pi:
+  switching the LED rail on is itself enough to make this supply dip once ("Undervoltage
+  detected", four seconds, on a cable that otherwise reads `0x0`); the rail then stays
+  up through every animation without another.
+
 - **Hearth can switch the television on and off over CEC** (`tv_power_on` /
   `tv_power_off` skills; English and Chinese: "turn off the tv", "關電視", "打開電視").
   A box beside the TV — a Pi on one of its HDMI ports — is not the TV, and the set

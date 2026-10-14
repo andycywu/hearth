@@ -18,6 +18,7 @@
  */
 import { access, readdir, readFile } from "node:fs/promises";
 import { systemRunner, type Runner } from "./run.js";
+import type { RingState } from "./leds.js";
 
 export type CecVerdict =
   | "reply"             // the target answered, with content
@@ -462,4 +463,31 @@ export async function diagnoseCec(ctx: CecContext, io: DiagnoseIo = {}): Promise
   else add({ layer: "TV on the bus", status: "fail", detail: `${v}: ${log.out.split("\n")[0] ?? ""}` });
 
   return { steps, firstProblem: steps.find((s) => s.status === "fail") ?? steps.find((s) => s.status === "warn") };
+}
+
+// ---------------------------------------------------------------------------------------------
+// What the status ring says about a result
+
+/**
+ * The ring's word for a CEC result — the same four answers it gives everywhere, no kinder.
+ *
+ * A read-back that agreed is `verified`; one that did not is `failed` even though the bus took the message,
+ * because "accepted and not done" is the failure this project exists to refuse to call success. A message the
+ * bus accepted with nothing to read back is `unverified` (amber), never green.
+ */
+export function ringStateForCec(r: CecLabResult): RingState {
+  if (r.readBack) return r.readBack.reached ? "verified" : "failed";
+  switch (r.verdict) {
+    case "reply": return "verified";
+    case "sent":
+    case "no-reply": return "unverified";
+    case "feature-abort": return "unsupported";
+    default: return "failed";                       // not-acknowledged, unconfigured, error
+  }
+}
+
+/** The ring's word for a diagnosis: the first failing layer is a failure, a warning is amber, a clean bill is green. */
+export function ringStateForDiagnosis(d: { firstProblem: DiagStep | undefined }): RingState {
+  if (!d.firstProblem) return "verified";
+  return d.firstProblem.status === "fail" ? "failed" : "unverified";
 }

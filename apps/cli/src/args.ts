@@ -93,6 +93,8 @@ export interface CliOptions {
   installLauncher: boolean;
   /** `hearth cec <command>`: the words after `cec`. */
   cecTool?: string[];
+  /** `hearth ring demo|off|<state>`: the words after `ring` — the status ring on its own. */
+  ringTool?: string[];
   /** `--target N`: the CEC logical address a `hearth cec` command is aimed at. */
   target?: number;
   /** `--no-save`: setup prints what it would write and writes nothing. */
@@ -290,6 +292,10 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     opts.commands = [];
     if (extra.length) opts.errors.push(`lab takes no commands (got: ${extra.join(", ")})`);
   }
+  if (opts.commands[0] === "ring") {
+    opts.ringTool = opts.commands.slice(1);
+    opts.commands = [];
+  }
   if (opts.commands[0] === "cec") {
     opts.cecTool = opts.commands.slice(1);
     opts.commands = [];
@@ -364,6 +370,8 @@ USAGE
                                      the same CEC commands in a terminal: hearth cec list,
                                      hearth cec diagnose, hearth cec tv-power-status,
                                      hearth cec send "--to 0 --give-device-power-status"
+  hearth ring demo                   every status-light state in turn, with what it means
+                                     (moving = working, still = nothing is happening)
   hearth stt bench <manifest> [--realtime] [--out <base>]
                                      the same recogniser over a dataset: expected vs actual,
                                      latency, real-time factor, memory (JSON + CSV)

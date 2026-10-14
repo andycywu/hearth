@@ -27,6 +27,7 @@ import { runSetup } from "./setup.js";
 import { runStt } from "./stt.js";
 import { createLocalListener, type LocalListener } from "./local-listener.js";
 import { runCecTool, runLab } from "./lab-run.js";
+import { runRingTool } from "./ring-tool.js";
 import { answer, listenForever, showOutcomes } from "./voice-loop.js";
 import { configAsEnv, loadConfig } from "./config.js";
 
@@ -52,24 +53,42 @@ async function main(): Promise<number> {
     });
   }
 
+  // `hearth ring` is the lights alone, to see them without running the rest.
+  if (opts.ringTool) {
+    const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
+    return runRingTool(opts.ringTool, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, { interrupted });
+  }
+
+  // The ring is opened first and shared by everything below: a light is the one status a person across the
+  // room can see, and every command that works — the agent, the lab, a CEC command, the recogniser —
+  // should show that it is working and what came of it. Still means nothing is happening.
+  const ring = opts.leds && opts.platform === "linux" ? await openRing() : undefined;
+
   // `hearth lab` and `hearth cec` talk to the adapter directly: no agent, no room.
   if (opts.lab) {
     const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
-    return runLab(opts, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, { env: { ...env }, interrupted });
+    const code = await runLab(opts, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, { env: { ...env }, interrupted, ring });
+    await ring?.off();
+    return code;
   }
   if (opts.cecTool) {
-    return runCecTool(opts, opts.cecTool, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } });
+    const code = await runCecTool(opts, opts.cecTool, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, { ring });
+    await finishRing(ring);
+    return code;
   }
 
   // `hearth stt` is the voice pipeline alone: no platform, no room, no agent.
   if (opts.stt) {
     const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
-    return runStt(opts, {
+    const code = await runStt(opts, {
       env: { ...env },
       io: { out: (text) => { stdout.write(text); }, err: (text) => { stderr.write(text); } },
       interrupted,
       rssMb: () => Math.round(process.memoryUsage.rss() / 1048576),
+      ring,
     });
+    await ring?.off();
+    return code;
   }
 
   // `--asr local`: recognition on this box. Built before the platform so a missing
@@ -77,7 +96,7 @@ async function main(): Promise<number> {
   let local: LocalListener | undefined;
   if (opts.voice && opts.platform === "linux" && opts.asrBaseUrl === "local") {
     try {
-      local = await createLocalListener({ ...env }, { err: (t) => { stderr.write(t); } }, { quiet: opts.quiet || opts.json });
+      local = await createLocalListener({ ...env }, { err: (t) => { stderr.write(t); } }, { quiet: opts.quiet || opts.json, ring });
     } catch (err) {
       stderr.write(`hearth: ${err instanceof Error ? err.message : String(err)}\n`);
       return 2;
@@ -136,8 +155,13 @@ async function main(): Promise<number> {
     });
   }
 
-  const ring = opts.leds && opts.platform === "linux" ? await openRing() : undefined;
-  if (ring) showOutcomes(agent, ring);
+  if (ring) {
+    showOutcomes(agent, ring);
+    // A command on its way is work, and the agent working out what to do next is work too: the ring moves
+    // for both, differently, and each answer (showOutcomes above) stops it.
+    agent.events.on("tool:call", () => { void ring.show("acting").catch(() => {}); });
+    agent.events.on("tool:result", () => { void ring.show("thinking").catch(() => {}); });
+  }
 
   let failures = 0;
   const voice = platform.has("voice") ? platform.voice : undefined;
@@ -156,7 +180,10 @@ async function main(): Promise<number> {
       // Spoken to completion before the turn ends, so the microphone is not
       // reopened mid-sentence — but a speech engine that fails is not a
       // failed turn; the text already went to stdout.
-      if (voice && output.trim()) await Promise.resolve(voice.speak(output)).catch(() => {});
+      if (voice && output.trim()) {
+        await ring?.show("speaking").catch(() => {});
+        await Promise.resolve(voice.speak(output)).catch(() => {});
+      }
     } catch (err) {
       failures++;
       const message = err instanceof Error ? err.message : String(err);
@@ -198,6 +225,16 @@ async function main(): Promise<number> {
   await ring?.off();
   // A non-zero exit for a failed turn, so this composes in a shell script.
   return failures ? 1 : 0;
+}
+
+/**
+ * End of a one-shot command: let the answer be read, then put the ring out. A command that ran and left
+ * the ring dim blue would look like a service that is still listening.
+ */
+async function finishRing(ring: StatusRing | undefined): Promise<void> {
+  if (!ring) return;
+  await new Promise<void>((resolve) => setTimeout(resolve, 2_600));
+  await ring.off();
 }
 
 /**

@@ -7,8 +7,8 @@ import { homedir, networkInterfaces } from "node:os";
 import { posix } from "node:path";
 const { join } = posix;   // this runs on a Pi; paths are POSIX whatever machine the tests run on
 import {
-  CEC_COMMANDS, diagnoseCec, findCommand, labContext, runCecCommand, runCecRaw,
-  type CecContext, type CecLabResult,
+  CEC_COMMANDS, diagnoseCec, findCommand, labContext, ringStateForCec, ringStateForDiagnosis, runCecCommand, runCecRaw,
+  type CecContext, type CecLabResult, type RingState, type StatusRing,
 } from "@hearthkit/adapter-linux";
 import type { CliOptions } from "./args.js";
 import { createLab, launcherEntry, type Lab } from "./lab.js";
@@ -30,6 +30,8 @@ export interface LabDeps {
   node?: string;
   cli?: string;
   write?: (path: string, text: string) => Promise<void>;
+  /** The status ring, if there is one: still and dim while the lab waits, moving while a command runs. */
+  ring?: StatusRing | undefined;
 }
 
 /** The command that opens the lab in a window of its own, on this machine's desktop. */
@@ -92,7 +94,7 @@ export async function runLab(opts: CliOptions, io: LabIo, deps: LabDeps = {}): P
     return 0;
   }
 
-  const lab = deps.lab ?? createLab({ device, lan: opts.labLan, ...(deps.cec ? { cec: deps.cec } : {}) });
+  const lab = deps.lab ?? createLab({ device, lan: opts.labLan, ring: deps.ring, ...(deps.cec ? { cec: deps.cec } : {}) });
   let port: number;
   try {
     port = await lab.listen(opts.labPort ?? 8420);
@@ -107,6 +109,7 @@ export async function runLab(opts: CliOptions, io: LabIo, deps: LabDeps = {}): P
     io.out(ip ? `  On the network:  http://${ip}:${port}/?t=${lab.token}   (anyone with this address can send CEC commands)\n` : "  On the network: (no LAN address found)\n");
   }
   io.out("Ctrl+C to stop.\n");
+  await deps.ring?.show("listening").catch(() => {});     // ready, and still
   if (!opts.noOpen) (deps.openWindow ?? ((u: string) => defaultOpen(u, env, io.err)))(local);
 
   await (deps.interrupted ?? new Promise<void>(() => {}));
@@ -129,7 +132,8 @@ function formatResult(r: CecLabResult): string {
   return lines.join("\n") + "\n";
 }
 
-export async function runCecTool(opts: CliOptions, words: string[], io: LabIo, deps: { cec?: CecContext; target?: number } = {}): Promise<number> {
+export async function runCecTool(opts: CliOptions, words: string[], io: LabIo, deps: { cec?: CecContext; target?: number; ring?: StatusRing | undefined } = {}): Promise<number> {
+  const lit = (state: RingState): Promise<void> => (deps.ring ? deps.ring.show(state).catch(() => {}) : Promise.resolve());
   const device = typeof opts.cec === "string" ? opts.cec : "/dev/cec0";
   const ctx = deps.cec ?? labContext(device);
   const [sub, ...rest] = words;
@@ -142,7 +146,9 @@ export async function runCecTool(opts: CliOptions, words: string[], io: LabIo, d
   }
 
   if (sub === "diagnose") {
+    await lit("acting");
     const d = await diagnoseCec(ctx);
+    await lit(ringStateForDiagnosis(d));
     for (const s of d.steps) {
       io.out(`  ${{ ok: "✓", warn: "!", fail: "✗", skipped: "–" }[s.status]} ${s.layer.padEnd(18)} ${s.detail}\n`);
       if (s.fix) io.out(`      → ${s.fix}\n`);
@@ -152,7 +158,9 @@ export async function runCecTool(opts: CliOptions, words: string[], io: LabIo, d
   }
 
   if (sub === "send") {
+    await lit("acting");
     const r = await runCecRaw(ctx, rest.join(" ").split(/\s+/).filter(Boolean));
+    await lit(ringStateForCec(r));
     io.out(formatResult(r));
     return verdictOk(r) ? 0 : 1;
   }
@@ -166,7 +174,9 @@ export async function runCecTool(opts: CliOptions, words: string[], io: LabIo, d
     io.err(`hearth: "${def.id}" changes the TV (${def.explain}) Re-run with --yes to send it.\n`);
     return 2;
   }
+  await lit("acting");
   const r = await runCecCommand(ctx, def, { target: deps.target ?? opts.target ?? 0 });
+  await lit(ringStateForCec(r));
   io.out(formatResult(r));
   return verdictOk(r) ? 0 : 1;
 }

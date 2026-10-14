@@ -9,8 +9,14 @@
 import {
   createEnergyVad, createPipeline, resolveEdgeVoiceConfig, type LogEvent,
 } from "@hearthkit/edge-voice";
-import { createArecordInput, createEdgeListener, createWavFileInput, gateInput, type SpeechListener } from "@hearthkit/adapter-linux";
+import {
+  createArecordInput, createEdgeListener, createWavFileInput, gateInput, type SpeechListener, type StatusRing,
+} from "@hearthkit/adapter-linux";
 import { defaultEngine } from "./stt.js";
+import { ringForPipelineEvent } from "./voice-ring.js";
+
+/** Events that move the ring and have nothing to say in a terminal. */
+const QUIET_EVENTS: ReadonlySet<string> = new Set(["stt_partial", "stt_empty", "speech_started", "speech_ended", "pipeline_loading"]);
 
 export interface LocalListener {
   listener: SpeechListener;
@@ -20,7 +26,7 @@ export interface LocalListener {
 export async function createLocalListener(
   env: Record<string, string | undefined>,
   io: { err(text: string): void },
-  opts: { quiet: boolean },
+  opts: { quiet: boolean; ring?: StatusRing | undefined },
 ): Promise<LocalListener> {
   const { config, warnings } = resolveEdgeVoiceConfig(env);
   for (const w of warnings) io.err(`hearth: ${w}\n`);
@@ -41,8 +47,11 @@ export async function createLocalListener(
     ...(config.vadEnabled ? { vad: createEnergyVad({ format }) } : {}),
     rssMb: () => Math.round(process.memoryUsage.rss() / 1048576),
     log: (e: LogEvent) => {
+      // The ring first, and whatever the terminal shows: a light is the only status a person across the room has.
+      const state = ringForPipelineEvent(e);
+      if (state) void opts.ring?.show(state).catch(() => { /* a ring that cannot be written must not stop listening */ });
       if (opts.quiet) return;
-      if (e.event === "stt_partial" || e.event === "stt_empty") return;
+      if (QUIET_EVENTS.has(e.event)) return;
       io.err(JSON.stringify(e) + "\n");
     },
   });

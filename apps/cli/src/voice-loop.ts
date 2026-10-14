@@ -109,6 +109,8 @@ export function listenForever(
         // heal itself, and a tight retry loop would bury the terminal.
         trace?.(`hearth: listening stopped — ${err instanceof Error ? err.message : String(err)}`);
         running = false;
+        // The one state that blinks: the box can no longer hear, and a still blue ring would say it can.
+        await ring?.show("error").catch(() => {});
       }
     }
   };

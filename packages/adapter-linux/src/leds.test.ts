@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { isTvUnsupported } from "@hearthkit/platform-api";
 import { apa102Frame, createStatusRing, RING_COLOURS } from "./leds.js";
 import type { Runner } from "./run.js";
+import { manualScheduler } from "./leds-test-kit.js";
 
 function fakeRunner(code = 0, stderr = ""): Runner & { calls: string[] } {
   const calls: string[] = [];
@@ -128,7 +129,7 @@ describe("the status ring", () => {
 
   it("does not toggle the power rail it has already set", async () => {
     const run = fakeRunner();
-    const ring = createStatusRing({ run, write: recorder().write });
+    const ring = createStatusRing({ run, write: recorder().write, scheduler: manualScheduler() });
     await ring.show("listening");
     await ring.show("thinking");
     await ring.show("verified");
@@ -154,7 +155,7 @@ describe("the status ring", () => {
 
   it("writes to CS1, where the ring actually is", async () => {
     const write = vi.fn(async () => {});
-    const ring = createStatusRing({ run: fakeRunner(), write });
+    const ring = createStatusRing({ run: fakeRunner(), write, scheduler: manualScheduler() });
     await ring.show("thinking");
     // `/dev/spidev0.0` is the one a first guess reaches for, and it is the wrong
     // chip select — the ring is on CS1, as the vendor's own driver opens it.

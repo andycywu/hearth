@@ -17,7 +17,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomBytes } from "node:crypto";
 import {
   CEC_COMMANDS, createAudioLab, createLinuxCecTransport, diagnoseCec, findCommand, labContext, readAdapter,
-  runCecCommand, runCecRaw, systemSpawner, type AudioLab, type CecContext, type Spawner,
+  ringStateForCec, ringStateForDiagnosis, runCecCommand, runCecRaw, systemSpawner,
+  type AudioLab, type CecContext, type RingState, type Spawner, type StatusRing,
 } from "@hearthkit/adapter-linux";
 import type { CecTransport } from "@hearthkit/adapter-cec";
 import { LAB_PAGE } from "./lab-page.js";
@@ -34,6 +35,8 @@ export interface LabOptions {
   spawn?: Spawner;
   transport?: () => CecTransport;
   throttled?: () => Promise<string | undefined>;
+  /** The status ring: it moves while a command is on the bus and shows the answer, so the room can see the lab work. */
+  ring?: StatusRing | undefined;
 }
 
 export interface Lab {
@@ -78,6 +81,8 @@ export function createLab(o: LabOptions = {}): Lab {
   });
   let monitor: ReturnType<Spawner> | undefined;
   let port = 0;
+  // A ring that cannot be written must never fail a CEC command: it is a courtesy.
+  const lit = (state: RingState): Promise<void> => (o.ring ? o.ring.show(state).catch(() => {}) : Promise.resolve());
 
   const server = createServer((req, res) => {
     void handle(req, res).catch((err: unknown) => {
@@ -124,19 +129,30 @@ export function createLab(o: LabOptions = {}): Lab {
         if (!def) return send(res, 400, { error: `unknown command "${String(body.id)}"` });
         const target = Number(body.target ?? 0);
         if (!Number.isInteger(target) || target < 0 || target > 14) return send(res, 400, { error: "target must be a logical address 0–14" });
-        return send(res, 200, await runCecCommand(cec, def, { target }));
+        await lit("acting");
+        const result = await runCecCommand(cec, def, { target });
+        await lit(ringStateForCec(result));
+        return send(res, 200, result);
       }
       case "/api/raw": {
         const args = Array.isArray(body.args) ? body.args.filter((a): a is string => typeof a === "string") : [];
-        return send(res, 200, await runCecRaw(cec, args));
+        await lit("acting");
+        const result = await runCecRaw(cec, args);
+        await lit(ringStateForCec(result));
+        return send(res, 200, result);
       }
       case "/api/diagnose":
-        return send(res, 200, await diagnoseCec(cec));
+        await lit("acting");
+        const diagnosis = await diagnoseCec(cec);
+        await lit(ringStateForDiagnosis(diagnosis));
+        return send(res, 200, diagnosis);
       case "/api/hearth-view": {
         const t = transport();
+        await lit("acting");
         try {
           const devices = await t.scan();
           const tv = await t.powerStatus(0).catch((e: unknown) => `error: ${e instanceof Error ? e.message : String(e)}`);
+          await lit("verified");
           return send(res, 200, {
             ok: true,
             summary: devices.length
@@ -145,15 +161,25 @@ export function createLab(o: LabOptions = {}): Lab {
             devices: devices.map((d) => JSON.stringify(d)),
           });
         } catch (err) {
+          await lit("failed");
           return send(res, 200, { ok: false, summary: `Hearth's transport failed: ${err instanceof Error ? err.message : String(err)}`, devices: [] });
         }
       }
       case "/api/audio/record":
-        return send(res, 200, await audio.record(Number(body.seconds ?? 4)));
+        await lit("hearing");                      // the microphone is open: the ring breathes
+        const rec = await audio.record(Number(body.seconds ?? 4));
+        await lit(rec.ok ? "listening" : "failed");
+        return send(res, 200, rec);
       case "/api/audio/play":
-        return send(res, 200, await audio.play());
+        await lit("speaking");
+        const played = await audio.play();
+        await lit(played.ok ? "listening" : "failed");
+        return send(res, 200, played);
       case "/api/audio/say":
-        return send(res, 200, await audio.say(String(body.text ?? ""), typeof body.voice === "string" ? body.voice : undefined));
+        await lit("speaking");
+        const said = await audio.say(String(body.text ?? ""), typeof body.voice === "string" ? body.voice : undefined);
+        await lit(said.ok ? "listening" : "failed");
+        return send(res, 200, said);
       default:
         return send(res, 404, { error: "not found" });
     }

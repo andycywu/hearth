@@ -116,6 +116,7 @@ export function createPipeline(opts: PipelineOptions): Pipeline {
   const handleVad = async (events: VadEvent[]): Promise<void> => {
     for (const ev of events) {
       if (ev.type === "speech_started") {
+        log({ event: "speech_started", at_ms: Math.round(ev.atMs) });
         await openSession(ev.atMs);
       } else if (ev.type === "speech_chunk") {
         const s = session;
@@ -128,6 +129,8 @@ export function createPipeline(opts: PipelineOptions): Pipeline {
           await s.abort().catch(() => {});
         }
       } else {
+        // Speech over, words not yet worked out: the interval a status light can show as "recognising".
+        log({ event: "speech_ended", at_ms: Math.round(ev.atMs) });
         await closeSession(ev.atMs, now());
         if (wake) armedUntilMs = -1;       // one command per wake word
       }
@@ -145,6 +148,8 @@ export function createPipeline(opts: PipelineOptions): Pipeline {
     },
 
     async run() {
+      // Loading is the slow, silent part (~20 s on a Pi 3B): say it has begun, so something can show it.
+      log({ event: "pipeline_loading", backend: stt.backend, model: stt.model });
       await stt.load();
       log({
         event: "pipeline_started", backend: stt.backend, model: stt.model,
