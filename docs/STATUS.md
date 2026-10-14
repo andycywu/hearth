@@ -65,8 +65,8 @@ need a room rather than a television.
 
 ## Test coverage (1026 tests)
 
-core 199 · ui 167 · adapter-linux 148 · modelpilot 69 · llm-connectors 61 ·
-skill-manifest 56 · adapter-cec 37 · cli 103 · edge-voice 42 · adapter-aosp 28 · acceptance 20 ·
+core 202 · ui 167 · adapter-linux 153 · modelpilot 69 · llm-connectors 61 ·
+skill-manifest 56 · adapter-cec 46 · cli 103 · edge-voice 42 · adapter-aosp 28 · acceptance 20 ·
 adapter-tizen 16 · perception-mock 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 

@@ -311,8 +311,14 @@ the token.
 - **On the Pi's Wayland desktop Chromium must be told `--ozone-platform=wayland`.**
   It defaults to X11 and exits with `Missing X server or $DISPLAY`;
   `--ozone-platform-hint=auto` did not help.
-- **Hearth cannot yet turn the TV on or off by voice.** The agent treats the Pi as
-  the television and uses CEC only for devices *past* it, so "turn off the tv"
-  gets "I can set volume, mute, switch input, or open an app" even though the bus
-  has just been shown to do it. The lab shows the gap from both sides; closing it
-  means treating the TV as a CEC target when the box is a playback device beside it.
+- **Hearth could not turn the TV on or off, and now can.** The agent treated the Pi
+  as the television and used CEC only for devices *past* it, so "turn off the tv"
+  got "I can set volume, mute, switch input, or open an app" even though the bus
+  had just been shown to do it. A box beside the TV now gives the TV at address 0
+  its own `tv.power.*` capabilities (`createCecTransport(bus, { remoteTv: true })`,
+  which the CLI sets and a TV host never does — a Tizen set must not try to put
+  itself in standby over CEC). Wake is `<Image View On>`, not `<Set Stream Path>`
+  aimed at the TV's own address. Read back from a real set the same afternoon:
+  `hearth "turn off the tv"` → `Done: tv.power.off.` and the TV itself reporting
+  `standby`; `hearth "turn on the tv"` → `on`. Typed, not yet spoken: see
+  `tools/pi-selftest.sh`.

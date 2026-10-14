@@ -8,6 +8,35 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Hearth can switch the television on and off over CEC** (`tv_power_on` /
+  `tv_power_off` skills; English and Chinese: "turn off the tv", "關電視", "打開電視").
+  A box beside the TV — a Pi on one of its HDMI ports — is not the TV, and the set
+  it answers to at CEC address 0 is a real device with its own power state, which
+  the runtime had skipped as "internal". The CLI now attaches `tv.power.on`,
+  `tv.power.off` and `tv.power.status` to the `tv` node (`remoteTv`); a TV host
+  does not, because a Tizen set must not try to put itself in standby. Each goes
+  through the same plan → policy → execute → read-back as a console: `verified` only
+  if the TV then reports the state itself, `failed` if it accepted the message and
+  stayed on, `unverified` if it never answers. Wake is `<Image View On>`
+  (`CecTransport.imageViewOn`, optional), not `<Set Stream Path>` at the TV's own
+  address. **Read back from the real set 2026-10-14**: `hearth "turn off the tv"` →
+  the TV reporting `standby`; `hearth "turn on the tv"` → `on`.
+- **`tools/pi-selftest.sh`** — everything on the Pi that can be checked without a
+  person in the room (`--tv-power` also switches the TV off and on): the sink volume
+  by write and read-back, Hearth's own sentences against ground truth, the CEC
+  adapter, the TV's power state, the recogniser, and the whole voice path —
+  speech → recogniser → wake word → agent → CEC → reply — with a WAV file played in
+  as the microphone (`HEARTH_AUDIO_DEVICE=file:…`, paced to its own clock so the
+  gated listener behaves as it does for a person). Each line says how it is known;
+  what only an ear or an eye can settle is listed as `NEEDS-PERSON`, never guessed.
+  `tools/pi-record-voice.sh` records the three spoken commands in your own voice for
+  it to use. What the first run found: the typed paths all verify, and **the small
+  bilingual model cannot read `espeak-ng`** ("hearth, turn off the tv" → "经历"), so
+  the spoken path could not be exercised with a robot voice and says so rather than
+  failing for a reason that is about the synthesiser. The microphone also did not
+  hear the TV's speakers at all (+0.0 dB), so a speaker-to-microphone loop is not a
+  usable test here.
+
 - **`hearth lab` and `hearth cec` — send any HDMI-CEC command and see what the bus
   did.** A window on the Pi's own desktop (a small local web app, nothing to build,
   zero dependencies) with a button for every CEC command, a **Diagnose** button
