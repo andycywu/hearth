@@ -14,6 +14,7 @@
     { "path": "../../packages/adapter-cec" },
     { "path": "../../packages/edge-voice" },
     { "path": "../../packages/llm-connectors" },
+    { "path": "../../packages/modelpilot" },
     { "path": "../../packages/platform-api" }
   ],
   "exclude": ["dist", "src/**/*.test.ts"]

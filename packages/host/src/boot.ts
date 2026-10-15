@@ -2,7 +2,7 @@ import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl,
   discoverRoom, deviceTreeText, describeFeatures, loadInstallId, RUNTIME_VERSION,
   attachTransports, transportSources,
-  type DeviceTransport, type PlanOutcome, type PlannerContext,
+  type DeviceTransport,
 } from "@hearthkit/core";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
 import {
@@ -10,7 +10,7 @@ import {
   exposeDeviceReport, keyboardOption, renderOption, applyTvTheme, tvThemeOptionsFromUrl,
 } from "@hearthkit/ui";
 import {
-  createModelPilotClient, createModelPilotPlanner, resolveModelPilotConfig,
+  createModelPilotWiring, resolveModelPilotConfig, type ModelPilotWiring,
 } from "@hearthkit/modelpilot";
 import type { PlatformProvider } from "@hearthkit/platform-api";
 
@@ -277,10 +277,7 @@ function readProvisionedKeys(host: HostDefinition): { llm?: string; modelPilot?:
 function buildModelPilotPlanner(
   provisionedKey: string | undefined,
   installId: string,
-): {
-  factory: (ctx: PlannerContext) => ReturnType<typeof createModelPilotPlanner>;
-  report: (outcome: PlanOutcome) => Promise<void>;
-} | undefined {
+): ModelPilotWiring | undefined {
   if (typeof __HEARTH_MODELPILOT__ !== "undefined" && !__HEARTH_MODELPILOT__) return undefined;
 
   const config = resolveModelPilotConfig({
@@ -293,35 +290,13 @@ function buildModelPilotPlanner(
   console.info(`[modelpilot] mode=${config.mode} (${config.source})`);
   if (!config.apiKey) return undefined;
 
-  const key = config.apiKey;
-  // The agent builds the planner from this factory, so the host never sees the
-  // instance — and the instance is the only thing that knows which ModelPilot
-  // request a finished plan came from. Capturing it here is what lets
-  // `plan:end` reach `/v1/feedback` without the planner needing a reference
-  // back to the agent that owns it.
-  let instance: ReturnType<typeof createModelPilotPlanner> | undefined;
-  const factory = (ctx: PlannerContext) => (instance = createModelPilotPlanner({
-    client: createModelPilotClient({
-      baseUrl: config.baseUrl,
-      apiKey: key,
-      timeoutMs: config.timeoutMs,
-      identity: { installId, runtimeVersion: RUNTIME_VERSION, mode: config.mode },
-    }),
-    mode: config.mode,
-    graph: ctx.capabilities,
-    world: ctx.world,
-    devices: ctx.devices,
-    meter: ctx.meter,
-    maxTaskBudget: config.maxTaskBudget,
+  // The wiring is shared with the CLI on a Pi (see `createModelPilotWiring`); the console line is the host's own.
+  return createModelPilotWiring({
+    config: { ...config, apiKey: config.apiKey },
+    installId,
+    runtimeVersion: RUNTIME_VERSION,
     telemetry: (record: unknown) => console.info("[modelpilot]", JSON.stringify(record)),
-  }));
-
-  return {
-    factory,
-    // Before the first plan there is no instance, and a plan the agent finished
-    // before one existed cannot have been ModelPilot's.
-    report: async (outcome: PlanOutcome) => instance?.report(outcome),
-  };
+  });
 }
 
 /**

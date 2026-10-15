@@ -26,6 +26,7 @@ import { runReport } from "./report.js";
 import { runSetup } from "./setup.js";
 import { runStt } from "./stt.js";
 import { createLocalListener, type LocalListener } from "./local-listener.js";
+import { connectModelPilot, routerChatClient } from "./modelpilot.js";
 import { runCecTool, runLab } from "./lab-run.js";
 import { runRingTool } from "./ring-tool.js";
 import { answer, listenForever, showOutcomes } from "./voice-loop.js";
@@ -125,6 +126,15 @@ async function main(): Promise<number> {
     for (const note of [...room.notes, ...room.tree]) stderr.write(`hearth: ${note}\n`);
   }
 
+  // ModelPilot, if a key was provisioned: a planner for goals the local one cannot close, and the router for conversation.
+  const modelPilot = await connectModelPilot({ ...env }, platform.storage, {
+    explicitLlm: Boolean(opts.baseUrl),
+    log: opts.quiet || opts.json ? undefined : (record) => { stderr.write(`  ☁ modelpilot ${JSON.stringify(record)}\n`); },
+  });
+  if (modelPilot && !opts.quiet && !opts.json) {
+    stderr.write(`hearth: modelpilot ${modelPilot.config.mode} (${modelPilot.config.source})${modelPilot.chat ? ", conversation through the router" : ""}\n`);
+  }
+
   const agent = new Agent({
     platform,
     devices: room.devices,
@@ -136,7 +146,10 @@ async function main(): Promise<number> {
           model: opts.model,
           ...(opts.apiKey ? { apiKey: opts.apiKey } : {}),
         })
-      : createScriptedClient(),
+      : modelPilot?.chat
+        ? routerChatClient(modelPilot.chat)
+        : createScriptedClient(),
+    ...(modelPilot ? { planner: modelPilot.wiring.factory, llmPlanning: true } : {}),
     confirm: confirmer(opts),
   });
 
@@ -154,6 +167,10 @@ async function main(): Promise<number> {
       stderr.write(`  · ${name}(${compactArgs(args)})\n`);
     });
   }
+
+  // Close the loop ModelPilot cannot close itself: its metric is cost per *successful* task, and the thing that knows
+  // whether a plan worked is the read-back on this box. Ambiguous outcomes are reported as nothing (see `verdictFor`).
+  if (modelPilot) agent.events.on("plan:end", ({ outcome }) => { void modelPilot.wiring.report(outcome).catch(() => {}); });
 
   if (ring) {
     showOutcomes(agent, ring);

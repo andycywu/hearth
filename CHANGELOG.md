@@ -8,6 +8,31 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`hearth` on a Pi can use ModelPilot** — `MODELPILOT_API_KEY` (and optionally
+  `MODELPILOT_MODE`, `_BASE_URL`, `_MAX_COST`, `MODELPILOT_CHAT`, `MODELPILOT_MODEL`) in
+  `~/.config/hearth/env`. Until now only the television's boot sequence had it, so a Pi that
+  could hear a question had nothing to ask. With a key and a mode other than `off`: goals
+  the local planner cannot close are planned by ModelPilot (re-validated and read back
+  locally; `shadow` by default, `enforce` to run its plan), questions that are not device
+  goals go to the router as a chat completion with `model: "auto"`, and each finished plan is
+  reported to `/v1/feedback`. Without a key nothing here runs and nothing leaves the box. The
+  wiring is one function shared with the television host (`createModelPilotWiring`, moved
+  out of `boot.ts`). Two things found by building it: a planner that sees every sentence
+  answers a question with a plan of no steps, which the voice loop used to read as "nothing
+  to do" — it now hands a freeform goal with no steps to conversation; and the conversation
+  client is sent **without streaming**, because the service rejects `stream: true` and a fake
+  that answered it with a plain body showed the failure: an empty reply, no error. Each
+  question costs two round trips (about 3 s each against production), which a gate in front —
+  the Jev gate in the voice design — would halve.
+- **ModelPilot itself, on the Pi.** Its Python reference implementation (the README's "no
+  provider key required" quick start) installed in about 4.5 minutes on a Pi 3B and runs at
+  ~75 MB as a `systemd --user` service on loopback, with a random on-device key in a 0600
+  file. Seen from `hearth`: 401 without the key, the catalogue with it, the routing
+  extension on a `model: "auto"` completion, `/v1/feedback` accepted, `stream: true` a 400,
+  and a device command still done and read back locally. It cannot *answer* yet: with no
+  provider configured the catalogue is three mock models that echo the prompt and whose
+  plans come back `unusable_output`. See [`docs/modelpilot-integration.md`](docs/modelpilot-integration.md).
+
 - **Hearth has a face and a voice you can change** — the Avatar and Voice tabs of
   `hearth lab`. Six faces (orb, robot, cat, owl, fox, ghost) drawn in SVG, with an
   expression for every state the status ring can be in, in the ring's own colours: the

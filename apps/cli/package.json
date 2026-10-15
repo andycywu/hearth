@@ -19,6 +19,7 @@
     "@hearthkit/core": "workspace:*",
     "@hearthkit/edge-voice": "workspace:*",
     "@hearthkit/llm-connectors": "workspace:*",
+    "@hearthkit/modelpilot": "workspace:*",
     "@hearthkit/platform-api": "workspace:*"
   },
   "license": "Apache-2.0",

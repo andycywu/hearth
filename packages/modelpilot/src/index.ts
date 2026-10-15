@@ -26,3 +26,5 @@ export { createModelPilotPlanner, toSteps, verdictFor } from "./planner.js";
 export type { ModelPilotPlanner, ModelPilotPlannerOptions, ShadowRecord } from "./planner.js";
 export { sanitizeTelemetry, createTelemetryLogger } from "./telemetry.js";
 export type { ModelPilotTelemetry, TelemetrySink } from "./telemetry.js";
+export { createModelPilotWiring } from "./wiring.js";
+export type { ModelPilotWiring, ModelPilotWiringOptions } from "./wiring.js";

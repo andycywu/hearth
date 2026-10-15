@@ -337,6 +337,74 @@ files (or `--staged`) for credential patterns and runs in CI. It is a tripwire,
 not a guarantee — the real defence is that no host reads a key from anywhere a
 repository can see.
 
+## On a Pi: the CLI
+
+The television's boot sequence has had ModelPilot since September; `hearth` on a Pi did
+not, so a box that could hear a question had nothing to ask. The wiring is now one
+function shared by both (`createModelPilotWiring`: a planner factory and a way to close
+the loop) and the CLI finds it from the environment — the same variables as above,
+nothing else to learn:
+
+```sh
+# On the Pi, once. `read -s` keeps the key out of the command line, the history and the
+# screen; the file is the one the service already reads (EnvironmentFile), mode 0600.
+read -rs -p "ModelPilot key: " K; echo
+printf 'MODELPILOT_API_KEY=%s\n' "$K" >> ~/.config/hearth/env; unset K
+chmod 600 ~/.config/hearth/env
+```
+
+With a key and a mode other than `off` (`shadow` by default), `hearth` does three
+things, and without a key it does none of them and nothing leaves the box:
+
+1. **Planning.** A goal the local planner cannot close goes to ModelPilot as a minimised
+   room summary and comes back as a plan, re-validated against this device's own
+   capabilities and read back locally. In `shadow` the local plan still runs and the
+   suggestion is only recorded; `MODELPILOT_MODE=enforce` runs ModelPilot's.
+2. **Conversation.** A question that is not a device goal ("will it rain tomorrow") is a
+   chat completion to the router with `model: "auto"`, using the same key
+   (`MODELPILOT_MODEL` picks another; `MODELPILOT_CHAT=off` or an explicit `--llm` keeps
+   conversation where it was). It is sent **without streaming** — risk 4 below was
+   exactly this, and a fake that answered `stream: true` with a plain JSON body showed
+   what the failure looks like: an empty reply, with no error.
+3. **Feedback.** Each finished plan is reported to `/v1/feedback`, so ModelPilot learns
+   whether what it routed worked — decided by the read-back here, never by the router.
+
+One consequence worth knowing: ModelPilot's planner sees every sentence, so for a
+question it returns a plan of no steps. `answer()` takes "no steps from a freeform goal"
+to mean "this was not a device goal" and hands the sentence to conversation, rather than
+saying "nothing to do" to a question. A *skill's* empty plan — "already true" — is
+unaffected. And each question now costs two round trips (the plan, then the answer),
+about 3 s each against production: a gate in front that tells a device command from a
+question would remove one of them, which is what the Jev gate in the voice design is for.
+
+### ModelPilot on the Pi itself
+
+The service does not have to be somewhere else. Its Python reference implementation (the
+README's "no provider key required" quick start) runs on the living-room Pi 3B, and was
+brought up there on 2026-10-15 to run the CLI against a real ModelPilot instead of a mock:
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -e .     # ~4.5 min on a Pi 3B, Python 3.13
+.venv/bin/alembic upgrade head                           # SQLite, nothing to configure
+.venv/bin/uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
+```
+
+It ran as a `systemd --user` service (`modelpilot.service`, not enabled at boot) reading
+`~/.config/modelpilot/env` (0600), with a random key generated on the Pi and bound to
+loopback. **About 75 MB resident.** Against it, from the CLI: `/v1/models` is 401 without
+the key and lists the catalogue with it; a `model: "auto"` completion returns the routing
+extension (selected model, reason, cost, baseline cost); `/v1/feedback` answers
+`accepted`; and `stream: true` is a 400 — the documented rejection, now seen from this
+side. A question put to `hearth` went planner → router → chat and came back; a device
+command was still done and read back locally, with ModelPilot asked and ignored in shadow.
+
+What it does not do yet is *answer*: with no provider key the catalogue is three **mock**
+models, which echo the prompt (`[mock-fast] what is the capital of France`), and the planner's
+answers come back `unusable_output`, because a mock cannot write a plan. So the wiring is
+proven and the intelligence is not there until a provider is configured in
+`config/models.yaml` and its key put in the service's env file. Until then Hearth on the
+Pi is better off *not* pointed at it, which is why nothing in `~/.config/hearth/env` does.
+
 ## What is sent, and what is not
 
 `minimiseRoomState` is an **allowlist**, so a new world path cannot leak by
@@ -497,7 +565,10 @@ set `window.__MODELPILOT_API_KEY__` before the bundle loads and launch with
 4. **Streaming is rejected outright by the service.** Planning does not need it,
    so this integration is unaffected — but the chat path's LLM connector does
    stream, so ModelPilot cannot be dropped in as the agent's conversational
-   endpoint without a non-streaming switch.
+   endpoint without a non-streaming switch. *(The CLI has that switch now:
+   `routerChatClient` drops `completeStream`, so the agent asks for a plain
+   completion. The television host's conversation still goes to whatever
+   `?llm=` says.)*
 5. **The feedback loop has run once, in one direction.** A live enforce pass
    posted a `success: true` verdict that the production service accepted — and
    since `/v1/feedback` answers 404 for a request it does not recognise, an

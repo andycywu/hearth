@@ -53,7 +53,12 @@ export function showOutcomes(agent: Agent, ring: StatusRing): void {
  */
 export async function answer(agent: Agent, text: string): Promise<string> {
   const outcome = await agent.pursueIntent(text);
-  if (outcome) return outcome.blocked ?? summarizeOutcome(outcome);
+  // A planner that sees every sentence — ModelPilot's does — answers a question with "nothing to do" (a plan of no
+  // steps: it decided the sentence is not a device goal). That is not an answer to the question, so it goes to
+  // conversation like anything else that is not plan work. A *skill's* empty plan is different — "already true" —
+  // and stays an answer.
+  const notADeviceGoal = outcome !== undefined && outcome.plan.goal.id === "freeform" && outcome.outcomes.length === 0 && !outcome.blocked;
+  if (outcome && !notADeviceGoal) return outcome.blocked ?? summarizeOutcome(outcome);
   return agent.run(text);
 }
 
