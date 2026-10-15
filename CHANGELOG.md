@@ -8,6 +8,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Two ModelPilots, by name.** `MODELPILOT_OFFICIAL_API_KEY` and `MODELPILOT_LOCAL_API_KEY`
+  (each with an optional `_BASE_URL`; defaults are the hosted service and `127.0.0.1:8000`) let
+  the hosted service and the Pi's own copy sit side by side instead of taking turns in one
+  slot. `--modelpilot official|local|off` chooses; `hearth modelpilot status` probes both and
+  reports `verified` only when the service answers **and** accepts that key — a 404 from the
+  models route is `unverified`, because the unauthenticated 404s seen from the hosted service
+  proved nothing about a key; `--compare` asks the other one the same goal in shadow and logs
+  whether the plans agreed, without running it or waiting for it. A named target without its
+  key is off and names the missing variable rather than borrowing the other's. The hosted one
+  has not been probed with a real key yet.
 - **`hearth` on a Pi can use ModelPilot** — `MODELPILOT_API_KEY` (and optionally
   `MODELPILOT_MODE`, `_BASE_URL`, `_MAX_COST`, `MODELPILOT_CHAT`, `MODELPILOT_MODEL`) in
   `~/.config/hearth/env`. Until now only the television's boot sequence had it, so a Pi that

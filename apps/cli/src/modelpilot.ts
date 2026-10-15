@@ -12,6 +12,10 @@
  *   MODELPILOT_CHAT      `off` keeps conversation on whatever `--llm` says
  *   MODELPILOT_MODEL     the model asked of the router; `auto` lets it choose
  *
+ * Those name one service. To keep two — the hosted one and the copy on the Pi — under their own keys and
+ * choose between them, see `modelpilot-targets.ts`: `--modelpilot official|local`, and `--compare` to ask the
+ * other one the same thing in shadow.
+ *
  * Two uses, both through the one key. **Planning**: a goal the local planner cannot close goes to
  * ModelPilot as a minimised room summary and comes back as a plan that is re-validated against this
  * device's own capabilities and read back locally — it never gets to say that something happened.
@@ -27,9 +31,16 @@ import {
   createModelPilotWiring, resolveModelPilotConfig, type ModelPilotConfig, type ModelPilotWiring,
 } from "@hearthkit/modelpilot";
 import type { KeyValueStore } from "@hearthkit/platform-api";
+import {
+  envForTarget, isTargetName, resolveTarget, withComparison, TARGET_NAMES, type TargetName,
+} from "./modelpilot-targets.js";
 
 export interface CliModelPilot {
   config: ModelPilotConfig & { apiKey: string };
+  /** Which named service this is, or `undefined` for the unnamed `MODELPILOT_API_KEY` one. */
+  target?: TargetName;
+  /** The other service, when `--compare` is asking it the same questions in shadow. */
+  comparing?: TargetName;
   wiring: ModelPilotWiring;
   /** Conversation through the router, unless `--llm` or `MODELPILOT_CHAT=off` said otherwise. */
   chat: { baseUrl: string; model: string; apiKey: string } | undefined;
@@ -38,20 +49,66 @@ export interface CliModelPilot {
 export async function connectModelPilot(
   env: Record<string, string | undefined>,
   storage: KeyValueStore,
-  o: { explicitLlm: boolean; log?: (record: unknown) => void },
+  o: {
+    explicitLlm: boolean;
+    /** `--modelpilot`: a named service, or `off`. Falls back to `MODELPILOT_TARGET`. */
+    target?: string;
+    /** `--compare`: ask the other named service the same thing in shadow. */
+    compare?: boolean;
+    log?: (record: unknown) => void;
+    /** Why something is not on, said once. */
+    note?: (message: string) => void;
+  },
 ): Promise<CliModelPilot | undefined> {
-  const config = resolveModelPilotConfig({ env });
+  const asked = (o.target ?? env.MODELPILOT_TARGET)?.trim().toLowerCase() || undefined;
+  if (asked === "off") return undefined;
+  if (asked !== undefined && !isTargetName(asked)) {
+    o.note?.(`modelpilot: unknown target "${asked}" (${TARGET_NAMES.join(" | ")} | off) — not using it`);
+    return undefined;
+  }
+
+  const named = asked as TargetName | undefined;
+  const target = named ? resolveTarget(env, named) : undefined;
+  if (target && !target.apiKey) {
+    o.note?.(`modelpilot ${target.name}: no ${target.keyVariable} — off, nothing is sent`);
+    return undefined;
+  }
+  const config = resolveModelPilotConfig({ env: target ? envForTarget(env, target) : env });
   // No credential, or switched off: no client is built, so no call can be made.
   if (!config.apiKey || config.mode === "off") return undefined;
 
   const installId = await loadInstallId(storage);
   const apiKey = config.apiKey;
+  const primary = createModelPilotWiring({
+    config: { ...config, apiKey }, installId, runtimeVersion: RUNTIME_VERSION,
+    ...(o.log ? { telemetry: o.log } : {}),
+  });
+
+  let wiring: ModelPilotWiring = primary;
+  let comparing: TargetName | undefined;
+  if (o.compare) {
+    const otherName = named === "official" ? "local" : named === "local" ? "official" : undefined;
+    const other = otherName ? resolveTarget(env, otherName) : undefined;
+    if (!named || !otherName || !other) {
+      o.note?.("modelpilot --compare: needs a named target (--modelpilot official|local) to compare against the other");
+    } else if (!other.apiKey) {
+      o.note?.(`modelpilot --compare: no ${other.keyVariable}, so there is nothing to compare with`);
+    } else {
+      // Shadow whatever the primary does: the second service's plan is recorded, never run.
+      const otherConfig = resolveModelPilotConfig({ env: { ...envForTarget(env, other), MODELPILOT_MODE: "shadow" } });
+      const second = createModelPilotWiring({
+        config: { ...otherConfig, apiKey: other.apiKey }, installId, runtimeVersion: RUNTIME_VERSION,
+      });
+      wiring = withComparison(primary, second, { primary: named, other: otherName }, (record) => o.log?.(record));
+      comparing = otherName;
+    }
+  }
+
   return {
     config: { ...config, apiKey },
-    wiring: createModelPilotWiring({
-      config: { ...config, apiKey }, installId, runtimeVersion: RUNTIME_VERSION,
-      ...(o.log ? { telemetry: o.log } : {}),
-    }),
+    ...(named ? { target: named } : {}),
+    ...(comparing ? { comparing } : {}),
+    wiring,
     chat: o.explicitLlm || env.MODELPILOT_CHAT?.trim().toLowerCase() === "off"
       ? undefined
       : { baseUrl: `${config.baseUrl}/v1`, model: env.MODELPILOT_MODEL?.trim() || "auto", apiKey },

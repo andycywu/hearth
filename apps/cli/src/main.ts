@@ -27,6 +27,7 @@ import { runSetup } from "./setup.js";
 import { runStt } from "./stt.js";
 import { createLocalListener, type LocalListener } from "./local-listener.js";
 import { connectModelPilot, routerChatClient } from "./modelpilot.js";
+import { runModelPilotStatus } from "./modelpilot-targets.js";
 import { runCecTool, runLab } from "./lab-run.js";
 import { runRingTool } from "./ring-tool.js";
 import { answer, listenForever, showOutcomes } from "./voice-loop.js";
@@ -59,6 +60,9 @@ async function main(): Promise<number> {
     const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
     return runRingTool(opts.ringTool, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, { interrupted });
   }
+
+  // `hearth modelpilot status` asks the two named services what they are and needs nothing else.
+  if (opts.modelpilotStatus) return runModelPilotStatus({ ...env }, { out: (t) => { stdout.write(t); } });
 
   // The ring is opened first and shared by everything below: a light is the one status a person across the
   // room can see, and every command that works — the agent, the lab, a CEC command, the recogniser —
@@ -129,10 +133,16 @@ async function main(): Promise<number> {
   // ModelPilot, if a key was provisioned: a planner for goals the local one cannot close, and the router for conversation.
   const modelPilot = await connectModelPilot({ ...env }, platform.storage, {
     explicitLlm: Boolean(opts.baseUrl),
+    ...(opts.modelpilot ? { target: opts.modelpilot } : {}),
+    compare: opts.compare,
     log: opts.quiet || opts.json ? undefined : (record) => { stderr.write(`  ☁ modelpilot ${JSON.stringify(record)}\n`); },
+    note: (message) => { if (!opts.quiet && !opts.json) stderr.write(`hearth: ${message}\n`); },
   });
   if (modelPilot && !opts.quiet && !opts.json) {
-    stderr.write(`hearth: modelpilot ${modelPilot.config.mode} (${modelPilot.config.source})${modelPilot.chat ? ", conversation through the router" : ""}\n`);
+    stderr.write(
+      `hearth: modelpilot ${modelPilot.target ?? "custom"} ${modelPilot.config.mode} (${modelPilot.config.source}) at ${modelPilot.config.baseUrl}` +
+      `${modelPilot.chat ? ", conversation through the router" : ""}${modelPilot.comparing ? `, comparing with ${modelPilot.comparing} in shadow` : ""}\n`,
+    );
   }
 
   const agent = new Agent({

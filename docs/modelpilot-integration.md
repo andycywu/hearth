@@ -405,6 +405,30 @@ proven and the intelligence is not there until a provider is configured in
 `config/models.yaml` and its key put in the service's env file. Until then Hearth on the
 Pi is better off *not* pointed at it, which is why nothing in `~/.config/hearth/env` does.
 
+### Two services, by name
+
+The hosted service and the Pi's own copy differ in URL and in key, and one `MODELPILOT_API_KEY`
+can hold only one pair — switching meant editing a file and hoping the key followed the URL.
+So each has a name, and each is complete or absent:
+
+```sh
+# ~/.config/hearth/env (0600)
+MODELPILOT_OFFICIAL_API_KEY=…      # base URL defaults to the hosted service
+MODELPILOT_LOCAL_API_KEY=…         # base URL defaults to http://127.0.0.1:8000
+```
+
+| | |
+| --- | --- |
+| `hearth modelpilot status` | Probes both: `/health`, then `/v1/models` with that target's key, and the latency of the second. `verified` means reachable **and** key accepted; 401/403 is `failed` (key rejected); any other answer, a 404 included, is `unverified` — it says nothing about the key; no key is `unconfigured` and no request is made. Prints neither key. |
+| `--modelpilot official\|local\|off` | (or `MODELPILOT_TARGET`) Plan and converse through that one. A named target without its key is off and says which variable is missing — it never borrows the other's. |
+| `--compare` | With a named target, ask the *other* one the same goal in shadow. Its plan is recorded and compared with the first's and logged as `☁ modelpilot {"compare":true,…}`; it is never run, and the comparison is not awaited, so a slow or failing second service costs a log line. Where the local planner closed the goal neither service is asked, and the log says that instead of inventing a comparison. |
+
+`MODELPILOT_API_KEY` alone still works, unnamed, as before. What `--compare` can and cannot
+say: it compares *plans* (capability ids, in order) for goals the local planner could not
+close; it does not compare conversation answers, and until the local instance has a real
+provider its plans are `unusable_output`, so a comparison against it says so rather than
+finding a difference.
+
 ## What is sent, and what is not
 
 `minimiseRoomState` is an **allowlist**, so a new world path cannot leak by

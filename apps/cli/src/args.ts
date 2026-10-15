@@ -101,6 +101,12 @@ export interface CliOptions {
   ttsPitch?: number;
   /** `--target N`: the CEC logical address a `hearth cec` command is aimed at. */
   target?: number;
+  /** `--modelpilot official|local|off` (or `MODELPILOT_TARGET`): which named ModelPilot to use. */
+  modelpilot?: string;
+  /** `--compare`: ask the other named ModelPilot the same thing, in shadow, and log the difference. */
+  compare: boolean;
+  /** `hearth modelpilot status`: probe both named services and say what answered. */
+  modelpilotStatus: boolean;
   /** `--no-save`: setup prints what it would write and writes nothing. */
   save: boolean;
   /** Anything wrong with the invocation, in the order found. */
@@ -144,6 +150,8 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     labLan: false,
     noOpen: false,
     installLauncher: false,
+    compare: false,
+    modelpilotStatus: false,
     save: true,
     writes: false,
     room: "stored",
@@ -215,6 +223,14 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       case "--realtime": opts.realtime = true; break;
       case "--serve": opts.serve = true; break;
       case "--no-open": opts.noOpen = true; break;
+      case "--compare": opts.compare = true; break;
+      case "--modelpilot": {
+        const v = takeValue("--modelpilot");
+        if (v === undefined) break;
+        if (v !== "official" && v !== "local" && v !== "off") opts.errors.push(`--modelpilot must be official, local or off (got "${v}")`);
+        else opts.modelpilot = v;
+        break;
+      }
       case "--install-launcher": opts.installLauncher = true; break;
       case "--port": {
         const v = takeValue("--port");
@@ -305,6 +321,11 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   }
   if (opts.commands[0] === "cec") {
     opts.cecTool = opts.commands.slice(1);
+    opts.commands = [];
+  }
+  // `hearth modelpilot status` — and only that exact pair, so "modelpilot is slow today" stays a sentence.
+  if (opts.commands[0] === "modelpilot" && opts.commands[1] === "status" && opts.commands.length === 2) {
+    opts.modelpilotStatus = true;
     opts.commands = [];
   }
   if (opts.commands[0] === "stt") {
