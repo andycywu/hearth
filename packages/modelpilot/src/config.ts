@@ -32,7 +32,7 @@ export interface ResolveOptions {
   defaults?: Partial<Omit<ModelPilotConfig, "source">>;
 }
 
-export const PRODUCTION_BASE_URL = "https://modelpilot.andycywu.workers.dev";
+export const PRODUCTION_BASE_URL = "https://modelpilot.andycywu.cc";
 
 /**
  * `timeoutMs` is 8000 because 5000 was a round number and this one is a

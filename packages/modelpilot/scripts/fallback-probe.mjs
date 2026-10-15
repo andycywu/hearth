@@ -12,7 +12,7 @@
  * threshold below its 0.8 — then make it fail. The next candidate is the real
  * provider, and fallback_count should come back 1.
  */
-const base = process.env.MODELPILOT_BASE_URL ?? "https://modelpilot.andycywu.workers.dev";
+const base = process.env.MODELPILOT_BASE_URL ?? "https://modelpilot.andycywu.cc";
 
 async function call(label, body) {
   const started = Date.now();

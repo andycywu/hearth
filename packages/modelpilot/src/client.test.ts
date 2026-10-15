@@ -372,7 +372,7 @@ describe("configuration", () => {
   it("defaults to shadow, and to the production endpoint", () => {
     const config = resolveModelPilotConfig({ env: { MODELPILOT_API_KEY: KEY } });
     expect(config.mode).toBe("shadow");
-    expect(config.baseUrl).toBe("https://modelpilot.andycywu.workers.dev");
+    expect(config.baseUrl).toBe("https://modelpilot.andycywu.cc");
     expect(config.timeoutMs).toBe(8000);
     expect(config.maxTaskBudget).toBe(0.05);
   });
