@@ -124,12 +124,12 @@ describe("--compare", () => {
   const plan = { id: "p", goal, steps: [], createdAt: 0 } as unknown as Plan;
   const record = (steps: string[], model?: string): ShadowRecord =>
     ({ workflowId: "w", agreement: "differs", localSteps: [], remoteSteps: steps, ...(model ? { selectedModel: model } : {}) }) as unknown as ShadowRecord;
-  const planner = (answer: ShadowRecord | undefined, throwing = false): ModelPilotPlanner => {
+  const planner = (answer: ShadowRecord | undefined, throwing = false, returns: Plan = plan): ModelPilotPlanner => {
     const shadow: ShadowRecord[] = [];
     return {
       shadow,
       report: async () => {},
-      async plan() { if (throwing) throw new Error("boom"); if (answer) shadow.push(answer); return plan; },
+      async plan() { if (throwing) throw new Error("boom"); if (answer) shadow.push(answer); return returns; },
     };
   };
   const wire = (p: ModelPilotPlanner) => ({ factory: (_c: PlannerContext) => p, report: async () => {} });
@@ -153,9 +153,18 @@ describe("--compare", () => {
     const same = withComparison(wire(planner(record(["a"]))), wire(planner(record(["a"]))), { primary: "official", other: "local" }, (r) => logged.push(r));
     await same.factory(ctx).plan(goal); await settle();
     expect(logged[0]?.summary).toBe("same plan from official and local");
-    const silent = withComparison(wire(planner(undefined)), wire(planner(undefined)), { primary: "official", other: "local" }, (r) => logged.push(r));
+    const closed = { ...plan, source: "deterministic" } as unknown as Plan;
+    const silent = withComparison(wire(planner(undefined, false, closed)), wire(planner(undefined)), { primary: "official", other: "local" }, (r) => logged.push(r));
     await silent.factory(ctx).plan(goal); await settle();
     expect(logged[1]?.summary).toContain("neither was asked");
+  });
+
+  it("does not claim the local planner closed a goal just because no suggestion was recorded — a failed call records none either", async () => {
+    const logged: CompareRecord[] = [];
+    const c = withComparison(wire(planner(undefined)), wire(planner(undefined)), { primary: "official", other: "local" }, (r) => logged.push(r));
+    await c.factory(ctx).plan(goal); await settle();
+    expect(logged[0]?.summary).not.toContain("closed");
+    expect(logged[0]).toMatchObject({ other: { agreement: "no-suggestion" } });
   });
 
   it("a second service that throws costs a log line and never the primary's plan", async () => {

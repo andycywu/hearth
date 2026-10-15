@@ -8,6 +8,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **First live run against the hosted ModelPilot found two faults, both fixed.** Conversation
+  through the router answered ("Paris."), but every *plan* came back `502 All eligible providers
+  failed: Provider returned HTTP 400`. Replaying the request with curl isolated it:
+  `reasoning_effort: "minimal"`, which September's providers dropped or accepted and the
+  hosted catalogue's current model (`openai-mini`) rejects; the identical body without it
+  returned a plan. It is now opt-in (`MODELPILOT_REASONING_EFFORT`), so a default install
+  plans against the hosted service. And `--compare` had told the user "the local planner
+  closed it" over that very failure — a missing shadow record was read as "nobody was asked",
+  but a failed call records nothing either. Only a deterministic plan now earns that
+  sentence; otherwise it says no suggestion was recorded and points at the ☁ lines, and the
+  second service's own telemetry is tagged `other` so its failures show.
 - **Two ModelPilots, by name.** `MODELPILOT_OFFICIAL_API_KEY` and `MODELPILOT_LOCAL_API_KEY`
   (each with an optional `_BASE_URL`; defaults are the hosted service and `127.0.0.1:8000`) let
   the hosted service and the Pi's own copy sit side by side instead of taking turns in one

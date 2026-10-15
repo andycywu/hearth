@@ -98,6 +98,8 @@ export async function connectModelPilot(
       const otherConfig = resolveModelPilotConfig({ env: { ...envForTarget(env, other), MODELPILOT_MODE: "shadow" } });
       const second = createModelPilotWiring({
         config: { ...otherConfig, apiKey: other.apiKey }, installId, runtimeVersion: RUNTIME_VERSION,
+        // Tagged, so its failures are not mistaken for the primary's in the same stream.
+        ...(o.log ? { telemetry: (record: unknown) => o.log?.({ other: otherName, ...(record as object) }) } : {}),
       });
       wiring = withComparison(primary, second, { primary: named, other: otherName }, (record) => o.log?.(record));
       comparing = otherName;

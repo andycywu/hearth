@@ -213,6 +213,14 @@ node --env-file=.env.local packages/modelpilot/scripts/latency-sample.mjs 3
    essay: the reasoning that matters is the Capability Graph's, and the model is
    picking one action out of seven with the options in front of it.
 
+   **Update, 2026-10-15: no longer sent by default.** The hosted catalogue now selects
+   `openai-mini`, and a plan request carrying `reasoning_effort` came back `502 All
+   eligible providers failed: Provider returned HTTP 400` — replayed with curl, the identical
+   body without the field returned a plan in 4.8 s. "Safe to send" held for the providers
+   of September and not for these. It is `MODELPILOT_REASONING_EFFORT` now, off unless set.
+   The 4.4 s / zero-reasoning-token figure above was measured on a reasoning model and has
+   not been re-measured; the 4.8 s here is one request on a different one.
+
 The default timeout moved from 5000ms to **8000ms** on the back of this. 5000
 was a round number; 8000 is about 2.5× the measured p90, chosen because the
 *first* call of a process repeatedly ran long — a cold Worker plus a cold
@@ -312,6 +320,7 @@ is noise in someone else's denominator.
 | `MODELPILOT_BASE_URL` | `https://modelpilot.andycywu.cc` | origin; `/v1/chat/completions` is appended. Point at `tools/mock-modelpilot-server.mjs` for testing |
 | `MODELPILOT_TIMEOUT_MS` | `8000` | per call, and the abort deadline. The service takes a latency *weight*, not a deadline, so this is the only one. 8000 is measured, not chosen — see [Measured against the live service](#measured-against-the-live-service) |
 | `MODELPILOT_MAX_COST` | `0.05` | USD, sent as `metadata.max_cost` |
+| `MODELPILOT_REASONING_EFFORT` | not sent | e.g. `minimal`. Forwarded verbatim to whichever provider the router picks; the hosted service answered 502 ("Provider returned HTTP 400") to every plan carrying it on 2026-10-15, and the same request without it returned a plan. `off` is the same as unset. |
 
 On a device host, the same values as globals: `__MODELPILOT_API_KEY__`,
 `__MODELPILOT_MODE__`, `__MODELPILOT_BASE_URL__`, `__MODELPILOT_TIMEOUT_MS__`,

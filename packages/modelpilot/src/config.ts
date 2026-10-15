@@ -21,6 +21,15 @@ export interface ModelPilotConfig {
   timeoutMs: number;
   /** Hard ceiling handed to ModelPilot with every task, in USD. */
   maxTaskBudget: number;
+  /**
+   * `reasoning_effort` for planning requests; absent means the field is not sent (`MODELPILOT_REASONING_EFFORT`).
+   *
+   * Off by default because it is forwarded verbatim to whichever provider the router picks, and the hosted
+   * service answered 502 "Provider returned HTTP 400" to every plan carrying it (2026-10-15, selected model
+   * `openai-mini`) while the identical request without it returned a plan. It was 4.4 s against 20.3 s on a
+   * reasoning model in September; set `minimal` again for a catalogue that accepts it.
+   */
+  reasoningEffort?: string;
   /** Where the mode came from, for the bring-up status line and telemetry. */
   source: "query" | "global" | "env" | "default";
 }
@@ -96,6 +105,9 @@ export function resolveModelPilotConfig(opts: ResolveOptions = {}): ModelPilotCo
     ?? positive(env.MODELPILOT_MAX_COST)
     ?? d.maxTaskBudget;
 
+  const effort = trimmed(env.MODELPILOT_REASONING_EFFORT);
+  const reasoningEffort = effort && effort.toLowerCase() !== "off" ? effort : undefined;
+
   return {
     // No credential, no calls — whatever the mode said.
     mode: apiKey ? mode : "off",
@@ -103,6 +115,7 @@ export function resolveModelPilotConfig(opts: ResolveOptions = {}): ModelPilotCo
     ...(apiKey ? { apiKey } : {}),
     timeoutMs,
     maxTaskBudget,
+    ...(reasoningEffort ? { reasoningEffort } : {}),
     source,
   };
 }

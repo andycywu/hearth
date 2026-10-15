@@ -55,6 +55,7 @@ export function createModelPilotWiring(o: ModelPilotWiringOptions): ModelPilotWi
       devices: ctx.devices,
       meter: ctx.meter,
       maxTaskBudget: config.maxTaskBudget,
+      ...(config.reasoningEffort ? { reasoningEffort: config.reasoningEffort } : {}),
       ...(o.telemetry ? { telemetry: o.telemetry } : {}),
     })),
     report: async (outcome) => instance?.report(outcome),

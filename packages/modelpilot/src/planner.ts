@@ -85,6 +85,11 @@ export interface ModelPilotPlannerOptions {
    */
   maxTaskBudget?: number;
   /**
+   * `reasoning_effort` to send with a planning request. Absent: none is sent — see
+   * `ModelPilotConfig.reasoningEffort` for why that is the default.
+   */
+  reasoningEffort?: string;
+  /**
    * `local` (default) plans locally when ModelPilot is unavailable; `refuse`
    * returns an empty plan instead. A kiosk that must not act without the engine
    * chooses `refuse`.
@@ -248,6 +253,7 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
       goal, world: opts.world, devices: opts.devices, capabilities: opts.graph,
       ...(goal.intent ? { utterance: goal.intent } : {}),
       ...(opts.maxTaskBudget !== undefined ? { maxTaskBudget: opts.maxTaskBudget } : {}),
+      reasoningEffort: opts.reasoningEffort ?? null,
     });
 
     let result: ModelPilotAnswer;

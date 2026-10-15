@@ -7,7 +7,7 @@ import {
 import { createModelPilotClient } from "./client.js";
 import { createModelPilotPlanner, verdictFor } from "./planner.js";
 import { parseActionPlan } from "./action-plan.js";
-import type { ModelPilotMode } from "./config.js";
+import { resolveModelPilotConfig, type ModelPilotMode } from "./config.js";
 import type { ModelPilotTelemetry } from "./telemetry.js";
 
 /**
@@ -94,6 +94,7 @@ function setup(opts: {
   onUnavailable?: "local" | "refuse";
   breakInput?: boolean;
   feedbackStatus?: number;
+  reasoningEffort?: string;
 }) {
   const platform = createWebAdapter();
   // A TV that takes the write and stays where it was — the case the local
@@ -131,6 +132,7 @@ function setup(opts: {
     graph: agent.capabilities, world: agent.world, devices: agent.devices,
     telemetry: (record) => telemetry.push(record),
     ...(opts.onUnavailable ? { onUnavailable: opts.onUnavailable } : {}),
+    ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
   });
 
   // The seam: whatever plans, the executor, the policy and the local verifier
@@ -164,6 +166,29 @@ describe("mode: off", () => {
     await agent.pursue(freeform);
     expect(requests).toEqual([]);
     expect(telemetry[0]).toMatchObject({ status: "skipped", mode: "off" });
+  });
+});
+
+describe("reasoning_effort", () => {
+  // The hosted service answered 502 "Provider returned HTTP 400" to every plan that carried it (2026-10-15), and
+  // the same request without it returned a plan. So it is opt-in.
+  it("is not sent unless configured", async () => {
+    const { agent, requests } = setup({ mode: "shadow" });
+    await agent.pursue(freeform);
+    expect(requests).toHaveLength(1);
+    expect("reasoning_effort" in (requests[0] as object)).toBe(false);
+  });
+
+  it("is sent when configured, for a catalogue that accepts it", async () => {
+    const { agent, requests } = setup({ mode: "shadow", reasoningEffort: "minimal" });
+    await agent.pursue(freeform);
+    expect(requests[0]).toMatchObject({ reasoning_effort: "minimal" });
+  });
+
+  it("MODELPILOT_REASONING_EFFORT sets it, and `off` clears it", () => {
+    expect(resolveModelPilotConfig({ env: { MODELPILOT_API_KEY: "k" } }).reasoningEffort).toBeUndefined();
+    expect(resolveModelPilotConfig({ env: { MODELPILOT_API_KEY: "k", MODELPILOT_REASONING_EFFORT: "minimal" } }).reasoningEffort).toBe("minimal");
+    expect(resolveModelPilotConfig({ env: { MODELPILOT_API_KEY: "k", MODELPILOT_REASONING_EFFORT: "off" } }).reasoningEffort).toBeUndefined();
   });
 });
 
