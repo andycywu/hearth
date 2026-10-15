@@ -21,10 +21,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `espeak-ng` command line, a bad saved one is reported and ignored rather than
   leaving the box mute, and the text always follows `--`. Checked by photographing
   the Pi's screen: the avatar and voice tabs render, and "done" is a smiling cat with
-  a green halo. What this is not: the voices are all plainly a machine; a neural one
-  (sherpa-onnx's offline TTS is already in the release on the Pi) has **not** been
-  tried on a Pi 3B and is the thing to measure next. See
-  [`docs/avatar-and-voice.md`](docs/avatar-and-voice.md).
+  a green halo. What this is not: the voices are all plainly a machine. Neural ones were
+  **measured on the Pi 3B and are too slow to speak a reply**: Piper English takes 4 s
+  to make 2.4 s of speech (real-time factor 1.7), Piper Mandarin 7 s for 2.6 s (2.7),
+  Kokoro with its many speakers 31 s for 2.1 s (14–15); each run also paid ~20 s to load
+  the model. Melo's int8 model would not load. So espeak-ng stays the voice on this
+  board, and a neural one means a TTS server on the LAN, a Pi 4/5, or cached fixed
+  replies. See [`docs/avatar-and-voice.md`](docs/avatar-and-voice.md).
 
 - **The status ring shows all the work, and is still when there is none.** Until now
   the ReSpeaker ring painted four answers (green, amber, red, violet) and a dim blue

@@ -60,10 +60,33 @@ These voices do not sound like a person, and espeak-ng will not get there. The w
 a voice worth choosing between is a neural one, and the runtime already on the Pi
 for recognition (sherpa-onnx's release) includes an offline text-to-speech program
 that runs VITS and Kokoro models, some with dozens of speakers in Mandarin and
-English. **That has not been tried on a Pi 3B** and whether it can speak a reply in a
-bearable time on a Cortex-A53 is the thing to measure before promising it. `TtsChoice`
-(a voice name, a speed, a pitch) is the interface it would sit behind; nothing above
-it would change.
+English. It was tried on the living-room Pi 3B (2026-10-15, sherpa-onnx v1.13.8,
+4 threads, `get_throttled` 0x0 before) and **it is too slow to speak a reply there**:
+
+| Model | Size | A short sentence | A longer one | Memory | Real-time factor |
+|---|---|---|---|---|---|
+| Piper en_US *amy-low*, int8 | 37 MB | 4.1 s to make 2.4 s of speech | 7.9 s for 4.7 s | ~100 MB | 1.7 |
+| Piper zh_CN *xiao_ya-medium*, int8 | 20 MB | 7.2 s for 2.6 s | 17.6 s for 6.1 s | ~120–150 MB | 2.7–2.9 |
+| Kokoro multi-lang v1.1, int8 (many speakers) | 207 MB | **31.5 s** for 2.1 s | 59.6 s for 4.0 s | ~330 MB | 14–15 |
+| Melo zh+en, int8 | 183 MB | — | — | — | the int8 file would not load (`Protobuf parsing failed`); not retried with the fp32 one |
+
+A real-time factor above 1 means it takes longer to make the speech than the speech
+lasts, and a spoken reply has to start within a second or two to feel like an answer.
+The best of them, the small English Piper voice, needs about four seconds for
+"I turned the volume down to thirty" — and each run here also paid ~20 s to load the
+model, which a resident server would pay once. Two caveats against the numbers: the
+Kokoro and Chinese runs came later in the sequence while the SoC climbed from 56 °C
+to 80.6 °C and ended with the clock capped (`get_throttled` 0x20002 — thermal, not
+under-voltage), so they are slower than a cooled board would be, but not by
+anything like the factor of ten that separates Kokoro from usable.
+
+So on a Pi 3B, espeak-ng is the voice, and these are the ways to something better:
+a TTS server on another machine on the LAN (the same arrangement the recogniser's
+`--asr <url>` already uses, and the one OpenAI-compatible `/audio/speech` servers
+speak, which would also let one choose among their many voices), a Pi 4/5 where the
+same models run several times faster, or a handful of fixed replies synthesised once
+and cached. `TtsChoice` (a voice name, a speed, a pitch) is the interface any of them
+would sit behind; nothing above it would change.
 
 ## Where it is
 
