@@ -124,12 +124,12 @@ describe("--compare", () => {
   const plan = { id: "p", goal, steps: [], createdAt: 0 } as unknown as Plan;
   const record = (steps: string[], model?: string): ShadowRecord =>
     ({ workflowId: "w", agreement: "differs", localSteps: [], remoteSteps: steps, ...(model ? { selectedModel: model } : {}) }) as unknown as ShadowRecord;
-  const planner = (answer: ShadowRecord | undefined, throwing = false, returns: Plan = plan): ModelPilotPlanner => {
+  const planner = (answer: ShadowRecord | undefined, throwing = false): ModelPilotPlanner => {
     const shadow: ShadowRecord[] = [];
     return {
       shadow,
       report: async () => {},
-      async plan() { if (throwing) throw new Error("boom"); if (answer) shadow.push(answer); return returns; },
+      async plan() { if (throwing) throw new Error("boom"); if (answer) shadow.push(answer); return plan; },
     };
   };
   const wire = (p: ModelPilotPlanner) => ({ factory: (_c: PlannerContext) => p, report: async () => {} });
@@ -148,23 +148,29 @@ describe("--compare", () => {
     });
   });
 
-  it("says when both agree, and when neither was asked because the local planner closed the goal", async () => {
+  it("says when both agree", async () => {
     const logged: CompareRecord[] = [];
     const same = withComparison(wire(planner(record(["a"]))), wire(planner(record(["a"]))), { primary: "official", other: "local" }, (r) => logged.push(r));
     await same.factory(ctx).plan(goal); await settle();
     expect(logged[0]?.summary).toBe("same plan from official and local");
-    const closed = { ...plan, source: "deterministic" } as unknown as Plan;
-    const silent = withComparison(wire(planner(undefined, false, closed)), wire(planner(undefined)), { primary: "official", other: "local" }, (r) => logged.push(r));
-    await silent.factory(ctx).plan(goal); await settle();
-    expect(logged[1]?.summary).toContain("neither was asked");
   });
 
-  it("does not claim the local planner closed a goal just because no suggestion was recorded — a failed call records none either", async () => {
+  // Both live runs of 2026-10-15 read a missing record as "nobody was asked" — over a 502, then over a mock model
+  // whose answer was unusable. A call that fails or is unusable records nothing, exactly as no call does.
+  it("when the other side recorded nothing, says that — not that the local planner closed the goal", async () => {
+    const logged: CompareRecord[] = [];
+    const c = withComparison(wire(planner(record(["a"], "m-1"))), wire(planner(undefined)), { primary: "official", other: "local" }, (r) => logged.push(r));
+    await c.factory(ctx).plan(goal); await settle();
+    expect(logged[0]?.summary).toBe("official suggested a plan; local gave no usable suggestion (see its ☁ line above)");
+    expect(logged[0]).toMatchObject({ primary: { model: "m-1" }, other: { agreement: "no-suggestion" } });
+  });
+
+  it("when neither side recorded anything, does not pretend to know why", async () => {
     const logged: CompareRecord[] = [];
     const c = withComparison(wire(planner(undefined)), wire(planner(undefined)), { primary: "official", other: "local" }, (r) => logged.push(r));
     await c.factory(ctx).plan(goal); await settle();
-    expect(logged[0]?.summary).not.toContain("closed");
-    expect(logged[0]).toMatchObject({ other: { agreement: "no-suggestion" } });
+    expect(logged[0]?.summary).toContain("neither side recorded a suggestion");
+    expect(logged[0]?.summary).toContain("or both calls failed");
   });
 
   it("a second service that throws costs a log line and never the primary's plan", async () => {

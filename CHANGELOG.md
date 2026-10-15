@@ -16,9 +16,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   returned a plan. It is now opt-in (`MODELPILOT_REASONING_EFFORT`), so a default install
   plans against the hosted service. And `--compare` had told the user "the local planner
   closed it" over that very failure — a missing shadow record was read as "nobody was asked",
-  but a failed call records nothing either. Only a deterministic plan now earns that
-  sentence; otherwise it says no suggestion was recorded and points at the ☁ lines, and the
-  second service's own telemetry is tagged `other` so its failures show.
+  but a failed call records nothing either — and a second run repeated it over a mock
+  model's unusable answer, since a shadow planner returns the local plan whoever it asked, so
+  the plan's own source proves nothing. It now says what it knows: the other side gave no
+  usable suggestion, or neither side recorded one and it cannot tell why; the second
+  service's own telemetry is tagged `other` so its failures show. With the field off, a plan
+  against the hosted service came back `ok` in 6–8 s at about 1/30 of the baseline cost
+  (single runs, not a benchmark).
 - **Two ModelPilots, by name.** `MODELPILOT_OFFICIAL_API_KEY` and `MODELPILOT_LOCAL_API_KEY`
   (each with an optional `_BASE_URL`; defaults are the hosted service and `127.0.0.1:8000`) let
   the hosted service and the Pi's own copy sit side by side instead of taking turns in one

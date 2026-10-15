@@ -191,7 +191,7 @@ export function withComparison(
           await second.plan(goal);
           const theirs = second.shadow.length > before ? second.shadow[second.shadow.length - 1] : undefined;
           const steps = mine?.remoteSteps ?? plan.steps.map((s) => s.action.capabilityId);
-          log(describe(goal, names, steps, mine?.selectedModel, theirs, plan.source));
+          log(describe(goal, names, steps, mine?.selectedModel, theirs, mine !== undefined));
         } catch (err) {
           log({
             compare: true, goal: goal.intent ?? goal.id,
@@ -206,20 +206,20 @@ export function withComparison(
 
 function describe(
   goal: Goal, names: { primary: TargetName; other: TargetName }, primarySteps: string[], primaryModel: string | undefined,
-  theirs: ShadowRecord | undefined, source?: Plan["source"],
+  theirs: ShadowRecord | undefined, primaryRecorded: boolean,
 ): CompareRecord {
   const text = goal.intent ?? goal.id;
   if (!theirs) {
-    // A missing record is not proof nobody was asked: a call that failed records nothing either (the first live
-    // comparison said "the local planner closed it" over a 502). Only a deterministic plan earns that sentence.
-    const closedLocally = source === "deterministic";
+    // No record is not "nobody was asked": a call that fails, or answers with something unusable, records none.
+    // (The first two live runs said "the local planner closed it" over a 502 and over a mock model's gibberish;
+    // the plan's own `source` cannot tell either, since a shadow planner returns the local plan whoever it asked.)
     return {
       compare: true, goal: text,
       primary: { target: names.primary, steps: primarySteps, ...(primaryModel ? { model: primaryModel } : {}) },
-      other: { target: names.other, steps: [], agreement: closedLocally ? "not-asked" : "no-suggestion" },
-      summary: closedLocally
-        ? `neither was asked: the local planner closed "${text}"`
-        : `no suggestion was recorded from ${names.other} — it was not asked, or its call failed (see the ☁ lines above)`,
+      other: { target: names.other, steps: [], agreement: "no-suggestion" },
+      summary: primaryRecorded
+        ? `${names.primary} suggested a plan; ${names.other} gave no usable suggestion (see its ☁ line above)`
+        : `neither side recorded a suggestion: the local planner closed it, or both calls failed (see the ☁ lines above)`,
     };
   }
   const same = theirs.remoteSteps.join(">") === primarySteps.join(">");
