@@ -36,6 +36,8 @@ export interface ModelPilotWiringOptions {
   installId: string;
   runtimeVersion: string;
   telemetry?: (record: unknown) => void;
+  /** Wait for the service in shadow mode too (a measurement run). Default: shadow answers locally at once. */
+  blockingShadow?: boolean;
 }
 
 export function createModelPilotWiring(o: ModelPilotWiringOptions): ModelPilotWiring {
@@ -55,6 +57,7 @@ export function createModelPilotWiring(o: ModelPilotWiringOptions): ModelPilotWi
       devices: ctx.devices,
       meter: ctx.meter,
       maxTaskBudget: config.maxTaskBudget,
+      ...(o.blockingShadow ? { blockingShadow: true } : {}),
       ...(config.reasoningEffort ? { reasoningEffort: config.reasoningEffort } : {}),
       ...(o.telemetry ? { telemetry: o.telemetry } : {}),
     })),

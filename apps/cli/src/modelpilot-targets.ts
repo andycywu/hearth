@@ -176,20 +176,23 @@ export function withComparison(
       return {
         get shadow() { return first.shadow; },
         report: (outcome) => first.report(outcome),
+        settled: () => first.settled(),
         async plan(goal: Goal): Promise<Plan> {
           const before = first.shadow.length;
           const plan = await first.plan(goal);
-          const mine = first.shadow.length > before ? first.shadow[first.shadow.length - 1] : undefined;
-          void compareOne(goal, plan, mine);
+          void compareOne(goal, plan, before);
           return plan;
         },
       };
 
-      async function compareOne(goal: Goal, plan: Plan, mine: ShadowRecord | undefined): Promise<void> {
+      async function compareOne(goal: Goal, plan: Plan, before: number): Promise<void> {
         try {
-          const before = second.shadow.length;
+          // The primary's own shadow call finishes behind its plan; read its record once it has.
+          await first.settled();
+          const mine = first.shadow.length > before ? first.shadow[first.shadow.length - 1] : undefined;
+          const beforeSecond = second.shadow.length;
           await second.plan(goal);
-          const theirs = second.shadow.length > before ? second.shadow[second.shadow.length - 1] : undefined;
+          const theirs = second.shadow.length > beforeSecond ? second.shadow[second.shadow.length - 1] : undefined;
           const steps = mine?.remoteSteps ?? plan.steps.map((s) => s.action.capabilityId);
           log(describe(goal, names, steps, mine?.selectedModel, theirs, mine !== undefined));
         } catch (err) {

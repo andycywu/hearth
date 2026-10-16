@@ -95,6 +95,7 @@ function setup(opts: {
   breakInput?: boolean;
   feedbackStatus?: number;
   reasoningEffort?: string;
+  blocking?: boolean;
 }) {
   const platform = createWebAdapter();
   // A TV that takes the write and stays where it was — the case the local
@@ -133,6 +134,7 @@ function setup(opts: {
     telemetry: (record) => telemetry.push(record),
     ...(opts.onUnavailable ? { onUnavailable: opts.onUnavailable } : {}),
     ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
+    ...(opts.blocking ? { blockingShadow: true } : {}),
   });
 
   // The seam: whatever plans, the executor, the policy and the local verifier
@@ -166,6 +168,35 @@ describe("mode: off", () => {
     await agent.pursue(freeform);
     expect(requests).toEqual([]);
     expect(telemetry[0]).toMatchObject({ status: "skipped", mode: "off" });
+  });
+});
+
+describe("shadow does not make the household wait", () => {
+  // Against the hosted service a plan took 5–8 s with an 8 s timeout; shadow only exists to be read afterwards.
+  it("answers with the local plan while the service is still being asked, and logs the outcome when it ends", async () => {
+    const { agent, planner, telemetry } = setup({ mode: "shadow", hang: true });
+    const started = Date.now();
+    const outcome = await agent.pursue({ id: "input_switched", desiredState: [{ path: W.tvInput, equals: "hdmi2" }] });
+    // The client's deadline in this fixture is 30 ms; the point is the order, not the clock.
+    expect(shapes(outcome)).toEqual(["tv.input.switch:verified"]);
+    expect(telemetry.some((t) => t.status === "error")).toBe(false);
+
+    await planner.settled();
+    expect(telemetry.find((t) => t.status === "error")).toMatchObject({ mode: "shadow", fallback_reason: expect.stringContaining("timeout") });
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it("settled() waits for every call in flight and never rejects", async () => {
+    const { agent, planner, requests } = setup({ mode: "shadow", status: 500 });
+    await agent.pursue(freeform);
+    await expect(planner.settled()).resolves.toBeUndefined();
+    expect(requests).toHaveLength(1);
+  });
+
+  it("blockingShadow restores the wait, for a measurement run that wants the record first", async () => {
+    const { agent, planner } = setup({ mode: "shadow", blocking: true });
+    await agent.pursue({ id: "input_switched", desiredState: [{ path: W.tvInput, equals: "hdmi2" }] });
+    expect(planner.shadow).toHaveLength(1);   // no settled() needed
   });
 });
 
@@ -214,6 +245,7 @@ describe("mode: shadow", () => {
   it("keeps the suggestion, the ids and the disagreement", async () => {
     const { agent, planner, telemetry } = setup({ mode: "shadow" });
     await agent.pursue({ id: "input_switched", desiredState: [{ path: W.tvInput, equals: "hdmi2" }] });
+    await planner.settled();
 
     expect(planner.shadow).toHaveLength(1);
     expect(planner.shadow[0]).toMatchObject({

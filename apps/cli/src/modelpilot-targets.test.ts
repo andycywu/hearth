@@ -129,6 +129,7 @@ describe("--compare", () => {
     return {
       shadow,
       report: async () => {},
+      settled: async () => {},
       async plan() { if (throwing) throw new Error("boom"); if (answer) shadow.push(answer); return plan; },
     };
   };

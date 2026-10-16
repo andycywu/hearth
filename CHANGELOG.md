@@ -8,6 +8,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Shadow no longer makes the household wait.** Measured against the hosted ModelPilot, a plan
+  took 5–8 s (twelve runs: ok at 5.1–7.3 s, two of six default-setting calls hit the 8 s
+  timeout), and shadow awaited it before returning the local plan it was always going to
+  return — so every goal the local planner could not close, which on a voice assistant is
+  every question, was answered seconds late to produce a log line. The planner now answers
+  with the local plan at once and finishes the call behind it; `settled()` waits for it,
+  `blockingShadow` restores the old behaviour for a measurement run, and `--compare` reads
+  its records after they land. `reasoning_effort: low` (accepted where `minimal` is not)
+  measured no clear win: median about 5.9 s against 6.2 s with the field off, six runs each,
+  one Pi, one afternoon — so it stays off.
 - **First live run against the hosted ModelPilot found two faults, both fixed.** Conversation
   through the router answered ("Paris."), but every *plan* came back `502 All eligible providers
   failed: Provider returned HTTP 400`. Replaying the request with curl isolated it:

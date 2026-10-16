@@ -129,6 +129,14 @@ comparison (`same` / `different` / `local_only` / `remote_only`) so the two path
 can be evaluated against each other on real hardware without any risk to the
 device.
 
+**Shadow runs behind the plan, not in front of it.** The suggestion is read afterwards, so
+nothing waits for it: the local plan is returned at once and the service is asked in the
+background (`planner.settled()` is how a test or a shutdown waits; `blockingShadow` restores
+the wait for a measurement run). It was in front until 2026-10-16, and against the hosted
+service that meant every goal the local planner could not close — every spoken question —
+sat 5–8 s behind a call whose only product was a log line, with an 8 s timeout that two of
+six calls hit.
+
 **With no API key configured, the resolved mode is `off`** whatever was
 requested. Configuring the key is the act that opts a device in; a television
 quietly trying to reach a cloud endpoint it has no credential for is both noisy

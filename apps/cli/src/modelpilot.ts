@@ -98,6 +98,8 @@ export async function connectModelPilot(
       const otherConfig = resolveModelPilotConfig({ env: { ...envForTarget(env, other), MODELPILOT_MODE: "shadow" } });
       const second = createModelPilotWiring({
         config: { ...otherConfig, apiKey: other.apiKey }, installId, runtimeVersion: RUNTIME_VERSION,
+        // The comparison is already behind the plan; this call is the thing being waited for.
+        blockingShadow: true,
         // Tagged, so its failures are not mistaken for the primary's in the same stream.
         ...(o.log ? { telemetry: (record: unknown) => o.log?.({ other: otherName, ...(record as object) }) } : {}),
       });

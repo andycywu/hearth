@@ -29,7 +29,8 @@ import { createTelemetryLogger, type ModelPilotTelemetry, type TelemetrySink } f
  *  - **shadow** (default) — calls, records the suggestion, the request id and
  *    the model that answered, compares it with the local plan, and **executes
  *    the local one**. Device behaviour is byte-identical to `off`; the only
- *    difference is a telemetry record and a network call. Nothing is reported
+ *    difference is a telemetry record and a network call — made in the
+ *    background, so the household does not wait for it (see `blockingShadow`). Nothing is reported
  *    to `/v1/feedback` either, because the answer was never run.
  *  - **enforce** — the returned plan is what runs, after local validation and
  *    with local policy still deciding whether each step may happen.
@@ -90,6 +91,16 @@ export interface ModelPilotPlannerOptions {
    */
   reasoningEffort?: string;
   /**
+   * Wait for the service in shadow mode too. Off by default.
+   *
+   * A shadow call exists to be read afterwards, so there is nothing to wait for — and measured against the hosted
+   * service it took 5–8 s per plan, against a timeout of 8 s, in front of *every* goal the local planner could not
+   * close. On a voice assistant that is a question answered six seconds late for a log line. Shadow now answers
+   * with the local plan at once and finishes its call behind it; `settled()` is how a test (or a shutdown) waits.
+   * Set this for a measurement run that wants the record before it moves on.
+   */
+  blockingShadow?: boolean;
+  /**
    * `local` (default) plans locally when ModelPilot is unavailable; `refuse`
    * returns an empty plan instead. A kiosk that must not act without the engine
    * chooses `refuse`.
@@ -125,6 +136,8 @@ export interface ShadowRecord {
 export interface ModelPilotPlanner extends Planner {
   /** Shadow-mode suggestions, newest last. Bounded; nothing is persisted. */
   readonly shadow: readonly ShadowRecord[];
+  /** Resolves when every shadow call started so far has finished and been logged. Never rejects. */
+  settled(): Promise<void>;
   /**
    * Hand back what the television actually did with a plan this planner
    * produced, so it can reach `/v1/feedback`.
@@ -224,8 +237,23 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
   const nextWorkflowId = opts.workflowId ?? (() => `wf-${now().toString(36)}-${++counter}`);
   const local = opts.local ?? new GoalPlanner({ graph: opts.graph, world: opts.world });
 
+  const inflight = new Set<Promise<void>>();
+
   async function plan(goal: Goal): Promise<Plan> {
     const workflowId = nextWorkflowId();
+    if (opts.mode === "shadow" && opts.client && !opts.blockingShadow) {
+      // The device does what it did before, now; the service is asked behind it. Whatever the call does — answer,
+      // fail, time out — it is logged by `run` and goes nowhere near this return.
+      const localPlan = await local.plan(goal);
+      const behind = run(goal, workflowId).then(() => undefined, () => undefined);
+      inflight.add(behind);
+      void behind.finally(() => inflight.delete(behind));
+      return withWorkflow(localPlan, workflowId);
+    }
+    return run(goal, workflowId);
+  }
+
+  async function run(goal: Goal, workflowId: string): Promise<Plan> {
     const taskType = goal.id;
 
     if (opts.mode === "off" || !opts.client) {
@@ -444,6 +472,7 @@ export function createModelPilotPlanner(opts: ModelPilotPlannerOptions): ModelPi
   return {
     plan,
     report,
+    settled: async () => { while (inflight.size) await Promise.all([...inflight]); },
     get shadow() {
       return shadow;
     },
