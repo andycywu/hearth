@@ -8,6 +8,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`hearth setup --modelpilot official|local|off` remembers the choice.** It goes in
+  `config.json` (`modelpilot`) and comes back as `MODELPILOT_TARGET`, so after setup a plain
+  `hearth "…"` — and the service — uses that ModelPilot with no flag; flag and environment still
+  win. Only the *name* is stored: the two keys stay in the 0600 env file, whose template now
+  names `MODELPILOT_OFFICIAL_API_KEY` and `MODELPILOT_LOCAL_API_KEY`. A `MODELPILOT_TARGET`
+  that is not a name is ignored with a warning rather than obeyed.
 - **The hosted service fixed what the first live run found, and re-probing confirmed it.** A
   malformed body is now `400 invalid_json` (was 500), an unknown model `404 model_not_found`
   (was a 422 that read like a policy failure), and a rejected `reasoning_effort` is

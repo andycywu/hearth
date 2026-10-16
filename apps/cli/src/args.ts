@@ -102,7 +102,7 @@ export interface CliOptions {
   /** `--target N`: the CEC logical address a `hearth cec` command is aimed at. */
   target?: number;
   /** `--modelpilot official|local|off` (or `MODELPILOT_TARGET`): which named ModelPilot to use. */
-  modelpilot?: string;
+  modelpilot?: "official" | "local" | "off";
   /** `--compare`: ask the other named ModelPilot the same thing, in shadow, and log the difference. */
   compare: boolean;
   /** `hearth modelpilot status`: probe both named services and say what answered. */
@@ -182,6 +182,11 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (env.HEARTH_VOICE === "1") opts.voice = true;
   if (env.HEARTH_LEDS === "1") opts.leds = true;
   if (env.HEARTH_WAKE) opts.wakeWord = env.HEARTH_WAKE;
+  if (env.MODELPILOT_TARGET) {
+    const t = env.MODELPILOT_TARGET.trim().toLowerCase();
+    if (t === "official" || t === "local" || t === "off") opts.modelpilot = t;
+    else opts.warnings.push(`MODELPILOT_TARGET must be official, local or off (got "${env.MODELPILOT_TARGET}") — ignored`);
+  }
   if (env.HEARTH_TTS_VOICE) opts.ttsVoice = env.HEARTH_TTS_VOICE;
   if (env.HEARTH_TTS_SPEED) opts.ttsSpeed = Number(env.HEARTH_TTS_SPEED);
   if (env.HEARTH_TTS_PITCH) opts.ttsPitch = Number(env.HEARTH_TTS_PITCH);
@@ -400,6 +405,8 @@ USAGE
                                      hearth cec send "--to 0 --give-device-power-status"
   hearth ring demo                   every status-light state in turn, with what it means
                                      (moving = working, still = nothing is happening)
+  hearth modelpilot status           probe the two named ModelPilot services (official, local):
+                                     reachable, key accepted, how long it took
   hearth stt bench <manifest> [--realtime] [--out <base>]
                                      the same recogniser over a dataset: expected vs actual,
                                      latency, real-time factor, memory (JSON + CSV)
@@ -422,11 +429,15 @@ OPTIONS
       --no-wake           act on everything heard
       --cec <device>      CEC adapter to discover with (default /dev/cec0, linux)
       --no-cec            do not touch the CEC bus
+      --modelpilot <t>    official|local|off — which named ModelPilot to use (or $MODELPILOT_TARGET;
+                          keys: $MODELPILOT_OFFICIAL_API_KEY, $MODELPILOT_LOCAL_API_KEY)
+      --compare           ask the other named ModelPilot the same thing in shadow and log the difference
       --room <mode>       demo|empty|stored — how the room is seeded (default: stored)
 
 SETUP OPTIONS
       --asr <url>         remember this transcription endpoint
       --llm <url>         remember this model endpoint (and --model)
+      --modelpilot <t>    remember which named ModelPilot to use (keys stay in the env file)
       --no-save           show what would be written, write nothing
 
 REPORT OPTIONS

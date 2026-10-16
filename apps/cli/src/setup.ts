@@ -164,6 +164,7 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
     // to discover.
     ...(heard.capture && asr && !keyMissing && (!local || localReady) ? { wakeWord: opts.wakeWord ?? previous.wakeWord ?? "hearth" } : {}),
     ...(opts.baseUrl ? { llmBaseUrl: opts.baseUrl } : {}),
+    ...(opts.modelpilot ? { modelpilot: opts.modelpilot } : {}),
     ...(opts.baseUrl && opts.model ? { llmModel: opts.model } : {}),
     writtenBy: `hearth setup, Node ${node}`,
     writtenAt: new Date().toISOString(),
@@ -208,10 +209,11 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
     if (!(await exists(envPath))) {
       await writeFile(envPath, opts.apiKey
         ? `# Read by the hearth user service (EnvironmentFile). Keep this file 0600.\nTV_AGENT_API_KEY=${opts.apiKey}\n`
-        : "# Read by the hearth user service (EnvironmentFile). Keep this file 0600.\n# TV_AGENT_API_KEY=sk-…\n# ModelPilot (planning for goals the box cannot close itself, and conversation through the router):\n# MODELPILOT_API_KEY=…\n# MODELPILOT_MODE=shadow   # off | shadow | enforce\n", { encoding: "utf8", mode: 0o600 });
+        : "# Read by the hearth user service (EnvironmentFile). Keep this file 0600.\n# TV_AGENT_API_KEY=sk-…\n# ModelPilot (planning for goals the box cannot close itself, and conversation through the router).\n# Two named services, each with its own key. Choose with `hearth setup --modelpilot official|local`; `hearth modelpilot status` checks them:\n# MODELPILOT_OFFICIAL_API_KEY=…\n# MODELPILOT_LOCAL_API_KEY=…\n# MODELPILOT_MODE=shadow   # off | shadow | enforce\n", { encoding: "utf8", mode: 0o600 });
       if (!opts.json) io.out(opts.apiKey ? `Wrote ${envPath} (0600) with the API key from the environment.\n` : `Wrote ${envPath} (0600) — put TV_AGENT_API_KEY there for the service.\n`);
     }
     if (!opts.json) {
+      if (config.modelpilot) io.out(`ModelPilot: ${config.modelpilot}${config.modelpilot === "off" ? "" : ` — keys live in ${envPath}; \`hearth modelpilot status\` says whether it answers.`}\n`);
       io.out(`Wrote ${path}\n`);
       io.out("Next `hearth \"turn it down\"` needs no flags.\n");
       if (config.wakeWord) {

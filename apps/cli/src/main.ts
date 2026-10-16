@@ -131,7 +131,7 @@ async function main(): Promise<number> {
   }
 
   // ModelPilot, if a key was provisioned: a planner for goals the local one cannot close, and the router for conversation.
-  const modelPilot = await connectModelPilot({ ...env }, platform.storage, {
+  const modelPilot = await connectModelPilot({ ...env }, platform.storage, {   // opts.modelpilot: flag > env > config
     explicitLlm: Boolean(opts.baseUrl),
     ...(opts.modelpilot ? { target: opts.modelpilot } : {}),
     compare: opts.compare,

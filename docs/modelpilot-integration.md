@@ -449,7 +449,8 @@ MODELPILOT_LOCAL_API_KEY=…         # base URL defaults to http://127.0.0.1:800
 | `--modelpilot official\|local\|off` | (or `MODELPILOT_TARGET`) Plan and converse through that one. A named target without its key is off and says which variable is missing — it never borrows the other's. |
 | `--compare` | With a named target, ask the *other* one the same goal in shadow. Its plan is recorded and compared with the first's and logged as `☁ modelpilot {"compare":true,…}`; it is never run, and the comparison is not awaited, so a slow or failing second service costs a log line. Where the local planner closed the goal neither service is asked, and the log says that instead of inventing a comparison. |
 
-`MODELPILOT_API_KEY` alone still works, unnamed, as before. What `--compare` can and cannot
+`hearth setup --modelpilot official|local|off` writes the *name* to `config.json` so the
+flag is not needed again; the keys stay in the env file. `MODELPILOT_API_KEY` alone still works, unnamed, as before. What `--compare` can and cannot
 say: it compares *plans* (capability ids, in order) for goals the local planner could not
 close; it does not compare conversation answers, and until the local instance has a real
 provider its plans are `unusable_output`, so a comparison against it says so rather than

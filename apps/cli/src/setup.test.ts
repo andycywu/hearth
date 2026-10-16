@@ -85,6 +85,38 @@ describe("hearth setup", () => {
     expect(unit).toContain("ExecStart=/home/andycywu/.local/node/bin/node /home/andycywu/hearth/apps/cli/dist/main.js --platform linux --yes --voice --leds --serve");
   });
 
+  it("--modelpilot is remembered, comes back as the target next time, and no key goes into config.json", async () => {
+    const { out, sink } = await io();
+    const p = await paths();
+    const deps = {
+      ...p, run: piRunner, readFile: async (f: string) => PI_FILES[f] ?? "",
+      exists: async (f: string) => f === "/dev/cec0",
+      nodeVersion: "v26.8.2", nodePath: "/n/node", cliPath: "/h/main.js",
+    };
+    expect(await runSetup(parseArgs(["--platform", "linux", "--modelpilot", "official", "setup"]), sink, deps)).toBe(0);
+    expect(out.join("")).toContain("ModelPilot: official");
+    const config = await loadConfig(p.configPath);
+    expect(config.modelpilot).toBe("official");
+    expect(JSON.stringify(config)).not.toMatch(/api[_-]?key/i);
+
+    // A later setup that does not mention it leaves the choice alone, and the config stands in for the flag.
+    expect(await runSetup(parseArgs(["--platform", "linux", "setup"]), (await io()).sink, deps)).toBe(0);
+    expect((await loadConfig(p.configPath)).modelpilot).toBe("official");
+    expect(parseArgs(["hi"], configAsEnv(config)).modelpilot).toBe("official");
+    expect(parseArgs(["--modelpilot", "local", "hi"], configAsEnv(config)).modelpilot).toBe("local");   // flag > config
+
+    // The env file the service reads names both keys and writes neither.
+    const envFile = await readFile(join(dirname(p.configPath), "env"), "utf8");
+    expect(envFile).toContain("MODELPILOT_OFFICIAL_API_KEY=…");
+    expect(envFile).toContain("MODELPILOT_LOCAL_API_KEY=…");
+  });
+
+  it("a MODELPILOT_TARGET that is not a name is ignored with a warning, not obeyed", () => {
+    const o = parseArgs(["hi"], { MODELPILOT_TARGET: "oficial" });
+    expect(o.modelpilot).toBeUndefined();
+    expect(o.warnings.join()).toContain("MODELPILOT_TARGET");
+  });
+
   it("--asr local: recognition on the box, the model settings go into the service, and no key is needed", async () => {
     const { out, sink } = await io();
     const p = await paths();
