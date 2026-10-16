@@ -18,6 +18,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   its records after they land. `reasoning_effort: low` (accepted where `minimal` is not)
   measured no clear win: median about 5.9 s against 6.2 s with the field off, six runs each,
   one Pi, one afternoon — so it stays off.
+  Because nobody waits in shadow, the CLI also gives the call 15 s there (8 s in enforce, where
+  someone does; `MODELPILOT_TIMEOUT_MS` overrides) — two of six calls had just hit 8 s and lost
+  their record. A one-shot command now waits for that call before it exits, so its line is
+  logged; the answer is printed first.
 - **First live run against the hosted ModelPilot found two faults, both fixed.** Conversation
   through the router answered ("Paris."), but every *plan* came back `502 All eligible providers
   failed: Provider returned HTTP 400`. Replaying the request with curl isolated it:

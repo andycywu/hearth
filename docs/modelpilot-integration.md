@@ -326,7 +326,7 @@ is noise in someone else's denominator.
 | `MODELPILOT_API_KEY` | — | **Environment, host global, or the Android keystore. Never the launch URL.** No key ⇒ mode `off`. |
 | `MODELPILOT_MODE` | `shadow` | `off` \| `shadow` \| `enforce` |
 | `MODELPILOT_BASE_URL` | `https://modelpilot.andycywu.cc` | origin; `/v1/chat/completions` is appended. Point at `tools/mock-modelpilot-server.mjs` for testing |
-| `MODELPILOT_TIMEOUT_MS` | `8000` | per call, and the abort deadline. The service takes a latency *weight*, not a deadline, so this is the only one. 8000 is measured, not chosen — see [Measured against the live service](#measured-against-the-live-service) |
+| `MODELPILOT_TIMEOUT_MS` | `8000` (the `hearth` CLI: `15000` in shadow, `8000` in enforce) | per call, and the abort deadline. The service takes a latency *weight*, not a deadline, so this is the only one. 8000 is measured, not chosen — see [Measured against the live service](#measured-against-the-live-service) |
 | `MODELPILOT_MAX_COST` | `0.05` | USD, sent as `metadata.max_cost` |
 | `MODELPILOT_REASONING_EFFORT` | not sent | e.g. `minimal`. Forwarded verbatim to whichever provider the router picks; the hosted service answered 502 ("Provider returned HTTP 400") to every plan carrying it on 2026-10-15, and the same request without it returned a plan. `off` is the same as unset. |
 

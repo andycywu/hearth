@@ -35,6 +35,19 @@ import {
   envForTarget, isTargetName, resolveTarget, withComparison, TARGET_NAMES, type TargetName,
 } from "./modelpilot-targets.js";
 
+/**
+ * How long a call may take before the CLI gives up on it.
+ *
+ * The library's 8 s is for a television, where enforce mode makes someone wait for it. Here the default mode is
+ * shadow, which runs behind the answer, so waiting costs nobody anything and giving up early only loses the
+ * record: against the hosted service plans took 5–8 s and two of six hit 8 s. Enforce keeps the short deadline,
+ * because there a person is waiting. `MODELPILOT_TIMEOUT_MS` overrides both.
+ */
+const SHADOW_TIMEOUT_MS = 15_000;
+function patience(env: Record<string, string | undefined>): { timeoutMs?: number } {
+  return env.MODELPILOT_MODE?.trim().toLowerCase() === "enforce" ? {} : { timeoutMs: SHADOW_TIMEOUT_MS };
+}
+
 export interface CliModelPilot {
   config: ModelPilotConfig & { apiKey: string };
   /** Which named service this is, or `undefined` for the unnamed `MODELPILOT_API_KEY` one. */
@@ -73,7 +86,7 @@ export async function connectModelPilot(
     o.note?.(`modelpilot ${target.name}: no ${target.keyVariable} — off, nothing is sent`);
     return undefined;
   }
-  const config = resolveModelPilotConfig({ env: target ? envForTarget(env, target) : env });
+  const config = resolveModelPilotConfig({ env: target ? envForTarget(env, target) : env, defaults: patience(env) });
   // No credential, or switched off: no client is built, so no call can be made.
   if (!config.apiKey || config.mode === "off") return undefined;
 
@@ -95,7 +108,7 @@ export async function connectModelPilot(
       o.note?.(`modelpilot --compare: no ${other.keyVariable}, so there is nothing to compare with`);
     } else {
       // Shadow whatever the primary does: the second service's plan is recorded, never run.
-      const otherConfig = resolveModelPilotConfig({ env: { ...envForTarget(env, other), MODELPILOT_MODE: "shadow" } });
+      const otherConfig = resolveModelPilotConfig({ env: { ...envForTarget(env, other), MODELPILOT_MODE: "shadow" }, defaults: { timeoutMs: SHADOW_TIMEOUT_MS } });
       const second = createModelPilotWiring({
         config: { ...otherConfig, apiKey: other.apiKey }, installId, runtimeVersion: RUNTIME_VERSION,
         // The comparison is already behind the plan; this call is the thing being waited for.

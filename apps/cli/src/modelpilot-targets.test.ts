@@ -52,6 +52,12 @@ describe("named targets", () => {
     expect(notes.join()).toContain("unknown target");
   });
 
+  it("waits 15 s in shadow, where nobody is waiting, and keeps the library's 8 s in enforce, where someone is", async () => {
+    expect((await connectModelPilot(both, memory(), { explicitLlm: false, target: "local" }))?.config.timeoutMs).toBe(15000);
+    expect((await connectModelPilot({ ...both, MODELPILOT_MODE: "enforce" }, memory(), { explicitLlm: false, target: "local" }))?.config.timeoutMs).toBe(8000);
+    expect((await connectModelPilot({ ...both, MODELPILOT_TIMEOUT_MS: "3000" }, memory(), { explicitLlm: false, target: "local" }))?.config.timeoutMs).toBe(3000);
+  });
+
   it("the unnamed MODELPILOT_API_KEY still works exactly as before", async () => {
     const mp = await connectModelPilot({ MODELPILOT_API_KEY: "k" }, memory(), { explicitLlm: false });
     expect(mp?.target).toBeUndefined();
