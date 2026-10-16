@@ -8,6 +8,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`hearth modelpilot check`: does this Hearth work against a real ModelPilot, end to end?** Asks, in order:
+  the catalogue, a plain completion, an SSE stream, a tool call, the tool's result sent back under its id, a
+  streamed tool call merged by index, then **the same tool loop through Hearth's own client** — streamed and
+  not — a cancelled stream followed by a request, and `--runs N` for success rate and latency. Against the
+  hosted service from the Pi 3B the acceptance loop (tool call → run it locally → result → answer) verified
+  both ways on `openai-mini` and `auto`, 20/20 repetitions each way, median 3.6 s plain and 2.9 s streamed.
+  What it learned that a raw request would not have: `claude-sonnet` and `gemini-flash` refuse streaming
+  (`422 streaming_provider_not_supported`, openai only) so streaming cannot be assumed for whatever `auto`
+  picks; `gemini-flash` rejects a tool schema carrying `additionalProperties` and reports `routable: true`
+  while answering `model_temporarily_unavailable`; and the checker's own first version judged `auto` as if it
+  were a catalogue entry — `auto` is "any routable model". The key is never printed and a service that puts it
+  in an error body is redacted. [`docs/modelpilot-integration.md`](docs/modelpilot-integration.md), "Checking a real service".
 - **`sh tools/install.sh` puts `hearth` on the command line.** The first person to log in to the Pi
   and type `hearth` got `command not found`: the CLI was only ever a path into a checkout. The installer
   builds it and writes one launcher, `~/.local/bin/hearth`, that puts Node first on `PATH` (so it also

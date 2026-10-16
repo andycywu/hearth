@@ -28,6 +28,7 @@ import { runStt } from "./stt.js";
 import { createLocalListener, type LocalListener } from "./local-listener.js";
 import { connectModelPilot, routerChatClient } from "./modelpilot.js";
 import { runModelPilotStatus } from "./modelpilot-targets.js";
+import { runModelPilotCheck } from "./modelpilot-targets.js";
 import { runCecTool, runLab } from "./lab-run.js";
 import { runRingTool } from "./ring-tool.js";
 import { answer, listenForever, showOutcomes } from "./voice-loop.js";
@@ -62,6 +63,7 @@ async function main(): Promise<number> {
   }
 
   // `hearth modelpilot status` asks the two named services what they are and needs nothing else.
+  if (opts.modelpilotCheck) return runModelPilotCheck(opts, { ...env }, { out: (t) => { stdout.write(t); } });
   if (opts.modelpilotStatus) return runModelPilotStatus({ ...env }, { out: (t) => { stdout.write(t); } });
 
   // The ring is opened first and shared by everything below: a light is the one status a person across the

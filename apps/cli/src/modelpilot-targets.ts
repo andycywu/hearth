@@ -143,6 +143,29 @@ export async function runModelPilotStatus(
   return statusExitCode(rows);
 }
 
+// ---- check ---------------------------------------------------------------------------------------------------------
+
+/** `hearth modelpilot check` for the named target (official unless `--modelpilot local`). */
+export async function runModelPilotCheck(
+  opts: { modelpilot?: "official" | "local" | "off"; runs?: number },
+  env: Env, io: { out: (t: string) => void },
+): Promise<number> {
+  const name: TargetName = opts.modelpilot === "local" ? "local" : "official";
+  const target = resolveTarget(env, name);
+  if (!target.apiKey) {
+    io.out(`ModelPilot ${name}: no ${target.keyVariable} — nothing to check, nothing sent.\n`);
+    return 2;
+  }
+  const { runChecks, formatChecks, checkExitCode } = await import("./modelpilot-check.js");
+  const rows = await runChecks({
+    baseUrl: target.baseUrl, apiKey: target.apiKey, ...(env.MODELPILOT_MODEL?.trim() ? { model: env.MODELPILOT_MODEL.trim() } : {}), reasoningEffort: env.MODELPILOT_REASONING_EFFORT?.trim() || "low",
+    ...(opts.runs ? { runs: opts.runs } : {}),
+    onRow: (r) => io.out(`  ${r.verdict.padEnd(10)} ${r.name}\n`),
+  });
+  io.out("\n" + formatChecks(rows, name, target.baseUrl));
+  return checkExitCode(rows);
+}
+
 // ---- compare --------------------------------------------------------------------------------------------------
 
 export interface CompareRecord {

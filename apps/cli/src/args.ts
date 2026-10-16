@@ -105,6 +105,10 @@ export interface CliOptions {
   modelpilot?: "official" | "local" | "off";
   /** `--compare`: ask the other named ModelPilot the same thing, in shadow, and log the difference. */
   compare: boolean;
+  /** `hearth modelpilot check`: a real conversation with the service — completion, SSE, tool loop — through this Hearth's own client. */
+  modelpilotCheck: boolean;
+  /** `--runs N`: repeat the plain and streamed completions N times in `modelpilot check`. */
+  runs?: number;
   /** `hearth modelpilot status`: probe both named services and say what answered. */
   modelpilotStatus: boolean;
   /** `--no-save`: setup prints what it would write and writes nothing. */
@@ -152,6 +156,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     installLauncher: false,
     compare: false,
     modelpilotStatus: false,
+    modelpilotCheck: false,
     save: true,
     writes: false,
     room: "stored",
@@ -229,6 +234,14 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       case "--serve": opts.serve = true; break;
       case "--no-open": opts.noOpen = true; break;
       case "--compare": opts.compare = true; break;
+      case "--runs": {
+        const v = takeValue("--runs");
+        if (v === undefined) break;
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 1 || n > 200) opts.errors.push(`--runs must be 1–200 (got "${v}")`);
+        else opts.runs = n;
+        break;
+      }
       case "--modelpilot": {
         const v = takeValue("--modelpilot");
         if (v === undefined) break;
@@ -333,6 +346,10 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     opts.modelpilotStatus = true;
     opts.commands = [];
   }
+  if (opts.commands[0] === "modelpilot" && opts.commands[1] === "check" && opts.commands.length === 2) {
+    opts.modelpilotCheck = true;
+    opts.commands = [];
+  }
   if (opts.commands[0] === "stt") {
     opts.stt = true;
     const rest = opts.commands.slice(1);
@@ -407,6 +424,11 @@ USAGE
                                      (moving = working, still = nothing is happening)
   hearth modelpilot status           probe the two named ModelPilot services (official, local):
                                      reachable, key accepted, how long it took
+  hearth modelpilot check [--modelpilot official|local] [--runs N]
+                                     a real conversation with the service through this Hearth's own
+                                     client: completion, streaming, tool call → result → answer
+                                     (MODELPILOT_MODEL=claude-sonnet|gemini-flash|auto picks the model);
+                                     --runs N adds success rate and latency over N repetitions
   hearth stt bench <manifest> [--realtime] [--out <base>]
                                      the same recogniser over a dataset: expected vs actual,
                                      latency, real-time factor, memory (JSON + CSV)

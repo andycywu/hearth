@@ -456,6 +456,39 @@ close; it does not compare conversation answers, and until the local instance ha
 provider its plans are `unusable_output`, so a comparison against it says so rather than
 finding a difference.
 
+### Checking a real service
+
+`hearth modelpilot status` says a service is there. `hearth modelpilot check` asks what a Hearth depends on, in order,
+against the named target (official unless `--modelpilot local`), and says `verified`, `unverified` or `failed` per row:
+
+| Row | Asks |
+| --- | --- |
+| 1 | `/v1/models` answers 200, the model is listed and `availability.routable` is true |
+| 2 | a plain completion: the text, `selected_model`, `usage`, `actual_cost`, `request_id` |
+| 3 | SSE: text arrives in pieces (a long answer, because a one-line reply reaches the client in a burst whether or not the service streams), `finish_reason: stop`, a usage chunk, `[DONE]` |
+| 4 | a tool call with `tool_choice: required`: `finish_reason: tool_calls`, `id`, `name`, `arguments` |
+| 5 | the tool's result sent back under the same id: the model answers from it and does not call the tool again |
+| 6 | a streamed tool call: arguments arrive in pieces and are merged **by index** into one JSON object |
+| 7, 8 | **the same loop through Hearth's own client**, not streamed and streamed — call, "run it here", result, answer. A raw request proves the service can; this proves this code can read it |
+| 9 | cancel a stream after the first bytes, then ask again: the next request must still work |
+| 10, 11 | `--runs N`: N plain and N streamed completions — success rate, median, slowest, median time to first text |
+
+`MODELPILOT_MODEL=claude-sonnet|gemini-flash|auto` picks the model; the key is read from the environment like every other
+and never printed (a service that puts it in an error body is redacted — there is a test for exactly that).
+
+**First run against the hosted service, 2026-10-16, from the Pi 3B** — the acceptance criterion (tool call → local
+execution → tool result → answer, streamed and not, through Hearth's client) is met:
+
+| Model | Result |
+| --- | --- |
+| `openai-mini` | all rows verified. 20 plain completions 20/20, median 3.6 s, slowest 4.6 s; 20 streamed 20/20, median 2.9 s, slowest 6.0 s, first text at a median 2.7 s — so streaming shows the first words about 0.9 s sooner, and most of the wait is the provider thinking, not the transport. A 40-number answer arrived in 118 chunks, first at 2.7 s of 3.6 s |
+| `auto` | all rows verified; it chose `openai-mini` every time |
+| `claude-sonnet` | plain completion, tool call, tool result and the non-streamed tool loop verified (tool-call ids `toolu_…`, same OpenAI shape). Every streamed row fails with `422 streaming_provider_not_supported`, `supported_providers: ["openai"]` — a documented limit, not a defect; it means **streaming must not be assumed for whatever `auto` picks** |
+| `gemini-flash` | not verifiable that day. The first plain completion was `502 provider_http_503`; the first tool call reached Gemini and was rejected `400 Unknown name "additionalProperties" at 'tools[0].function_declarations[0].parameters'` — the strict schema in the test is forwarded with a keyword Gemini does not accept; and later calls were `503 model_temporarily_unavailable` while `/v1/models` still said `routable: true` |
+
+Not covered here, and why: a provider *timeout* falling back safely cannot be forced from the client (the service's error body
+lists its own `attempts`, which is where to look); the server's validation and format conversion have their own tests.
+
 ## What is sent, and what is not
 
 `minimiseRoomState` is an **allowlist**, so a new world path cannot leak by
@@ -613,7 +646,10 @@ set `window.__MODELPILOT_API_KEY__` before the bundle loads and launch with
 3. **REST, not MCP.** Still deliberate
    ([ADR-0004](adr/0004-modelpilot-boundary.md)), and now a weaker decision than
    it was: there is no MCP surface to weigh it against.
-4. **Streaming is rejected outright by the service.** Planning does not need it,
+4. **Streaming was rejected outright by the service.** *(Changed 2026-10-16: the hosted service now streams — for
+   `openai` models only; `claude-sonnet` and `gemini-flash` answer `422 streaming_provider_not_supported`. See
+   "Checking a real service" above. The CLI still asks for plain completions, which is safe for whichever model
+   `auto` picks.)* Planning does not need it,
    so this integration is unaffected — but the chat path's LLM connector does
    stream, so ModelPilot cannot be dropped in as the agent's conversational
    endpoint without a non-streaming switch. *(The CLI has that switch now:
