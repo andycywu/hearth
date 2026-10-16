@@ -8,6 +8,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`sh tools/install.sh` puts `hearth` on the command line.** The first person to log in to the Pi
+  and type `hearth` got `command not found`: the CLI was only ever a path into a checkout. The installer
+  builds it and writes one launcher, `~/.local/bin/hearth`, that puts Node first on `PATH` (so it also
+  works from `ssh host ~/.local/bin/hearth …`, which reads no profile), loads `~/.config/hearth/env`
+  into the process (keys never on a command line), and runs the build. It adds one line to
+  `~/.profile` if `~/.local/bin` is not on `PATH`, installs pnpm under `~/.local` if missing, needs no
+  `sudo`, and `--uninstall` removes only a launcher it wrote. A shell that was already open still says
+  `command not found` until `. ~/.profile` or a new login — the README now says so, and gives the whole
+  install-to-first-command path in order, with every command. Its five tests run the script under `sh` in
+  a throwaway HOME with a stand-in `node`, so they run on Linux (CI, the Pi) and are skipped on Windows;
+  `pnpm test` there is five short of the Linux count.
 - **Re-running `hearth setup` no longer switches listening off.** Found the first time it was
   re-run on the Pi, to add `--modelpilot official`: from a shell that had not sourced
   `~/.config/hearth/env` it printed "No boot service yet: it would have nothing to listen with" and

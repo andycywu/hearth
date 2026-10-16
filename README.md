@@ -129,6 +129,92 @@ pnpm test           # 1137 tests
 pnpm bench          # agent-loop latency (p50/p95 per turn)
 ```
 
+## Install on a Pi (or any Linux box)
+
+`hearth` is a command-line agent that runs on the box itself — a Raspberry Pi on the television's HDMI, a
+set-top box — and controls what it can read back: volume, HDMI-CEC power and discovery, and anything on the CEC
+bus. This is the whole path from a fresh login, in order. It needs **Node 26 or newer**, `git`, and no `sudo`.
+
+**1. Node 26.** Check with `node --version`. If it is older or missing, unpack the `linux-arm64` (Pi) or
+`linux-x64` tarball from <https://nodejs.org/dist/> under `~/.local/node` — the installer looks there too.
+
+**2. Get the code and install the command.**
+
+```sh
+git clone https://github.com/andycywu/hearth.git ~/hearth
+cd ~/hearth
+sh tools/install.sh
+```
+
+This builds the checkout and writes one launcher, `~/.local/bin/hearth`, and (if needed) one line in
+`~/.profile` to put that directory on `PATH`. **Log out and ssh in again** — or run `. ~/.profile` — and
+`hearth` works from any directory. The launcher puts Node first on `PATH` and reads `~/.config/hearth/env`
+if it exists, which is where keys live (step 4). `sh tools/install.sh --uninstall` removes it.
+
+> `hearth: command not found` right after installing means the shell started before `~/.profile` was
+> changed. A non-interactive `ssh host hearth …` does not read `~/.profile` at all; use the full path
+> `~/.local/bin/hearth …` there, or `ssh host 'bash -lc "hearth …"'`.
+
+**3. Look at the box, once.**
+
+```sh
+hearth --platform linux setup
+```
+
+It reports what this box can actually do (volume, CEC, microphone, speaker, the status ring) and writes
+`~/.config/hearth/config.json`, so every later `hearth` needs no flags. Add `--asr openai` for hosted
+transcription, `--asr local` for on-box recognition ([`docs/edge-voice.md`](docs/edge-voice.md)),
+`--modelpilot official` or `local` to choose a ModelPilot. Re-running it is safe; it keeps what it
+already knows.
+
+**4. Keys go in one file, never on a command line.** `setup` creates `~/.config/hearth/env` (mode 0600).
+Add keys with `read -rs` so they appear neither on screen nor in shell history:
+
+```sh
+read -rs K; echo "TV_AGENT_API_KEY=$K" >> ~/.config/hearth/env; unset K              # OpenAI transcription
+read -rs K; echo "MODELPILOT_OFFICIAL_API_KEY=$K" >> ~/.config/hearth/env; unset K   # hosted ModelPilot
+chmod 600 ~/.config/hearth/env
+```
+
+**5. Check, then use it.**
+
+```sh
+hearth modelpilot status        # reachable? key accepted? how long? (official and local)
+hearth "turn it down"           # a command; prints what it did and whether it read it back
+hearth "what is the capital of France"   # not a device goal: answered through ModelPilot
+hearth --voice                  # listen on the microphone: say "hearth, turn it down"
+```
+
+Every action ends `verified`, `unverified`, `unsupported` or `failed`, and the agent says which. A
+change it could not read back is reported as `unverified`, never as done.
+
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `hearth "<sentence>"` | run one command and exit; with no argument it reads lines from the terminal |
+| `hearth --voice` | also listen on the microphone (needs `setup` to have found one and a transcriber) |
+| `hearth --platform linux setup` | inspect this box, write the config, offer a boot service |
+| `hearth modelpilot status` | probe the two named ModelPilot services |
+| `hearth --modelpilot official\|local\|off` | choose the ModelPilot for this run; `--compare` asks the other one too, in shadow |
+| `hearth --platform linux report` | probe everything and print a Hearth Report (markdown) |
+| `hearth cec list \| diagnose \| tv-power-status` | talk to the HDMI-CEC bus directly |
+| `hearth lab` | a window on the Pi's desktop to send CEC commands and test the mic and speaker |
+| `hearth ring demo` | every status-light state in turn |
+| `hearth stt` / `hearth stt bench <manifest>` | the speech recogniser on its own, and its benchmark |
+| `hearth --help` | every option |
+
+### Update
+
+```sh
+cd ~/hearth && git pull && sh tools/install.sh
+```
+
+### Without the launcher
+
+The launcher is a convenience; nothing needs it. From the checkout,
+`set -a; . ~/.config/hearth/env; set +a; node apps/cli/dist/main.js "turn it down"` is the same program.
+
 ## Add a skill
 
 ```bash

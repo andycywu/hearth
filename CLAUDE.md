@@ -48,6 +48,8 @@ and commit messages all hold to that: say what was checked, not what was hoped.
   `voice.ts` (arecord / espeak-ng / OpenAI-schema transcriber / silence gate),
   `leds.ts` (APA102 ring), `host.ts` (device identity).
 - `packages/adapter-cec` — the CEC transport, `createCecTransport(bus)`.
+- `tools/install.sh` installs the `hearth` command (`~/.local/bin/hearth`); README "Install on a Pi" is the
+  user-facing path and must stay true to it.
 - `tools/pi-first-report.sh` runs the whole first-report flow on a Pi;
   `tools/pi.ps1` drives it from Windows (`$env:HEARTH_PI`, `$env:HEARTH_TV`).
 - `docs/platform/reports/` — one Hearth Report per device, generated, never
