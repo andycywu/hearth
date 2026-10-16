@@ -8,6 +8,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The hosted service fixed what the first live run found, and re-probing confirmed it.** A
+  malformed body is now `400 invalid_json` (was 500), an unknown model `404 model_not_found`
+  (was a 422 that read like a policy failure), and a rejected `reasoning_effort` is
+  `400 unsupported_reasoning_effort` with the model and its `supported_values` (was a 502
+  that discarded the upstream reason). Still open on their side: trivial replies take 4.0–4.3 s
+  with about 33 completion tokens of default reasoning against a declared 1400 ms. The accepted
+  list includes `none`, which measured 4.2 s and 29 tokens against 5.1 s and 88–125 with the
+  field unset (three runs each); `MODELPILOT_REASONING_EFFORT=none` to use it.
 - **Shadow no longer makes the household wait.** Measured against the hosted ModelPilot, a plan
   took 5–8 s (twelve runs: ok at 5.1–7.3 s, two of six default-setting calls hit the 8 s
   timeout), and shadow awaited it before returning the local plan it was always going to

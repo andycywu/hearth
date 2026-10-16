@@ -229,6 +229,15 @@ node --env-file=.env.local packages/modelpilot/scripts/latency-sample.mjs 3
    The 4.4 s / zero-reasoning-token figure above was measured on a reasoning model and has
    not been re-measured; the 4.8 s here is one request on a different one.
 
+   **Update, 2026-10-16: the service was fixed, and says what it accepts.** The same request now
+   returns `400 unsupported_reasoning_effort` naming the model (`gpt-6-luna`) and
+   `supported_values: none, low, medium, high, xhigh, max` — `minimal` is not one of them,
+   which is why it failed. Of the accepted values `none` is the fast one: on a plan-shaped
+   request, three runs each, **4.2 s and 29 completion tokens against 5.1 s and 88–125 with the field
+   unset**, and `low` was slower than unset (4.8–5.7 s, 84–113 tokens). So `MODELPILOT_REASONING_EFFORT=none`
+   is the measured choice for this catalogue, and it is still opt-in: the list is per model, and
+   the router may send a request to one that does not take it. Three runs, one afternoon.
+
 The default timeout moved from 5000ms to **8000ms** on the back of this. 5000
 was a round number; 8000 is about 2.5× the measured p90, chosen because the
 *first* call of a process repeatedly ran long — a cold Worker plus a cold
