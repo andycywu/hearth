@@ -12,7 +12,7 @@
  * machine has to be trusted more than a tool that reports — and the report is
  * the thing people can check.
  */
-import { access, writeFile } from "node:fs/promises";
+import { access, readFile, writeFile } from "node:fs/promises";
 import { execPath, version as nodeVersion } from "node:process";
 import { dirname, join } from "node:path";
 import { createLinuxCecTransport, describeHost, detectAudioBackend, detectVoice, systemRunner, type Runner } from "@hearthkit/adapter-linux";
@@ -115,7 +115,12 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
   const sttEnv = local ? localSttEnv(deps.env ?? process.env) : {};
   const localReady = Boolean(sttEnv.HEARTH_STT_SERVER_URL || (sttEnv.HEARTH_STT_MODEL_PATH && sttEnv.HEARTH_STT_RUNTIME_PATH));
   const hosted = asr !== undefined && /^https:\/\/api\.openai\.com\b/.test(asr);
-  const keyMissing = hosted && !opts.apiKey;
+  // The key counts if it is in the environment *or* already in the 0600 file the service reads. Setup is run from a
+  // plain shell as often as from one that sourced that file, and judging only the shell turned a working box's
+  // `voice: true` into `false` the first time someone re-ran it to change something else (2026-10-16).
+  const keyFile = join(dirname(path), "env");
+  const keyInFile = /^TV_AGENT_API_KEY=\S+/m.test(await (deps.readFile ?? ((p: string) => readFile(p, "utf8")))(keyFile).catch(() => ""));
+  const keyMissing = hosted && !opts.apiKey && !keyInFile;
   if (heard.capture && heard.tts) {
     findings.push(local
       ? localReady

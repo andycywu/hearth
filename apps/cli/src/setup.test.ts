@@ -276,4 +276,23 @@ describe("a hosted transcriber", () => {
     expect(unit).toContain("EnvironmentFile=-%h/.config/hearth/env");
     expect(unit).not.toContain("sk-test");
   });
+
+  // Re-running setup to change something else (`--modelpilot official`) from a shell that never sourced the env file
+  // turned a working box's `voice: true` into `false`: the key was in the file the service reads, not in that shell.
+  it("a key already in the env file counts, so a re-run from a plain shell does not switch listening off", async () => {
+    const p = await paths();
+    const { sink } = await io();
+    const files: Record<string, string> = { ...PI };
+    await runSetup(parseArgs(["--platform", "linux", "setup", "--asr", "openai"], { TV_AGENT_API_KEY: "sk-test" }), (await io()).sink,
+      { ...p, run: piRun, readFile: async (f) => files[f] ?? "", exists: async (f) => f === "/dev/cec0", nodeVersion: "v26.8.2", nodePath: "/n", cliPath: "/c" });
+    expect((await loadConfig(p.configPath)).voice).toBe(true);
+
+    // Plain shell now: no key in the environment, but the file beside the config has it.
+    const envFile = join(dirname(p.configPath), "env");
+    const readWithFile = async (f: string) => f === envFile ? "TV_AGENT_API_KEY=sk-test\n" : files[f] ?? "";
+    const again = parseArgs(["--platform", "linux", "setup", "--modelpilot", "official"], configAsEnv(await loadConfig(p.configPath)));
+    expect(again.apiKey).toBeUndefined();
+    await runSetup(again, sink, { ...p, run: piRun, readFile: readWithFile, exists: async (f) => f === "/dev/cec0", nodeVersion: "v26.8.2", nodePath: "/n", cliPath: "/c" });
+    expect(await loadConfig(p.configPath)).toMatchObject({ voice: true, modelpilot: "official", asrBaseUrl: "https://api.openai.com/v1" });
+  });
 });

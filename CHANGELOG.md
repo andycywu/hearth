@@ -8,6 +8,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Re-running `hearth setup` no longer switches listening off.** Found the first time it was
+  re-run on the Pi, to add `--modelpilot official`: from a shell that had not sourced
+  `~/.config/hearth/env` it printed "No boot service yet: it would have nothing to listen with" and
+  wrote `voice: false` over a working box. The hosted-transcriber key was judged by that shell's
+  environment alone; it now also counts when `TV_AGENT_API_KEY` is already in the 0600 file the
+  service reads. Restored on the Pi by re-running setup with the file sourced.
 - **`hearth setup --modelpilot official|local|off` remembers the choice.** It goes in
   `config.json` (`modelpilot`) and comes back as `MODELPILOT_TARGET`, so after setup a plain
   `hearth "…"` — and the service — uses that ModelPilot with no flag; flag and environment still
