@@ -154,6 +154,7 @@ function activeInterfaces(): string[] {
 
 export { systemRunner, type Runner, type RunResult } from "./run.js";
 export { describeHost, socFrom, type HostIdentity, type FileReader } from "./host.js";
+export { readHostStatus, type HostStatus, type PowerStatus, type HostStatusDeps } from "./host-status.js";
 export {
   parseWpctlVolume, parsePactlVolume, parseAmixerVolume, parseAmixerMuted, detectAudioBackend,
 } from "./audio.js";

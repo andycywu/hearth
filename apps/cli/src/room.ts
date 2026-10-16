@@ -9,7 +9,7 @@
  */
 import {
   discoverRoom, attachTransports, transportSources, deviceTreeText,
-  type DeviceGraph, type DeviceTransport, type Capability, type Tool,
+  defineTool, type DeviceGraph, type DeviceTransport, type Capability, type Tool,
 } from "@hearthkit/core";
 import type { PlatformProvider } from "@hearthkit/platform-api";
 import type { CliOptions } from "./args.js";
@@ -29,6 +29,30 @@ export interface RoomDeps {
   persist?: boolean;
   /** Substituted in tests; defaults to the real CEC adapter on linux. */
   transports?: (opts: CliOptions) => Promise<DeviceTransport[]>;
+  /** Substituted in tests; the real one reads /sys, /proc and `vcgencmd`. */
+  hostStatus?: Tool[];
+}
+
+/**
+ * "Is the Pi okay?" — a read-only tool for questions about *this box*, as opposed to the television.
+ *
+ * Not a capability: nothing here is something the room can be asked to become, so there is no goal to plan and no
+ * read-back to do. It is for the model to answer with, through the same tool loop as `get_volume` — and its fields
+ * that could not be read come back `null` and named, so the model has nothing to invent a number from.
+ */
+export async function hostStatusTool(read?: () => Promise<unknown>): Promise<Tool> {
+  const readStatus = read ?? (async () => (await import("@hearthkit/adapter-linux")).readHostStatus());
+  return defineTool(
+    {
+      name: "get_host_status",
+      description:
+        "Read the health of the computer Hearth runs on (the Raspberry Pi, not the television): CPU temperature in °C, free and total memory in MB, " +
+        "1-minute load, uptime in seconds, and whether its power supply is under-voltage or throttled right now or has been since boot. " +
+        "Read-only. A field that could not be measured is null and listed in `unreadable`; never guess it.",
+      parameters: {},
+    },
+    async () => readStatus(),
+  );
 }
 
 export async function assembleRoom(
@@ -43,13 +67,14 @@ export async function assembleRoom(
     ...(transports.length ? { sources: transportSources(transports) } : {}),
   });
   const reach = await attachTransports(devices, transports);
+  const tools = [...reach.tools, ...(deps.hostStatus ?? (opts.platform === "linux" ? [await hostStatusTool()] : []))];
 
   const notes = [
     ...reach.notes,
     ...reach.failed.map((id) => `${id}: transport failed and was dropped`),
   ];
   const tree = deviceTreeText(devices).split("\n").map((line) => `room: ${line}`);
-  return { devices, capabilities: reach.capabilities, tools: reach.tools, notes, tree };
+  return { devices, capabilities: reach.capabilities, tools, notes, tree };
 }
 
 /**

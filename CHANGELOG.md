@@ -8,6 +8,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **"Is the Pi okay?" — a real tool, through the loop the hosted-service check proved.** The model could
+  already read the volume and the TV's power through the router's tool loop; asked how hot the Pi was it
+  said it could not know, because nothing could tell it. `get_host_status` (read-only, linux only) reads
+  CPU temperature, `MemAvailable` (what can be allocated, not what is merely free), load, uptime and the
+  `vcgencmd get_throttled` bits decoded — under-voltage and throttling *now* and *since boot*. A field it
+  could not read is `null` and named in `unreadable`; the description tells the model never to guess one.
+  It is a tool and not a capability on purpose: there is no goal to plan and nothing to read back. On the
+  Pi, asked through the hosted ModelPilot, it answered 62.3 °C and 616 MB free where `vcgencmd` and
+  `/proc/meminfo` read 61.2 °C and 641 MB a moment later — and, asked about the power supply, said it
+  looked fine now but that undervoltage had been detected since boot, which `0x50000` confirmed: this Pi
+  browned out again at some point after reading `0x0` that morning. Not yet explained.
 - **`hearth modelpilot check`: does this Hearth work against a real ModelPilot, end to end?** Asks, in order:
   the catalogue, a plain completion, an SSE stream, a tool call, the tool's result sent back under its id, a
   streamed tool call merged by index, then **the same tool loop through Hearth's own client** — streamed and
