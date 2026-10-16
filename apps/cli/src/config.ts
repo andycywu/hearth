@@ -31,6 +31,8 @@ export interface HearthConfig {
   llmModel?: string;
   /** Which named ModelPilot to use (`official` | `local` | `off`); the keys stay in the env file. */
   modelpilot?: "official" | "local" | "off";
+  /** Speak a streamed reply sentence by sentence as it arrives; see `CliOptions.streamSpeech`. */
+  streamSpeech?: boolean;
   /** The face shown in `hearth lab`: one of the ids in `lab-avatars.ts`. */
   avatar?: string;
   /** The voice replies are spoken in: an espeak-ng voice (`en-us`, `cmn+f3`), words per minute, pitch 0–99. */
@@ -80,6 +82,7 @@ export function configAsEnv(config: HearthConfig): Record<string, string> {
   if (config.leds) env.HEARTH_LEDS = "1";
   if (config.wakeWord) env.HEARTH_WAKE = config.wakeWord;
   if (config.modelpilot) env.MODELPILOT_TARGET = config.modelpilot;
+  if (config.streamSpeech) env.HEARTH_STREAM_SPEECH = "1";
   if (config.avatar) env.HEARTH_AVATAR = config.avatar;
   if (config.ttsVoice) env.HEARTH_TTS_VOICE = config.ttsVoice;
   if (config.ttsSpeed !== undefined) env.HEARTH_TTS_SPEED = String(config.ttsSpeed);

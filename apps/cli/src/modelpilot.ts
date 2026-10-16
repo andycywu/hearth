@@ -140,7 +140,37 @@ export async function connectModelPilot(
  * implement badly or not at all: a service that answers `stream: true` with a plain JSON body produces an
  * empty reply, silently, which is the worst way to fail. (Found by a fake that did exactly that.)
  */
-export function routerChatClient(chat: NonNullable<CliModelPilot["chat"]>): LlmClient {
-  const { completeStream: _stream, ...plain } = createOpenAiCompatibleClient(chat);
-  return plain;
+export function routerChatClient(
+  chat: NonNullable<CliModelPilot["chat"]>,
+  o: { stream?: boolean; now?: () => number; fetchImpl?: typeof fetch } = {},
+): LlmClient {
+  const client = createOpenAiCompatibleClient({ ...chat, ...(o.fetchImpl ? { fetchImpl: o.fetchImpl } : {}) });
+  if (!o.stream) {
+    const { completeStream: _stream, ...plain } = client;
+    return plain;
+  }
+  return { ...client, completeStream: streamWithFallback(client, o.now ?? Date.now) };
+}
+
+/**
+ * Stream when the model the router picked can, and say the same thing in one piece when it cannot.
+ *
+ * `model: "auto"` may pick `claude-sonnet` or `gemini-flash`, which the hosted service answers with
+ * `422 streaming_provider_not_supported` (only openai models stream, 2026-10-16). That error arrives before
+ * a single token, so retrying the same request without streaming loses nothing and repeats nothing; any
+ * other failure, and any failure after text has started, is not ours to hide. A refusal is remembered for ten
+ * minutes so the next sentence does not pay a wasted round trip to be told the same thing.
+ */
+function streamWithFallback(client: LlmClient, now: () => number): NonNullable<LlmClient["completeStream"]> {
+  let refusedUntil = 0;
+  return async (req, handlers) => {
+    if (now() < refusedUntil) return client.complete(req);
+    try {
+      return await client.completeStream!(req, handlers);
+    } catch (err) {
+      if (!/streaming_provider_not_supported/.test(err instanceof Error ? err.message : String(err))) throw err;
+      refusedUntil = now() + 10 * 60_000;
+      return client.complete(req);
+    }
+  };
 }

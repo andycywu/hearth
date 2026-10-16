@@ -8,6 +8,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`--stream-speech`: speak a reply sentence by sentence while it is still being written.** A splitter turns
+  streamed words into sentences the moment a sentence is known to be over — a full stop at the very end of
+  what has arrived waits, because `48.` may be the start of `48.2`; Chinese stops end a sentence at once;
+  abbreviations, initials and closing quotes are handled; a line break is a break and markdown (`**Status:**`,
+  bullets) is removed rather than read — and a queue speaks them in order, survives a sentence that fails, and
+  can be cancelled. When the router picks a model that cannot stream (`claude-sonnet`, `gemini-flash`: `422
+  streaming_provider_not_supported`) the same request is sent whole, once, and the refusal is remembered for ten
+  minutes. Off by default. **Measured on the Pi 3B against the hosted service, six turns each way: the first
+  word is spoken about 1.5 s sooner** (4.1 s against 5.6 s into the turn, both questions), **but it is not
+  free** — each `espeak-ng` call costs about 0.45–0.5 s of audio-device open and close (1.71 s of speech took
+  2.16 s, 2.72 s took 3.22 s; synthesis itself starts in 44 ms), so a reply spoken as three sentences carries
+  about a second of small gaps that one call would not, and the turn as a whole did not finish reliably
+  sooner. It pays on a long reply and not on "Yes, the TV is on". A persistent player fed raw audio would
+  remove the gaps; that is not built. It does not make the agent interruptible: the microphone is still
+  closed while it speaks, and talking over it needs echo cancellation. (My test also let the microphone hear
+  the Pi speaking — `--no-wake` turns every sound into a command — which is why some runs show a second turn.)
 - **A tool call's provider data is kept and sent back.** A provider can attach something to a tool call that
   only it understands — for Gemini through the hosted ModelPilot, `provider_metadata`, which turn two has to
   carry or the provider refuses the tool result. Hearth's client rebuilt the assistant message from `id`,

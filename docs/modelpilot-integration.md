@@ -456,6 +456,13 @@ close; it does not compare conversation answers, and until the local instance ha
 provider its plans are `unusable_output`, so a comparison against it says so rather than
 finding a difference.
 
+### Speaking a streamed reply
+
+Streaming's use on a voice assistant is `--stream-speech` (README, "Commands"). The numbers, from the Pi 3B against the hosted
+service, six turns each way on two questions: the first word is spoken at a median 4.1 s into the turn against 5.6 s unstreamed, about
+1.5 s sooner; `espeak-ng` is started once per sentence and each start costs 0.45–0.5 s, so a multi-sentence reply has small gaps that a
+single call does not. Only openai models stream; for anything else the client sends the same request whole after one `422`.
+
 ### Checking a real service
 
 `hearth modelpilot status` says a service is there. `hearth modelpilot check` asks what a Hearth depends on, in order,

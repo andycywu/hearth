@@ -101,6 +101,11 @@ export interface CliOptions {
   ttsPitch?: number;
   /** `--target N`: the CEC logical address a `hearth cec` command is aimed at. */
   target?: number;
+  /**
+   * `--stream-speech`: speak each sentence of a streamed reply as it arrives, instead of the whole reply once it is
+   * complete. Off by default — see docs/modelpilot-integration.md for what it costs on a Pi.
+   */
+  streamSpeech: boolean;
   /** `--modelpilot official|local|off` (or `MODELPILOT_TARGET`): which named ModelPilot to use. */
   modelpilot?: "official" | "local" | "off";
   /** `--compare`: ask the other named ModelPilot the same thing, in shadow, and log the difference. */
@@ -157,6 +162,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     compare: false,
     modelpilotStatus: false,
     modelpilotCheck: false,
+    streamSpeech: false,
     save: true,
     writes: false,
     room: "stored",
@@ -192,6 +198,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
     if (t === "official" || t === "local" || t === "off") opts.modelpilot = t;
     else opts.warnings.push(`MODELPILOT_TARGET must be official, local or off (got "${env.MODELPILOT_TARGET}") — ignored`);
   }
+  if (env.HEARTH_STREAM_SPEECH === "1") opts.streamSpeech = true;
   if (env.HEARTH_TTS_VOICE) opts.ttsVoice = env.HEARTH_TTS_VOICE;
   if (env.HEARTH_TTS_SPEED) opts.ttsSpeed = Number(env.HEARTH_TTS_SPEED);
   if (env.HEARTH_TTS_PITCH) opts.ttsPitch = Number(env.HEARTH_TTS_PITCH);
@@ -234,6 +241,8 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       case "--serve": opts.serve = true; break;
       case "--no-open": opts.noOpen = true; break;
       case "--compare": opts.compare = true; break;
+      case "--stream-speech": opts.streamSpeech = true; break;
+      case "--no-stream-speech": opts.streamSpeech = false; break;
       case "--runs": {
         const v = takeValue("--runs");
         if (v === undefined) break;
@@ -453,6 +462,8 @@ OPTIONS
       --no-cec            do not touch the CEC bus
       --modelpilot <t>    official|local|off — which named ModelPilot to use (or $MODELPILOT_TARGET;
                           keys: $MODELPILOT_OFFICIAL_API_KEY, $MODELPILOT_LOCAL_API_KEY)
+      --stream-speech     speak a streamed reply sentence by sentence as it arrives (needs --voice and a
+                          model that streams; otherwise the whole reply is spoken at the end, as before)
       --compare           ask the other named ModelPilot the same thing in shadow and log the difference
       --room <mode>       demo|empty|stored — how the room is seeded (default: stored)
 

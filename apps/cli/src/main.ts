@@ -28,6 +28,7 @@ import { runStt } from "./stt.js";
 import { createLocalListener, type LocalListener } from "./local-listener.js";
 import { connectModelPilot, routerChatClient } from "./modelpilot.js";
 import { runModelPilotStatus } from "./modelpilot-targets.js";
+import { createStreamSpeaker } from "./speech-stream.js";
 import { runModelPilotCheck } from "./modelpilot-targets.js";
 import { runCecTool, runLab } from "./lab-run.js";
 import { runRingTool } from "./ring-tool.js";
@@ -159,7 +160,7 @@ async function main(): Promise<number> {
           ...(opts.apiKey ? { apiKey: opts.apiKey } : {}),
         })
       : modelPilot?.chat
-        ? routerChatClient(modelPilot.chat)
+        ? routerChatClient(modelPilot.chat, { stream: opts.streamSpeech && opts.voice })
         : createScriptedClient(),
     ...(modelPilot ? { planner: modelPilot.wiring.factory, llmPlanning: true } : {}),
     confirm: confirmer(opts),
@@ -202,16 +203,42 @@ async function main(): Promise<number> {
       // is planned, executed and read back without a model, and every step
       // reaches the ring as verified / unverified / unsupported / failed; only
       // what is not plan work costs a model call.
-      const output = await answer(agent, command);
+      // A streamed reply is spoken sentence by sentence while it is still being written; if nothing was spoken that
+      // way (the model did not stream, or this was a device command with a one-line answer) the whole reply is
+      // spoken afterwards, exactly as before.
+      const turnStart = Date.now();
+      // When the first word is actually handed to the speaker, counted from the start of the turn — the number a person
+      // waits, and the same one whether the reply was streamed or not, so the two can be compared.
+      let firstSpeechMs: number | undefined;
+      const noteFirstSpeech = (): void => { firstSpeechMs ??= Date.now() - turnStart; };
+      const live = opts.streamSpeech && voice
+        ? createStreamSpeaker(async (sentence) => {
+            noteFirstSpeech();
+            await ring?.show("speaking").catch(() => {});
+            await voice.speak(sentence);
+          })
+        : undefined;
+      const off = live ? agent.events.on("token", ({ delta }) => live.onDelta(delta)) : undefined;
+      let output: string;
+      try { output = await answer(agent, command); } finally { off?.(); }
       stdout.write(opts.json
         ? JSON.stringify({ ok: true, input: command, output }) + "\n"
         : output + "\n");
+      // The text is printed the moment the reply is complete; what is still being said is waited for before the turn ends,
+      // so the microphone is not reopened mid-sentence.
+      if (live) {
+        await live.finish();
+      }
       // Spoken to completion before the turn ends, so the microphone is not
       // reopened mid-sentence — but a speech engine that fails is not a
       // failed turn; the text already went to stdout.
-      if (voice && output.trim()) {
+      if (voice && output.trim() && !live?.spokeAnything) {
+        noteFirstSpeech();
         await ring?.show("speaking").catch(() => {});
         await Promise.resolve(voice.speak(output)).catch(() => {});
+      }
+      if (voice && firstSpeechMs !== undefined && !opts.quiet && !opts.json) {
+        stderr.write(`  🔊 speech began ${firstSpeechMs} ms into the turn${live?.spokeAnything ? " (spoken as it streamed)" : ""}; turn took ${Date.now() - turnStart} ms\n`);
       }
     } catch (err) {
       failures++;
