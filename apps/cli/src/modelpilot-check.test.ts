@@ -9,7 +9,7 @@ import { runModelPilotCheck } from "./modelpilot-targets.js";
  * under the wrong index, a catalogue that leaks the key into an error. The check is run against it through real
  * sockets, because what is being tested is whether this code can *read* what a service sends.
  */
-const KEY = "mp_live_test-secret-key";
+const KEY = "mp_live_NOT-A-REAL-test-key";
 let server: Server | undefined;
 afterEach(async () => { await new Promise<void>((r) => (server ? server.close(() => r()) : r())); server = undefined; });
 

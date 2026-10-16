@@ -60,6 +60,14 @@ const TOOL_SPEC: ToolSpec = {
   parameters: { device: { type: "string", description: "which device", required: true, enum: ["hearth"] } },
 } as unknown as ToolSpec;
 
+/** Names of what a tool call carries besides the three fields every client reads — so a report can say it was there and sent back. */
+function extrasNote(call: Record<string, any>): string {
+  const extra = Object.keys(call).filter((k) => !["id", "type", "function", "index"].includes(k));
+  const inFn = Object.keys(call.function ?? {}).filter((k) => !["name", "arguments"].includes(k));
+  const all = [...extra, ...inFn.map((k) => `function.${k}`)];
+  return all.length ? `; also carries ${all.join(", ")} (sent back on turn 2)` : "";
+}
+
 const STATUS_RESULT = { online: true, cpu_temperature_c: 48.2, memory_free_mb: 312 };
 const ASK = "Check the current Hearth device status.";
 
@@ -191,6 +199,8 @@ export async function runChecks(o: CheckOptions): Promise<CheckRow[]> {
 
   // 4 ---- tool call, first turn
   let toolCall: { id: string; name: string; arguments: string } | undefined;
+  /** The call exactly as the service sent it — including anything provider-specific it attached (Gemini's `provider_metadata`). */
+  let rawCall: Record<string, unknown> | undefined;
   await guard("4 tool call, first turn", async () => {
     const r = await post({ model, ...effort, tool_choice: "required", tools: [TOOL], messages: [{ role: "user", content: ASK }] });
     if (r.status !== 200) return bad(r.status, r.text);
@@ -198,6 +208,7 @@ export async function runChecks(o: CheckOptions): Promise<CheckRow[]> {
     const call = choice?.message?.tool_calls?.[0];
     if (!call) return { verdict: "failed", detail: `no tool_calls (finish_reason=${choice?.finish_reason})`, ms: r.ms };
     toolCall = { id: call.id, name: call.function?.name, arguments: call.function?.arguments };
+    rawCall = call;
     let args: any; try { args = JSON.parse(toolCall.arguments); } catch { /* reported below */ }
     const problems = [
       choice.finish_reason !== "tool_calls" && `finish_reason=${choice.finish_reason}`,
@@ -206,7 +217,7 @@ export async function runChecks(o: CheckOptions): Promise<CheckRow[]> {
       args?.device !== "hearth" && `arguments=${redact(String(toolCall.arguments))}`,
       choice.message.content !== null && choice.message.content !== undefined && choice.message.content !== "" && "content is not null",
     ].filter(Boolean);
-    return problems.length ? { verdict: "failed", detail: problems.join("; "), ms: r.ms } : { verdict: "verified", detail: `${toolCall.name}(${toolCall.arguments}) id=${toolCall.id}`, ms: r.ms };
+    return problems.length ? { verdict: "failed", detail: problems.join("; "), ms: r.ms } : { verdict: "verified", detail: `${toolCall.name}(${toolCall.arguments}) id=${toolCall.id}${extrasNote(call)}`, ms: r.ms };
   });
 
   // 5 ---- the tool's result, second turn
@@ -216,7 +227,8 @@ export async function runChecks(o: CheckOptions): Promise<CheckRow[]> {
       model, ...effort, tools: [TOOL],
       messages: [
         { role: "user", content: ASK },
-        { role: "assistant", content: null, tool_calls: [{ id: toolCall.id, type: "function", function: { name: toolCall.name, arguments: toolCall.arguments } }] },
+        // The call goes back as received, not rebuilt from id/name/arguments: a provider's own metadata rides on it.
+        { role: "assistant", content: null, tool_calls: [rawCall ?? { id: toolCall.id, type: "function", function: { name: toolCall.name, arguments: toolCall.arguments } }] },
         { role: "tool", tool_call_id: toolCall.id, content: JSON.stringify(STATUS_RESULT) },
       ],
     });
@@ -285,7 +297,7 @@ export async function runChecks(o: CheckOptions): Promise<CheckRow[]> {
       ].filter(Boolean);
       return problems.length
         ? { verdict: "failed", detail: problems.join("; "), ms: now() - started }
-        : { verdict: "verified", detail: `call ${call.id} → run here → "${redact(second.message.content.trim())}"`, ms: now() - started };
+        : { verdict: "verified", detail: `call ${call.id}${call.providerData ? ` (kept ${Object.keys(call.providerData).join(", ")} and sent it back)` : ""} → run here → "${redact(second.message.content.trim())}"`, ms: now() - started };
     });
   }
 

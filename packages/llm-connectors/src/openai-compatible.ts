@@ -90,12 +90,17 @@ export function createOpenAiCompatibleClient(opts: OpenAiCompatibleOptions): Llm
       if (!res.ok) throw new Error(`LLM HTTP ${res.status}: ${await res.text()}`);
       const json: any = await res.json();
       const choice = json.choices?.[0]?.message ?? {};
-      const toolCalls: ToolCall[] | undefined = choice.tool_calls?.map((tc: any) => ({
-        id: tc.id,
-        name: tc.function.name,
-        args: safeParse(tc.function.arguments),
-      }));
-      const message: ChatMessage = { role: "assistant", content: choice.content ?? "", toolCalls };
+      const toolCalls: ToolCall[] | undefined = choice.tool_calls?.map((tc: any) => {
+        const extra = extrasOf(tc, ["id", "type", "function", "index"], extrasOf(tc.function, ["name", "arguments"]));
+        return {
+          id: tc.id,
+          name: tc.function.name,
+          args: safeParse(tc.function.arguments),
+          ...(extra ? { providerData: extra } : {}),
+        };
+      });
+      const messageExtra = extrasOf(choice, ["role", "content", "tool_calls"]);
+      const message: ChatMessage = { role: "assistant", content: choice.content ?? "", toolCalls, ...(messageExtra ? { providerData: messageExtra } : {}) };
       return { message, wantsToolCalls: !!toolCalls && toolCalls.length > 0 };
     },
 
@@ -136,7 +141,8 @@ export function createOpenAiCompatibleClient(opts: OpenAiCompatibleOptions): Llm
  */
 export class StreamAccumulator {
   private content = "";
-  private toolCalls = new Map<number, { id: string; name: string; args: string }>();
+  private toolCalls = new Map<number, { id: string; name: string; args: string; extra: Record<string, unknown>; fnExtra: Record<string, unknown> }>();
+  private messageExtra: Record<string, unknown> = {};
 
   constructor(private readonly handlers: StreamHandlers = {}) {}
 
@@ -154,9 +160,12 @@ export class StreamAccumulator {
         this.content += delta.content;
         this.handlers.onContentDelta?.(delta.content);
       }
+      Object.assign(this.messageExtra, extrasOf(delta, ["role", "content", "tool_calls"]));
       for (const tc of delta.tool_calls ?? []) {
         const i = tc.index ?? 0;
-        const cur = this.toolCalls.get(i) ?? { id: "", name: "", args: "" };
+        const cur = this.toolCalls.get(i) ?? { id: "", name: "", args: "", extra: {}, fnExtra: {} };
+        Object.assign(cur.extra, extrasOf(tc, ["id", "type", "function", "index"]));
+        Object.assign(cur.fnExtra, extrasOf(tc.function, ["name", "arguments"]));
         if (tc.id) cur.id = tc.id;
         if (tc.function?.name) cur.name = tc.function.name;
         if (tc.function?.arguments) cur.args += tc.function.arguments;
@@ -168,9 +177,15 @@ export class StreamAccumulator {
   result(): CompletionResult {
     const calls = [...this.toolCalls.values()].filter((c) => c.name);
     const toolCalls: ToolCall[] | undefined = calls.length
-      ? calls.map((c, i) => ({ id: c.id || `call_${i}`, name: c.name, args: safeParse(c.args) }))
+      ? calls.map((c, i) => {
+          const extra = { ...c.extra, ...(Object.keys(c.fnExtra).length ? { function: c.fnExtra } : {}) };
+          return { id: c.id || `call_${i}`, name: c.name, args: safeParse(c.args), ...(Object.keys(extra).length ? { providerData: extra } : {}) };
+        })
       : undefined;
-    const message: ChatMessage = { role: "assistant", content: this.content, toolCalls };
+    const message: ChatMessage = {
+      role: "assistant", content: this.content, toolCalls,
+      ...(Object.keys(this.messageExtra).length ? { providerData: this.messageExtra } : {}),
+    };
     return { message, wantsToolCalls: !!toolCalls && toolCalls.length > 0 };
   }
 }
@@ -216,16 +231,33 @@ function toApiMessage(m: ChatMessage): Record<string, unknown> {
   }
   if (m.role === "assistant" && m.toolCalls?.length) {
     return {
+      ...m.providerData,
       role: "assistant",
       content: m.content || null,
-      tool_calls: m.toolCalls.map((tc) => ({
-        id: tc.id,
-        type: "function",
-        function: { name: tc.name, arguments: JSON.stringify(tc.args) },
-      })),
+      tool_calls: m.toolCalls.map((tc) => {
+        const { function: fnExtra, ...extra } = (tc.providerData ?? {}) as { function?: Record<string, unknown> };
+        return {
+          ...extra,
+          id: tc.id,
+          type: "function",
+          function: { ...fnExtra, name: tc.name, arguments: JSON.stringify(tc.args) },
+        };
+      }),
     };
   }
-  return { role: m.role, content: m.content };
+  return { ...(m.role === "assistant" ? m.providerData : undefined), role: m.role, content: m.content };
+}
+/**
+ * Everything on `o` except the named keys, or `undefined` if there is nothing else — what a service attached that
+ * this client has no field for. Kept, not interpreted: a provider's signature on a tool call is only meaningful to
+ * that provider, and dropping it is how a second turn gets refused.
+ */
+function extrasOf(o: unknown, known: string[], base?: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!o || typeof o !== "object") return base;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o as Record<string, unknown>)) if (!known.includes(k)) out[k] = v;
+  if (base) out.function = base;
+  return Object.keys(out).length ? out : undefined;
 }
 function safeParse(s: string): Record<string, unknown> {
   try { return JSON.parse(s); } catch { return {}; }

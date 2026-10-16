@@ -8,6 +8,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A tool call's provider data is kept and sent back.** A provider can attach something to a tool call that
+  only it understands — for Gemini through the hosted ModelPilot, `provider_metadata`, which turn two has to
+  carry or the provider refuses the tool result. Hearth's client rebuilt the assistant message from `id`,
+  `name` and `arguments` alone, so it would have dropped it on every tool loop and the second turn would have
+  failed for exactly the provider whose calls need it. `ToolCall` and `ChatMessage` now carry `providerData`:
+  whatever the service attached beyond the fields every client reads — on the call, inside its `function`
+  object, or on the message — kept as received (streamed deltas merged by index) and sent back verbatim; a service
+  that attaches nothing gets the plain OpenAI shape, byte for byte. Hearth does not interpret it. Five tests, both
+  transports. `hearth modelpilot check` now sends the call back as received in its raw second turn and says when a
+  call carried extras. **Not yet seen against the real Gemini:** on 2026-10-16 it still answered `503
+  model_temporarily_unavailable` with the circuit `half_open` and a `retry_at` six minutes in the past, and
+  one plain completion hung for the full 60 s — so there was never a first-turn response to read the metadata
+  from.
 - **"Is the Pi okay?" — a real tool, through the loop the hosted-service check proved.** The model could
   already read the volume and the TV's power through the router's tool loop; asked how hot the Pi was it
   said it could not know, because nothing could tell it. `get_host_status` (read-only, linux only) reads
