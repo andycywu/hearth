@@ -28,6 +28,11 @@ export interface ModelPilotWiring {
    * plan the agent finished before one existed cannot have been ModelPilot's.
    */
   report: (outcome: PlanOutcome) => Promise<void>;
+  /**
+   * Wait for the shadow calls still in flight. A long-lived host never needs it; a one-shot command does, or the
+   * process ends before the call it started behind the answer has been logged. Bounded by the client's timeout.
+   */
+  settled: () => Promise<void>;
 }
 
 export interface ModelPilotWiringOptions {
@@ -62,5 +67,6 @@ export function createModelPilotWiring(o: ModelPilotWiringOptions): ModelPilotWi
       ...(o.telemetry ? { telemetry: o.telemetry } : {}),
     })),
     report: async (outcome) => instance?.report(outcome),
+    settled: async () => instance?.settled(),
   };
 }

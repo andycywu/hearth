@@ -247,6 +247,8 @@ async function main(): Promise<number> {
   if (spoken && opts.serve && !opts.commands.length) {
     await new Promise<void>((resolve) => { process.once("SIGINT", resolve); process.once("SIGTERM", resolve); });
   }
+  // A one-shot command ends before the shadow call it started behind the answer; let it be logged.
+  await modelPilot?.wiring.settled().catch(() => {});
   await spoken?.stop();
   await local?.stop();            // waits for the model server to be shut down, or it outlives us
   await ring?.off();

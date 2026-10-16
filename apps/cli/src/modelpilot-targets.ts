@@ -16,8 +16,8 @@
  * Keys are read from the environment only, like every credential here — never a flag, never printed. `status`
  * says which variable is missing, never what is in one.
  */
-import type { PlanOutcome, Plan, PlannerContext, Goal } from "@hearthkit/core";
-import { PRODUCTION_BASE_URL, type ModelPilotPlanner, type ShadowRecord } from "@hearthkit/modelpilot";
+import type { Plan, PlannerContext, Goal } from "@hearthkit/core";
+import { PRODUCTION_BASE_URL, type ModelPilotPlanner, type ModelPilotWiring, type ShadowRecord } from "@hearthkit/modelpilot";
 
 export const TARGET_NAMES = ["official", "local"] as const;
 export type TargetName = (typeof TARGET_NAMES)[number];
@@ -163,13 +163,15 @@ export interface CompareRecord {
  * fired after the plan is returned and is not awaited — the room does not wait for a benchmark.
  */
 export function withComparison(
-  primary: { factory: (ctx: PlannerContext) => ModelPilotPlanner; report: (o: PlanOutcome) => Promise<void> },
+  primary: ModelPilotWiring,
   other: { factory: (ctx: PlannerContext) => ModelPilotPlanner },
   names: { primary: TargetName; other: TargetName },
   log: (record: CompareRecord) => void,
-): { factory: (ctx: PlannerContext) => ModelPilotPlanner; report: (o: PlanOutcome) => Promise<void> } {
+): ModelPilotWiring {
+  const comparing = new Set<Promise<void>>();
   return {
     report: primary.report,
+    settled: async () => { await primary.settled(); while (comparing.size) await Promise.all([...comparing]); },
     factory: (ctx) => {
       const first = primary.factory(ctx);
       const second = other.factory(ctx);
@@ -180,7 +182,9 @@ export function withComparison(
         async plan(goal: Goal): Promise<Plan> {
           const before = first.shadow.length;
           const plan = await first.plan(goal);
-          void compareOne(goal, plan, before);
+          const run = compareOne(goal, plan, before);
+          comparing.add(run);
+          void run.finally(() => comparing.delete(run));
           return plan;
         },
       };

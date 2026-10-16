@@ -133,7 +133,7 @@ describe("--compare", () => {
       async plan() { if (throwing) throw new Error("boom"); if (answer) shadow.push(answer); return plan; },
     };
   };
-  const wire = (p: ModelPilotPlanner) => ({ factory: (_c: PlannerContext) => p, report: async () => {} });
+  const wire = (p: ModelPilotPlanner) => ({ factory: (_c: PlannerContext) => p, report: async () => {}, settled: async () => {} });
   const ctx = {} as PlannerContext;
   const settle = () => new Promise((r) => setTimeout(r, 0));
 
@@ -172,6 +172,18 @@ describe("--compare", () => {
     await c.factory(ctx).plan(goal); await settle();
     expect(logged[0]?.summary).toContain("neither side recorded a suggestion");
     expect(logged[0]?.summary).toContain("or both calls failed");
+  });
+
+  it("settled() waits for the comparison, so a one-shot command logs it before it exits", async () => {
+    const logged: CompareRecord[] = [];
+    const slow = planner(record(["a"]));
+    const slowPlan = slow.plan.bind(slow);
+    slow.plan = async (g) => { await new Promise((r) => setTimeout(r, 20)); return slowPlan(g); };
+    const c = withComparison(wire(planner(record(["a"]))), wire(slow), { primary: "official", other: "local" }, (r) => logged.push(r));
+    await c.factory(ctx).plan(goal);
+    expect(logged).toHaveLength(0);          // the plan did not wait for it
+    await c.settled();
+    expect(logged).toHaveLength(1);
   });
 
   it("a second service that throws costs a log line and never the primary's plan", async () => {

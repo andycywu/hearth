@@ -24,7 +24,7 @@ has: webOS stubs audio and app management, no Samsung-branded set has run
 anything, and CEC, IR, an AVR, a console, a camera and a far-field microphone
 need a room rather than a television.
 
-**1132 tests green**, across 19 packages.
+**1133 tests green**, across 19 packages.
 
 ## At a glance
 
@@ -49,7 +49,7 @@ need a room rather than a television.
 | Edge speech-to-text (`hearth stt`, `packages/edge-voice`) | 🟡 **built and measured on a Pi 3B on clean power 2026-10-12, not yet heard speaking.** Offline sherpa-onnx behind a backend interface: mic → energy VAD → bilingual streaming zipformer → `Transcript`, with a benchmark mode. ~111–115 MB resident and flat across 20 utterances, ~16–20 s to load, real-time factor 0.43–0.48, 0.26–0.39 s from end of audio to final text (≈0.9–1.0 s with the VAD hangover, an estimate). The first run on a bad cable was twice as slow. No recording of a person saying a TV command exists yet; no wake word, no AEC, no intent routing. [`edge-voice.md`](edge-voice.md) |
 | CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1132 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1133 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
@@ -63,10 +63,10 @@ need a room rather than a television.
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (1132 tests)
+## Test coverage (1133 tests)
 
 core 202 · ui 167 · adapter-linux 190 · modelpilot 77 · llm-connectors 61 ·
-skill-manifest 56 · adapter-cec 46 · cli 162 · edge-voice 44 · adapter-aosp 28 · acceptance 20 ·
+skill-manifest 56 · adapter-cec 46 · cli 163 · edge-voice 44 · adapter-aosp 28 · acceptance 20 ·
 adapter-tizen 16 · perception-mock 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 
