@@ -17,10 +17,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   object, or on the message — kept as received (streamed deltas merged by index) and sent back verbatim; a service
   that attaches nothing gets the plain OpenAI shape, byte for byte. Hearth does not interpret it. Five tests, both
   transports. `hearth modelpilot check` now sends the call back as received in its raw second turn and says when a
-  call carried extras. **Not yet seen against the real Gemini:** on 2026-10-16 it still answered `503
-  model_temporarily_unavailable` with the circuit `half_open` and a `retry_at` six minutes in the past, and
-  one plain completion hung for the full 60 s — so there was never a first-turn response to read the metadata
-  from.
+  call carried extras. **Then seen against the real Gemini, and it was needed.** Once the service let Gemini through again
+  (it had sat `503 model_temporarily_unavailable` with the circuit `half_open` for hours), the first turn carried
+  `provider_metadata: { gemini_thought_signature: <424 characters> }` on the call. Sent back as received, the second
+  turn answered; sent back rebuilt from `id`, `name` and `arguments` — what this client did until that commit — it was
+  `400 Function call is missing a thought_signature in functionCall parts`. `hearth modelpilot check` against
+  `gemini-flash`: plain completion, tool call, tool result and Hearth's own client's tool loop verified, with the
+  metadata kept and sent back; the streamed rows fail with the documented `422 streaming_provider_not_supported`
+  (openai only), and the strict schema that Gemini rejected on 2026-10-16 now goes through.
 - **"Is the Pi okay?" — a real tool, through the loop the hosted-service check proved.** The model could
   already read the volume and the TV's power through the router's tool loop; asked how hot the Pi was it
   said it could not know, because nothing could tell it. `get_host_status` (read-only, linux only) reads
