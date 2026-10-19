@@ -27,6 +27,8 @@ export interface HearthConfig {
   leds?: boolean;
   /** Attention word; see `CliOptions.wakeWord`. */
   wakeWord?: string;
+  /** Extra spellings of the wake word, or `false` for none; see wake.ts. */
+  wakeAliases?: string[] | false;
   llmBaseUrl?: string;
   llmModel?: string;
   /** Which named ModelPilot to use (`official` | `local` | `off`); the keys stay in the env file. */
@@ -81,6 +83,7 @@ export function configAsEnv(config: HearthConfig): Record<string, string> {
   if (config.voice) env.HEARTH_VOICE = "1";
   if (config.leds) env.HEARTH_LEDS = "1";
   if (config.wakeWord) env.HEARTH_WAKE = config.wakeWord;
+  if (config.wakeAliases !== undefined) env.HEARTH_WAKE_ALIASES = config.wakeAliases === false ? "off" : config.wakeAliases.join(",");
   if (config.modelpilot) env.MODELPILOT_TARGET = config.modelpilot;
   if (config.streamSpeech) env.HEARTH_STREAM_SPEECH = "1";
   if (config.avatar) env.HEARTH_AVATAR = config.avatar;

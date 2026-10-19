@@ -5,7 +5,7 @@ A snapshot of what is built, what is verified, and by what. For the plan see
 and [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md) (platform bring-up). For what an emulator structurally cannot answer, see
 [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
 
-_Last updated: 2026-10-04 · released: v0.3.0 (2026-10-04) · previous: v0.2.0 (2026-08-28), v0.1.0 (2026-08-05)_
+_Last updated: 2026-10-19 · released: v0.3.0 (2026-10-04) · previous: v0.2.0 (2026-08-28), v0.1.0 (2026-08-05)_
 
 **The honest one-line version: the runtime works, it has run on one real
 television — an HKC TTQ55UQ1CS on Tizen 7.0, where the capability probe is clean
@@ -24,7 +24,7 @@ has: webOS stubs audio and app management, no Samsung-branded set has run
 anything, and CEC, IR, an AVR, a console, a camera and a far-field microphone
 need a room rather than a television.
 
-**1177 tests green**, across 19 packages.
+**1183 tests green**, across 19 packages.
 
 ## At a glance
 
@@ -48,8 +48,12 @@ need a room rather than a television.
 | Voice (ASR/TTS + wake word) | ✅ Web Speech on web/Tizen/webOS, native bridge on Android, and **ALSA + espeak-ng on Linux, verified on a Pi 3B with a ReSpeaker 4-Mic array 2026-09-16**. Recognition on Linux is an *injected* `Transcriber` — a build without one reports `unsupported` rather than listening to a microphone it cannot understand. No wake word there: that needs an always-on detector, and `VoicePipeline` makes it optional so an adapter can decline instead of imitating one |
 | Edge speech-to-text (`hearth stt`, `packages/edge-voice`) | 🟡 **built and measured on a Pi 3B on clean power 2026-10-12, not yet heard speaking.** Offline sherpa-onnx behind a backend interface: mic → energy VAD → bilingual streaming zipformer → `Transcript`, with a benchmark mode. ~111–115 MB resident and flat across 20 utterances, ~16–20 s to load, real-time factor 0.43–0.48, 0.26–0.39 s from end of audio to final text (≈0.9–1.0 s with the VAD hangover, an estimate). The first run on a bad cable was twice as slow. No recording of a person saying a TV command exists yet; no wake word, no AEC, no intent routing. [`edge-voice.md`](edge-voice.md) |
 | CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal |
+| **Hearth on a Pi: install, setup, run** | ✅ **verified on a Pi 3B 2026-10-15/16.** `sh tools/install.sh` puts `hearth` on PATH (launcher loads the 0600 env file); `hearth setup` remembers platform, voice, wake word and ModelPilot choice and no longer switches listening off when re-run from a shell that did not source the key; README "Install on a Pi" is the whole path |
+| **ModelPilot hosted service, end to end** | ✅ **verified from the Pi 2026-10-16** with `hearth modelpilot check`: catalogue, completion, SSE, tool call → local run → result → answer, streamed tool calls merged by index, Hearth's own client doing the loop streamed and not, a cancelled stream followed by a request; 20/20 repetitions, median 3.6 s plain / 2.9 s streamed on `openai-mini`. Gemini and Claude: non-streamed verified (Gemini's `provider_metadata` must be sent back — it is); their streaming is `422`, openai only. [`modelpilot-integration.md`](modelpilot-integration.md#checking-a-real-service) |
+| **Spoken commands, end to end** | ⛔ **none verified.** Files, a robot voice and a scripted microphone only; no person has been heard yet. Attention word, silence gate, recognition accuracy, distance, false accepts, the boot service: [`VOICE_TEST_PLAN.md`](VOICE_TEST_PLAN.md) (V1–V16) |
+| `--stream-speech` | 🟡 built, off by default: first word ~1.5 s sooner on typed input, ~0.5 s audio-device gap per sentence; nobody has judged it by ear (V9) |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1177 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1183 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
@@ -63,10 +67,10 @@ need a room rather than a television.
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (1177 tests)
+## Test coverage (1183 tests)
 
 core 202 · ui 167 · adapter-linux 195 · modelpilot 77 · llm-connectors 66 ·
-skill-manifest 56 · adapter-cec 46 · cli 197 · edge-voice 44 · adapter-aosp 28 · acceptance 20 ·
+skill-manifest 56 · adapter-cec 46 · cli 203 · edge-voice 44 · adapter-aosp 28 · acceptance 20 ·
 adapter-tizen 16 · perception-mock 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 

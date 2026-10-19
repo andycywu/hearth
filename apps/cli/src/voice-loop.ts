@@ -8,11 +8,13 @@
 import { summarizeOutcome, type Agent } from "@hearthkit/core";
 import type { PlatformProvider } from "@hearthkit/platform-api";
 import type { RingState, StatusRing } from "@hearthkit/adapter-linux";
-import { afterWakeWord } from "./wake.js";
+import { matchWake } from "./wake.js";
 
 export interface ListenOptions {
   ring?: StatusRing | undefined;
   wakeWord?: string | undefined;
+  /** Spellings of the wake word a transcriber is known to produce; `false` for none. Default: the built-in ones. */
+  wakeAliases?: readonly string[] | false | undefined;
   /** One line per thing heard, for the terminal; omitted in --quiet / --json. */
   trace?: ((line: string) => void) | undefined;
 }
@@ -76,7 +78,7 @@ export function listenForever(
   handle: (command: string) => Promise<void>,
   opts: ListenOptions = {},
 ): { stop(): Promise<void> } {
-  const { ring, wakeWord, trace } = opts;
+  const { ring, wakeWord, wakeAliases, trace } = opts;
   let running = true;
   // The turn in progress, if any. The loop waits for it before opening the
   // microphone again: otherwise the next window records the agent's own
@@ -87,13 +89,16 @@ export function listenForever(
 
   voice.onTranscript((text, isFinal) => {
     if (!isFinal || !text.trim()) return;
-    const heard = afterWakeWord(text, wakeWord);
+    const match = matchWake(text, wakeWord, wakeAliases);
+    const heard = match?.command;
     if (heard === undefined) {
       // Heard, transcribed, dropped: the room was talking, not to us.
       trace?.(`  🎤 (not for me) ${text}`);
       return;
     }
-    trace?.(`  🎤 ${text}`);
+    trace?.(match && match.via !== "word"
+      ? `  🎤 ${text}   (taken as "${wakeWord}": heard "${match.via.alias}")`
+      : `  🎤 ${text}`);
     if (!heard) {
       // The word alone. Acknowledge, so saying it and waiting is not silence.
       busy = Promise.resolve(voice.speak("Yes?")).catch(() => {});

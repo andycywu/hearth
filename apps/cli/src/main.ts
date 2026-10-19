@@ -256,6 +256,7 @@ async function main(): Promise<number> {
     ? listenForever(voice, handle, {
         ring,
         wakeWord: opts.wakeWord,
+        wakeAliases: opts.wakeAliases,
         trace: !opts.quiet && !opts.json ? (line) => stderr.write(line + "\n") : undefined,
       })
     : undefined;

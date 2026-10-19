@@ -2,6 +2,7 @@
  * Command-line parsing, kept separate from anything that touches a terminal so
  * the rules can be tested without spawning a process.
  */
+import { parseWakeAliases } from "./wake.js";
 
 export interface CliOptions {
   /** Commands to run and exit. Empty means interactive. */
@@ -45,6 +46,8 @@ export interface CliOptions {
    * this is the honest thing that can be done with the transcript instead.
    */
   wakeWord?: string;
+  /** Spellings of the wake word a transcriber is known to produce (`HEARTH_WAKE_ALIASES`); `false` for none, absent for the built-in list. See wake.ts. */
+  wakeAliases?: readonly string[] | false;
   /**
    * `hearth report`: probe this box and whatever it can reach, run the four
    * scenarios, and print a Hearth Report section instead of starting the agent.
@@ -193,6 +196,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (env.HEARTH_VOICE === "1") opts.voice = true;
   if (env.HEARTH_LEDS === "1") opts.leds = true;
   if (env.HEARTH_WAKE) opts.wakeWord = env.HEARTH_WAKE;
+  { const a = parseWakeAliases(env.HEARTH_WAKE_ALIASES); if (a !== undefined) opts.wakeAliases = a; }
   if (env.MODELPILOT_TARGET) {
     const t = env.MODELPILOT_TARGET.trim().toLowerCase();
     if (t === "official" || t === "local" || t === "off") opts.modelpilot = t;
@@ -235,6 +239,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       case "--leds": opts.leds = true; break;
       case "--wake": { const v = takeValue("--wake"); if (v !== undefined) opts.wakeWord = v.trim() || undefined; break; }
       case "--no-wake": delete opts.wakeWord; break;
+      case "--no-wake-aliases": opts.wakeAliases = false; break;
       case "--out": { const v = takeValue("--out"); if (v !== undefined) opts.out = v; break; }
       case "--writes": opts.writes = true; break;
       case "--realtime": opts.realtime = true; break;
@@ -458,6 +463,8 @@ OPTIONS
       --wake <word>       act only on what is said after this word is heard;
                           everything else is transcribed and dropped
       --no-wake           act on everything heard
+      --no-wake-aliases   accept only the exact wake word, not spellings a transcriber is known to produce
+                          for it ("Hard, turn it down" counts for "hearth" by default; $HEARTH_WAKE_ALIASES=a,b replaces the list)
       --cec <device>      CEC adapter to discover with (default /dev/cec0, linux)
       --no-cec            do not touch the CEC bus
       --modelpilot <t>    official|local|off — which named ModelPilot to use (or $MODELPILOT_TARGET;

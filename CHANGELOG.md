@@ -8,6 +8,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The wake word has aliases, because the transcriber does not spell a made-up word.** The first live run
+  heard "hearth, turn off the light" as "Hard turn off light." and dropped it as not for us; the matcher accepted
+  only the exact word. Known mishearings (`hard`, `harth`, `hart`, `heart`, `hurth`, `herth`) now stand in for
+  "hearth" — but only as the **first word** of the utterance, after an optional "hey"/"ok", **and only with a command
+  after it**: they are ordinary English, so "that is hard to say" and "I love you with all my heart" are still not
+  for us, and "Hard." alone is not a request. The exact word still counts anywhere. A line taken by alias is marked
+  `(taken as "hearth": heard "hard")`, so the next real misspelling shows up in the trace instead of in a dropped
+  command. `HEARTH_WAKE_ALIASES=off` (or `--no-wake-aliases`) is strict; a comma list replaces the built-in one; the
+  config file takes `wakeAliases`. This is a guess made from one sentence — whether it is enough is test V4 in
+  [`docs/VOICE_TEST_PLAN.md`](docs/VOICE_TEST_PLAN.md), which is also new: sixteen things only a person speaking can show,
+  each with the command, what to expect, what to record, and a table to fill in. STATUS, HANDOFF and the roadmap counts
+  were brought up to date at the same time (STATUS still said 2026-10-04 and HANDOFF still said the software roadmap
+  was finished).
 - **`--stream-speech`: speak a reply sentence by sentence while it is still being written.** A splitter turns
   streamed words into sentences the moment a sentence is known to be over — a full stop at the very end of
   what has arrived waits, because `48.` may be the start of `48.2`; Chinese stops end a sentence at once;

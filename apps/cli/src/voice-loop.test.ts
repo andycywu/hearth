@@ -117,6 +117,24 @@ describe("the voice loop, with a scripted microphone", () => {
     expect(states[0]).toBe("listening");
   });
 
+  // The first live run: "hearth, turn off the light" was transcribed "Hard turn off light." and dropped.
+  it("acts on a known mishearing of the attention word, and the trace says what it was taken for", async () => {
+    const { agent, platform } = await livingRoom();
+    const { voice, done } = scriptedMicrophone(["That is hard to say", "Hard, turn it down"]);
+    const trace: string[] = [];
+    const outputs: string[] = [];
+    const loop = listenForever(voice, async (c) => { outputs.push(await answer(agent, c)); }, { wakeWord: "hearth", trace: (l) => trace.push(l) });
+    await done;
+    await settle();
+    await loop.stop();
+    expect(trace).toEqual([
+      "  🎤 (not for me) That is hard to say",
+      '  🎤 Hard, turn it down   (taken as "hearth": heard "hard")',
+    ]);
+    expect(await platform.system.getVolume()).toBeLessThan(40);
+    expect(outputs).toHaveLength(1);
+  });
+
   it("with no attention word, acts on everything", async () => {
     const { agent } = await livingRoom();
     const { voice, done } = scriptedMicrophone(["turn it down"]);

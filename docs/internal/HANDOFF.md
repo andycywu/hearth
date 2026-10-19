@@ -14,22 +14,42 @@ blocked on physical objects).
 
 ## Where the work is
 
-**The software roadmap is finished.** All ten
-[implementation tasks](../roadmap.md#next-10-implementation-tasks) have landed —
-task 7, HDMI-CEC, as far as a mock bus can take it. Everything still outstanding
-needs hardware nobody here has, and no amount of further code moves it:
+_Updated 2026-10-19. The software roadmap is finished; M1 (Hearth Hub) is built and mostly measured; what is left is a person
+speaking, a stranger installing, and hardware nobody here has._
+
+**Done and verified on a real Pi 3B (ReSpeaker 4-Mic, HDMI 3 of a Titan OS television)**: `sh tools/install.sh` → `hearth`
+on PATH; `hearth setup` (remembers the platform, voice, wake word, ModelPilot choice); `hearth report`; CEC discovery and
+TV power by text with read-back; the status ring; Lab; the hosted ModelPilot end to end through Hearth's own client
+(`hearth modelpilot check` — completion, SSE, tool loop, streamed and not; Gemini needs its `provider_metadata` sent back);
+`get_host_status`; shadow planning that does not make anyone wait; `--stream-speech` (first word ~1.5 s sooner, ~0.5 s gap per
+sentence — off by default).
+
+**Not done, in this order**
+
+1. **Spoken commands, end to end — none is verified.** Everything that listens has been exercised with files, a robot voice or a
+   scripted microphone. The whole list, with commands, expectations and a table to fill in, is
+   [`../VOICE_TEST_PLAN.md`](../VOICE_TEST_PLAN.md). Start with V4 (how the transcriber spells "hearth" — it once wrote "Hard"):
+   everything else reads as failing if the wake word is wrong. Read `vcgencmd get_throttled` first; it was `0x50000` on
+   2026-10-19 (under-voltage since boot, cause unknown).
+2. **The boot service.** `setup` writes `hearth.service`; nothing has confirmed it is installed, enabled, or survives a reboot (V16).
+3. **On-TV agent UI** — a Chromium kiosk on the Pi's HDMI fed by a local WebSocket from the CLI.
+4. **The 15-minute stranger test** — M1's exit condition; needs a stranger and only the README.
+5. **Titan OS recon** — private repo, not here ([`../../CLAUDE.md`](../../CLAUDE.md), "Boundaries").
+6. **Two-television comparison** — the Pi back on the HKC Tizen set.
+7. **Not built, and named so nobody assumes**: wake-word detector, echo cancellation and barge-in, a persistent audio player (removes
+   the per-sentence gap), Jev gate / IntentRouter interfaces, a real provider behind the local ModelPilot (it answers with mock models).
+
+**Waiting on someone else:** ModelPilot streaming for `claude-sonnet` and `gemini-flash` (`422 streaming_provider_not_supported`;
+only openai models stream), and the hosted service's default reasoning effort (`medium`; `none` measured ~0.9 s faster).
+
+**Blocked on hardware**
 
 | Blocked on | Items |
 |---|---|
-| A retail Samsung TV | Tizen audio — `volume`/`mute` are unexercised code, that emulator has no audio API |
+| A console or AVR on the CEC bus | M2: "switch to the PS5", every step `verified` — a power change needs a second device that answers |
+| A retail Samsung TV | Tizen audio via `webapis.audiocontrol` — unexercised code |
 | MTK / NVT boards | Phase 2 bring-up, the privileged controls, on-device model benchmarks |
-| A Raspberry Pi (+ a console and an AVR for the full story) | CEC against a real bus. The transport is written; `node tools/verify-cec.mjs` is the whole task — see [`../cec.md`](../cec.md) |
 | A browser with a weak GPU | Blits as the default renderer |
-
-So the highest-value thing that can be done from a desk is **anything that makes
-someone else's television answer the question for us** — which is what
-[the Hearth Report](../platform/capability-matrix.md) and
-`tools/device-report.mjs` exist for.
 
 ## Definition of green
 
@@ -39,7 +59,7 @@ Run before every commit. CI runs the same thing:
 pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm bundle:all && pnpm check:size
 ```
 
-Currently: **1177 tests**, 19 packages, clean lint.
+Currently: **1183 tests**, 19 packages, clean lint.
 
 ## Conventions that are load-bearing
 
