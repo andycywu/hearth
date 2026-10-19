@@ -125,7 +125,7 @@ discovered rather than declared; then ask 「我要打 PS5」), `?skills=weather
 (example skill), `?llm=http://127.0.0.1:11434/v1&model=llama3.2` (real model).
 
 ```bash
-pnpm test           # 1184 tests
+pnpm test           # 1231 tests
 pnpm bench          # agent-loop latency (p50/p95 per turn)
 ```
 
@@ -200,6 +200,7 @@ change it could not read back is reported as `unverified`, never as done.
 | `hearth "<sentence>"` | run one command and exit; with no argument it reads lines from the terminal |
 | `hearth --voice` | also listen on the microphone (needs `setup` to have found one and a transcriber) |
 | `hearth --voice --stream-speech` | speak a reply sentence by sentence as it arrives (the first word comes about 1.5 s sooner; each sentence costs about half a second of gap; needs a model that streams, otherwise it speaks the whole reply as before) |
+| `hearth --voice --wake-detector kws` | hear the wake word on the box, before anything is recognised, so a hosted recogniser is only sent what was said *after* it (install: [`docs/edge-voice.md`](docs/edge-voice.md#a-wake-word-that-runs-on-the-box)) |
 | `hearth --platform linux setup` | inspect this box, write the config, offer a boot service |
 | `hearth modelpilot status` | probe the two named ModelPilot services |
 | `hearth modelpilot check [--runs N]` | a real conversation with the service through Hearth's own client: completion, streaming, tool call → result → answer |
@@ -379,7 +380,7 @@ has no third-party dependencies at all.**
 | Runtime | **Node.js ≥ 20** for tooling; the agent itself runs in the TV's WebView | |
 | Package manager | **pnpm 9** workspaces + TypeScript project references | One repo, ~20 packages, real build ordering |
 | Bundler | **esbuild** — one ESM file per target, minified, with feature flags folded out | Fast, and its `define` is what removes optional code |
-| Tests | **Vitest** — 1184 tests, including one that builds the bundle and weighs it | |
+| Tests | **Vitest** — 1231 tests, including one that builds the bundle and weighs it | |
 | Lint | **ESLint 10** flat config with `typescript-eslint` | |
 | UI | Hand-written DOM / Canvas 2D. No framework, no CSS library | A framework would be larger than the agent |
 | Models | Any **OpenAI-compatible** HTTP endpoint — cloud gateway, or `llama.cpp` / Ollama on the TV | No vendor lock-in; see [on-device inference](docs/on-device-inference.md) |
@@ -398,7 +399,7 @@ on retail TV hardware yet.**
 
 | | |
 |---|---|
-| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 1184 tests |
+| Core, HAL, 7 adapters, world model, planner, policy, perception | ✅ done, 1231 tests |
 | Packaging for all three OSes | ✅ verified (.apk / signed .wgt / .ipk) |
 | Android TV emulator bring-up + acceptance run | ✅ passes |
 | Goal mode on the Android TV emulator | ✅ device graph → plan → verify, through logcat |

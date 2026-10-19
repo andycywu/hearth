@@ -24,7 +24,7 @@ has: webOS stubs audio and app management, no Samsung-branded set has run
 anything, and CEC, IR, an AVR, a console, a camera and a far-field microphone
 need a room rather than a television.
 
-**1184 tests green**, across 19 packages.
+**1231 tests green**, across 19 packages.
 
 ## At a glance
 
@@ -50,10 +50,11 @@ need a room rather than a television.
 | CLI on the device (`apps/cli`) | ✅ same agent loop in a terminal |
 | **Hearth on a Pi: install, setup, run** | ✅ **verified on a Pi 3B 2026-10-15/16.** `sh tools/install.sh` puts `hearth` on PATH (launcher loads the 0600 env file); `hearth setup` remembers platform, voice, wake word and ModelPilot choice and no longer switches listening off when re-run from a shell that did not source the key; README "Install on a Pi" is the whole path |
 | **ModelPilot hosted service, end to end** | ✅ **verified from the Pi 2026-10-16** with `hearth modelpilot check`: catalogue, completion, SSE, tool call → local run → result → answer, streamed tool calls merged by index, Hearth's own client doing the loop streamed and not, a cancelled stream followed by a request; 20/20 repetitions, median 3.6 s plain / 2.9 s streamed on `openai-mini`. Gemini and Claude: non-streamed verified (Gemini's `provider_metadata` must be sent back — it is); their streaming is `422`, openai only. [`modelpilot-integration.md`](modelpilot-integration.md#checking-a-real-service) |
+| **Wake word on the box (`--wake-detector kws`)** | 🟡 **built and measured with a synthetic voice on a Pi 3B 2026-10-19; no person has been heard.** A ~5 MB keyword spotter runs before anything is recognised, so a hosted recogniser is only sent what was said after the wake word. Neural voice: "hearth" 3/3, "heart"/"hard" sentences 0/4; end to end the recogniser ran once for one command in a 17.6 s room recording. [`edge-voice.md`](edge-voice.md#a-wake-word-that-runs-on-the-box) |
 | **Spoken commands, end to end** | ⛔ **none verified.** Files, a robot voice and a scripted microphone only; no person has been heard yet. Attention word, silence gate, recognition accuracy, distance, false accepts, the boot service: [`VOICE_TEST_PLAN.md`](VOICE_TEST_PLAN.md) (V1–V16) |
 | `--stream-speech` | 🟡 built, off by default: first word ~1.5 s sooner on typed input, ~0.5 s audio-device gap per sentence; nobody has judged it by ear (V9) |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1184 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1231 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
@@ -67,10 +68,10 @@ need a room rather than a television.
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (1184 tests)
+## Test coverage (1231 tests)
 
-core 202 · ui 167 · adapter-linux 195 · modelpilot 77 · llm-connectors 66 ·
-skill-manifest 56 · adapter-cec 46 · cli 204 · edge-voice 44 · adapter-aosp 28 · acceptance 20 ·
+core 202 · ui 167 · adapter-linux 213 · modelpilot 77 · llm-connectors 66 ·
+skill-manifest 56 · adapter-cec 46 · cli 225 · edge-voice 52 · adapter-aosp 28 · acceptance 20 ·
 adapter-tizen 16 · perception-mock 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 

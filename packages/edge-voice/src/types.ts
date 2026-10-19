@@ -36,6 +36,18 @@ export interface WakeWordDetector {
   /** True on the chunk in which the phrase was heard. */
   accept(chunk: Uint8Array): boolean;
   reset(): void;
+  /** Load a model or start a helper process. Awaited before the first chunk, like the engine's `load`. */
+  load?(): Promise<void>;
+  /** Release whatever `load` started. Awaited when the pipeline stops. */
+  close?(): Promise<void>;
+  /**
+   * A detector that answers late — a model that needs half a second of trailing audio before it is sure — says how
+   * much audio before its answer may belong to what the person said next. The pipeline keeps that much and replays it
+   * into the voice detector when the word fires, so "hearth, turn it down" said in one breath is not clipped to
+   * "it down". The replay may include the tail of the wake word itself; the recogniser hearing "hearth" once more
+   * is harmless, and losing the first word of the command is not.
+   */
+  readonly preRollMs?: number;
 }
 
 export type VadEvent =

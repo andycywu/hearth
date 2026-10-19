@@ -8,13 +8,23 @@
 import { summarizeOutcome, type Agent } from "@hearthkit/core";
 import type { PlatformProvider } from "@hearthkit/platform-api";
 import type { RingState, StatusRing } from "@hearthkit/adapter-linux";
-import { matchWake } from "./wake.js";
+import { addressedTo, matchWake } from "./wake.js";
 
 export interface ListenOptions {
   ring?: StatusRing | undefined;
   wakeWord?: string | undefined;
   /** Spellings of the wake word a transcriber is known to produce; `false` for none. Default: the built-in ones. */
   wakeAliases?: readonly string[] | false | undefined;
+  /**
+   * A wake-word detector already decided each utterance was for us, so the transcript is the command and is not searched for
+   * the word. (A leading wake word, replayed from the detector's pre-roll, is still stripped.)
+   */
+  addressed?: boolean | undefined;
+  /**
+   * Called after "Yes?", when only the wake word was said: the host re-opens the recogniser for the answer, so the person is
+   * not made to say the word twice.
+   */
+  onBareWake?: (() => void) | undefined;
   /** One line per thing heard, for the terminal; omitted in --quiet / --json. */
   trace?: ((line: string) => void) | undefined;
 }
@@ -89,19 +99,19 @@ export function listenForever(
 
   voice.onTranscript((text, isFinal) => {
     if (!isFinal || !text.trim()) return;
-    const match = matchWake(text, wakeWord, wakeAliases);
+    const match = opts.addressed ? addressedTo(text, wakeWord, wakeAliases) : matchWake(text, wakeWord, wakeAliases);
     const heard = match?.command;
     if (heard === undefined) {
       // Heard, transcribed, dropped: the room was talking, not to us.
       trace?.(`  🎤 (not for me) ${text}`);
       return;
     }
-    trace?.(match && match.via !== "word"
+    trace?.(match && typeof match.via === "object"
       ? `  🎤 ${text}   (taken as "${wakeWord}": heard "${match.via.alias}")`
       : `  🎤 ${text}`);
     if (!heard) {
       // The word alone. Acknowledge, so saying it and waiting is not silence.
-      busy = Promise.resolve(voice.speak("Yes?")).catch(() => {});
+      busy = Promise.resolve(voice.speak("Yes?")).catch(() => {}).then(() => opts.onBareWake?.());
       return;
     }
     busy = handle(heard).catch(() => { /* handle reports its own failures */ });

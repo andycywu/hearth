@@ -98,6 +98,74 @@ describe("pipeline: wake word", () => {
   });
 });
 
+describe("pipeline: a wake word that answers late", () => {
+  /** A VAD that records exactly which chunks it was given, in order. */
+  const recordingVad = (seen: Uint8Array[]) => ({
+    name: "recording-vad",
+    accept: (chunk: Uint8Array) => { seen.push(chunk); return []; },
+    reset: () => {},
+  });
+
+  it("replays the audio spoken while it was deciding, then carries on — so the command is not clipped to its last words", async () => {
+    const chunks = hundredMs(6);
+    const seen: Uint8Array[] = [];
+    const wake = fakeWake(3, { preRollMs: 200 });                 // fires on the fourth chunk, asks for 200 ms before it
+    const p = createPipeline({ input: fakeAudioInput(chunks), stt: fakeStt({ finals: [] }), vad: recordingVad(seen), wake });
+    await p.run();
+    // The two chunks before the one it fired on, the firing chunk itself, then the rest of the stream.
+    expect(seen).toEqual([chunks[1], chunks[2], chunks[3], chunks[4], chunks[5]]);
+    expect(seen[0]).toBe(chunks[1]);
+  });
+
+  it("without a pre-roll the audio resumes after the word, as it always did", async () => {
+    const chunks = hundredMs(6);
+    const seen: Uint8Array[] = [];
+    const p = createPipeline({ input: fakeAudioInput(chunks), stt: fakeStt({ finals: [] }), vad: recordingVad(seen), wake: fakeWake(3) });
+    await p.run();
+    expect(seen).toEqual([chunks[4], chunks[5]]);
+  });
+
+  it("holds only as much audio as it was asked to, not the whole stream", async () => {
+    const chunks = hundredMs(40);
+    const seen: Uint8Array[] = [];
+    const p = createPipeline({ input: fakeAudioInput(chunks), stt: fakeStt({ finals: [] }), vad: recordingVad(seen), wake: fakeWake(30, { preRollMs: 300 }) });
+    await p.run();
+    expect(seen.length).toBe(3 + 1 + 9);                          // 300 ms before, the firing chunk, nine more
+  });
+
+  it("loads the detector before the first chunk and closes it when the pipeline ends, even on a failure", async () => {
+    const wake = fakeWake(99);
+    const stt = fakeStt({ finals: [] });
+    const p = createPipeline({ input: fakeAudioInput(hundredMs(2), { failAfter: 1 }), stt, vad: fakeVad({}), wake });
+    await expect(p.run()).rejects.toThrow(/disconnected/);
+    expect(wake.order).toEqual(["wake.load", "wake.close"]);
+    expect(stt.loaded && stt.closed).toBe(true);
+  });
+});
+
+describe("pipeline: arming without a wake word", () => {
+  // After "Yes?" the host is waiting for the answer; making the person say the wake word twice would be absurd.
+  it("takes the next utterance when the host arms it, once, and then waits for the wake word again", async () => {
+    const stt = fakeStt({ finals: ["answer", "second"] });
+    const vad = fakeVad({ ...speech(1, 3), ...speech(4, 6) });
+    const p = createPipeline({ input: fakeAudioInput(hundredMs(8)), stt, vad, wake: fakeWake(99) });
+    const got = collect(p);
+    p.arm();
+    await p.run();
+    expect(got.map((t) => t.text)).toEqual(["answer"]);          // the second utterance needed a wake word and had none
+    expect(stt.starts).toBe(1);
+  });
+
+  it("does nothing when there is no wake word: everything is already accepted", async () => {
+    const stt = fakeStt({ finals: ["a"] });
+    const p = createPipeline({ input: fakeAudioInput(hundredMs(6)), stt, vad: fakeVad(speech(1, 4)) });
+    const got = collect(p);
+    p.arm();
+    await p.run();
+    expect(got.map((t) => t.text)).toEqual(["a"]);
+  });
+});
+
 describe("pipeline: without a VAD", () => {
   it("feeds a streaming engine the raw stream and passes its finals through", async () => {
     const stt = fakeStt({ finals: [], partials: ["he", "hello"] });

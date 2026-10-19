@@ -41,6 +41,12 @@ export interface Pipeline {
   run(): Promise<void>;
   stop(): Promise<void>;
   onTranscript(cb: (t: Transcript) => void): () => void;
+  /**
+   * Accept the next utterance without the wake word — for a host that has just asked a question ("Yes?") and is
+   * waiting for the answer. Like a detection, it lasts `wakeWindowMs` of audio and one utterance. Without a wake word
+   * configured everything is already accepted and this does nothing.
+   */
+  arm(): void;
 }
 
 export function createPipeline(opts: PipelineOptions): Pipeline {
@@ -65,6 +71,16 @@ export function createPipeline(opts: PipelineOptions): Pipeline {
   let utteranceStartMs = 0;
   let utteranceWall = 0;
   let failures = 0;
+  // The last `preRollMs` of audio, for a wake word that answers late (see WakeWordDetector.preRollMs).
+  const preRollMs = wake?.preRollMs ?? 0;
+  const recent: Array<{ chunk: Uint8Array; ms: number }> = [];
+  let recentMs = 0;
+  const remember = (chunk: Uint8Array, ms: number): void => {
+    if (preRollMs <= 0) return;
+    recent.push({ chunk, ms });
+    recentMs += ms;
+    while (recent.length > 1 && recentMs - recent[0]!.ms >= preRollMs) recentMs -= recent.shift()!.ms;
+  };
 
   const emit = (r: SttResult, startMs: number, endMs: number): Transcript => {
     const t: Transcript = {
@@ -140,6 +156,14 @@ export function createPipeline(opts: PipelineOptions): Pipeline {
   return {
     onTranscript(cb) { listeners.add(cb); return () => listeners.delete(cb); },
 
+    arm() {
+      if (!wake) return;
+      armedUntilMs = streamMs + wakeWindowMs;
+      vad?.reset();
+      recent.length = 0; recentMs = 0;      // what was heard before the host asked is not the answer
+      log({ event: "armed", reason: "host", at_ms: Math.round(streamMs) });
+    },
+
     async stop() {
       stopped = true;
       await session?.abort().catch(() => {});
@@ -151,6 +175,7 @@ export function createPipeline(opts: PipelineOptions): Pipeline {
       // Loading is the slow, silent part (~20 s on a Pi 3B): say it has begun, so something can show it.
       log({ event: "pipeline_loading", backend: stt.backend, model: stt.model });
       await stt.load();
+      await wake?.load?.();      // both are awaited before the first chunk; the slower of the two is the wait a person feels
       log({
         event: "pipeline_started", backend: stt.backend, model: stt.model,
         vad: vad?.name ?? null, wake: wake?.name ?? null, rss_mb: opts.rssMb?.(), engine_rss_mb: stt.rssMb?.(),
@@ -167,6 +192,16 @@ export function createPipeline(opts: PipelineOptions): Pipeline {
               armedUntilMs = streamMs + wakeWindowMs;
               vad?.reset();
               log({ event: "wake", detector: wake.name, at_ms: Math.round(streamMs) });
+              // What was said while the detector was making up its mind goes to the voice detector first, in order,
+              // then this chunk — so the command starts where the person started it, not where the detector decided.
+              const replay = recent.map((r) => r.chunk);
+              recent.length = 0; recentMs = 0;
+              if (vad && preRollMs > 0) {      // a detector that did not ask for a replay gets the old behaviour: audio resumes after the word
+                for (const old of replay) await handleVad(vad.accept(old));
+                await handleVad(vad.accept(chunk));
+              }
+            } else {
+              remember(chunk, chunk.byteLength / bytesPerMs);
             }
             continue;                             // STT stays idle until armed
           }
@@ -193,6 +228,7 @@ export function createPipeline(opts: PipelineOptions): Pipeline {
         await session?.abort().catch(() => {});
         await single?.abort().catch(() => {});
         await stt.close().catch(() => {});
+        await wake?.close?.().catch(() => {});
         log({ event: "pipeline_stopped", backend: stt.backend });
       }
     },

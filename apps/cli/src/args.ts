@@ -46,6 +46,12 @@ export interface CliOptions {
    * this is the honest thing that can be done with the transcript instead.
    */
   wakeWord?: string;
+  /**
+   * Who decides an utterance was for us. `kws`: a keyword spotter on this box hears the wake word before anything is
+   * recognised, so a hosted recogniser is only ever given what was said to Hearth. `transcript` (the default): the word is
+   * looked for in what a recogniser returned, which means everything with sound in it is recognised — and paid for — first.
+   */
+  wakeDetector?: "kws" | "transcript";
   /** Spellings of the wake word a transcriber is known to produce (`HEARTH_WAKE_ALIASES`); `false` for none, absent for the built-in list. See wake.ts. */
   wakeAliases?: readonly string[] | false;
   /**
@@ -196,6 +202,11 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (env.HEARTH_VOICE === "1") opts.voice = true;
   if (env.HEARTH_LEDS === "1") opts.leds = true;
   if (env.HEARTH_WAKE) opts.wakeWord = env.HEARTH_WAKE;
+  if (env.HEARTH_WAKE_DETECTOR) {
+    const d = env.HEARTH_WAKE_DETECTOR.trim().toLowerCase();
+    if (d === "kws" || d === "transcript") opts.wakeDetector = d;
+    else opts.warnings.push(`HEARTH_WAKE_DETECTOR must be kws or transcript (got "${env.HEARTH_WAKE_DETECTOR}") — ignored`);
+  }
   { const a = parseWakeAliases(env.HEARTH_WAKE_ALIASES); if (a !== undefined) opts.wakeAliases = a; }
   if (env.MODELPILOT_TARGET) {
     const t = env.MODELPILOT_TARGET.trim().toLowerCase();
@@ -240,6 +251,13 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       case "--wake": { const v = takeValue("--wake"); if (v !== undefined) opts.wakeWord = v.trim() || undefined; break; }
       case "--no-wake": delete opts.wakeWord; break;
       case "--no-wake-aliases": opts.wakeAliases = false; break;
+      case "--wake-detector": {
+        const v = takeValue("--wake-detector");
+        if (v === undefined) break;
+        if (v !== "kws" && v !== "transcript") opts.errors.push(`--wake-detector must be kws or transcript (got "${v}")`);
+        else opts.wakeDetector = v;
+        break;
+      }
       case "--out": { const v = takeValue("--out"); if (v !== undefined) opts.out = v; break; }
       case "--writes": opts.writes = true; break;
       case "--realtime": opts.realtime = true; break;
@@ -463,6 +481,9 @@ OPTIONS
       --wake <word>       act only on what is said after this word is heard;
                           everything else is transcribed and dropped
       --no-wake           act on everything heard
+      --wake-detector <d> kws|transcript — who decides it was for us. kws runs a small keyword model on this box before
+                          anything is recognised, so a hosted recogniser is only sent what was said after the wake word
+                          (needs HEARTH_KWS_MODEL_PATH; see docs/edge-voice.md). Default: transcript
       --no-wake-aliases   accept only the exact wake word, not spellings a transcriber is known to produce
                           for it ("Hard, turn it down" counts for "hearth" by default; $HEARTH_WAKE_ALIASES=a,b replaces the list)
       --cec <device>      CEC adapter to discover with (default /dev/cec0, linux)

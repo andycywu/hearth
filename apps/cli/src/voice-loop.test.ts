@@ -135,6 +135,29 @@ describe("the voice loop, with a scripted microphone", () => {
     expect(outputs).toHaveLength(1);
   });
 
+  // A wake-word detector decided before anything was recognised, so the transcript is the command and is not searched for the word.
+  it("with a detector, acts on a transcript that never contains the wake word", async () => {
+    const { agent, platform } = await livingRoom();
+    const { voice, done } = scriptedMicrophone(["turn it down"]);
+    const trace: string[] = [];
+    const outputs: string[] = [];
+    const loop = listenForever(voice, async (c) => { outputs.push(await answer(agent, c)); }, { wakeWord: "hearth", addressed: true, trace: (l) => trace.push(l) });
+    await done; await settle(); await loop.stop();
+    expect(trace).toEqual(["  🎤 turn it down"]);                       // not "(not for me)"
+    expect(outputs).toHaveLength(1);
+    expect(await platform.system.getVolume()).toBeLessThan(40);
+  });
+
+  it("with a detector, the word alone is answered with \"Yes?\" and then the recogniser is re-opened, so it need not be said twice", async () => {
+    const { agent } = await livingRoom();
+    const { voice, spoken, done } = scriptedMicrophone(["Hearth", "Hard.", "turn it down"]);
+    let rearmed = 0;
+    const loop = listenForever(voice, async (c) => { await answer(agent, c); }, { wakeWord: "hearth", addressed: true, onBareWake: () => { rearmed++; } });
+    await done; await settle(); await loop.stop();
+    expect(spoken.filter((s) => s === "Yes?")).toHaveLength(2);        // "Hearth" and "Hard." (the recogniser's spelling of it)
+    expect(rearmed).toBe(2);
+  });
+
   it("with no attention word, acts on everything", async () => {
     const { agent } = await livingRoom();
     const { voice, done } = scriptedMicrophone(["turn it down"]);

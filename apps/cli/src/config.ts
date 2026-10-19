@@ -12,6 +12,7 @@
  * quietest voice, so anything someone types still wins.
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { kwsConfigAsEnv, type KwsConfig } from "./kws-config.js";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -27,6 +28,10 @@ export interface HearthConfig {
   leds?: boolean;
   /** Attention word; see `CliOptions.wakeWord`. */
   wakeWord?: string;
+  /** `kws`: a keyword spotter on this box decides what is for us before anything is recognised; `transcript` (default): the word is looked for afterwards. */
+  wakeDetector?: "kws" | "transcript";
+  /** The keyword spotter `wakeDetector: "kws"` runs: where its model is and how it is started. See kws-config.ts. */
+  kws?: KwsConfig;
   /** Extra spellings of the wake word, or `false` for none; see wake.ts. */
   wakeAliases?: string[] | false;
   llmBaseUrl?: string;
@@ -83,6 +88,8 @@ export function configAsEnv(config: HearthConfig): Record<string, string> {
   if (config.voice) env.HEARTH_VOICE = "1";
   if (config.leds) env.HEARTH_LEDS = "1";
   if (config.wakeWord) env.HEARTH_WAKE = config.wakeWord;
+  if (config.wakeDetector) env.HEARTH_WAKE_DETECTOR = config.wakeDetector;
+  Object.assign(env, kwsConfigAsEnv(config.kws));
   if (config.wakeAliases !== undefined) env.HEARTH_WAKE_ALIASES = config.wakeAliases === false ? "off" : config.wakeAliases.join(",");
   if (config.modelpilot) env.MODELPILOT_TARGET = config.modelpilot;
   if (config.streamSpeech) env.HEARTH_STREAM_SPEECH = "1";

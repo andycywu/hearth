@@ -69,22 +69,33 @@ hearth stt bench bench/stt/tv-commands.json --realtime --out ~/stt-run
   of the audio to the text, resident memory, `get_throttled` before and after.
 - **Known so far:** real-time factor 0.43–0.48 and ~0.3 s to final text on files; **no number exists for a person.**
 
-### V4 — how the wake word is spelled (do this early)
+### V4 — does it wake for you? (do this early)
 
-Everything after depends on it. Say **"hearth, turn it down"** ten times, then **"hearth"** alone five times, then the same
-in a flat tone and a quick one.
+Everything after depends on it. There are now two ways the word is heard; test the one you will use, and the other if you want to compare.
+
+**4a. The keyword spotter** (`--wake-detector kws`; nothing is recognised, or sent anywhere, until it fires):
 
 ```sh
-hearth --voice          # watch the 🎤 lines
+systemctl --user stop hearth
+HEARTH_KWS_MODEL_PATH=~/kws/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20 HEARTH_KWS_PYTHON=~/kws/venv/bin/python \
+  hearth --platform linux --voice --asr local --wake-detector kws          # free: recognition on the box too
 ```
 
-- **Record:** every transcription, verbatim.
-- **Known:** "hearth, turn off the light" was heard as **"Hard turn off light."** and dropped. Aliases now exist
-  (`hard`, `harth`, `hart`, `heart`, `hurth`, `herth`) and count only as the **first word with a command after it**; a
-  line taken that way is marked `(taken as "hearth": heard "hard")`.
-- **Decide from the numbers:** if more than two in ten need an alias, change the wake word (a word the transcriber can
-  spell) instead of widening the list. Widening it widens what a television's dialogue can trigger.
-- **Also test Chinese** if you use a Chinese wake word: `hearth setup --wake 小爐` and say it ten times.
+Say **"hearth, turn it down"** twenty times, **"hearth"** alone ten times (it should answer "Yes?" and take the next thing you say without
+the word), and a flat tone and a quick one. Then ten sentences that are *not* for it, including "that's hard to say" and "I love you with
+all my heart".
+
+- **Record:** how many of the 20 woke it; what it did with the lone "hearth"; how many of the ten others woke it.
+- **Why this is the interesting test:** it was measured only with a synthetic voice (3/3 wake, 0/4 for the lookalikes). People are not
+  Piper. If it misses you, try `HEARTH_KWS_CHUNK=8` before touching the threshold — looser thresholds did *worse* on the synthetic voice.
+- **Known:** espeak-ng's robot voice never fires it (0/8), which is why the pre-recorded self-test (V2) uses your own voice.
+
+**4b. The transcript** (`--wake-detector transcript`, the default; everything with sound in it is recognised first): say "hearth, turn it down"
+ten times and record every transcription verbatim. "hearth, turn off the light" was once heard as **"Hard turn off light."**; aliases
+(`hard`, `harth`, `hart`, `heart`, `hurth`, `herth`) count only as the **first word with a command after it** and a taken line is marked
+`(taken as "hearth": heard "hard")`. If more than two in ten need an alias, prefer 4a, or change the wake word to one the transcriber can spell.
+
+**Also test Chinese** if you use a Chinese wake word — that is 4b only; the keyword spotter takes English words.
 
 ### V5 — volume by voice
 

@@ -38,7 +38,7 @@ export interface EdgeListenerOptions {
   gate: { setOpen(open: boolean): void };
 }
 
-export function createEdgeListener(o: EdgeListenerOptions): SpeechListener & { stop(): Promise<void> } {
+export function createEdgeListener(o: EdgeListenerOptions): SpeechListener & { stop(): Promise<void>; arm(): void } {
   let started = false;
   let running: Promise<void> = Promise.resolve();
   let fault: Error | undefined;
@@ -69,6 +69,9 @@ export function createEdgeListener(o: EdgeListenerOptions): SpeechListener & { s
   };
 
   return {
+    /** Take the next utterance without the wake word; see `Pipeline.arm`. */
+    arm() { o.pipeline.arm(); },
+
     listen() {
       if (fault) return Promise.reject(fault);
       start();

@@ -311,3 +311,69 @@ describe("a hosted transcriber", () => {
     expect(await loadConfig(p.configPath)).toMatchObject({ voice: true, modelpilot: "official", asrBaseUrl: "https://api.openai.com/v1" });
   });
 });
+
+describe("the wake-word detector in setup", () => {
+  const PI = { "/proc/device-tree/model": "Raspberry Pi 3 Model B Rev 1.2\0" };
+  const piRun: Runner = async (cmd, args) => {
+    switch (cmd) {
+      case "wpctl": return ok("Volume: 0.20\n");
+      case "cec-ctl": return args.includes("--version") ? ok("cec-ctl 1.30.1\n") : ok("Topology:\n    0.0.0.0: TV\n");
+      case "id": return ok("pi video\n");
+      case "arecord": return ok("card 1: seeed4micvoicec\n");
+      case "espeak-ng": return ok("eSpeak NG 1.52\n");
+      default: return missing;
+    }
+  };
+  const MODEL = "/home/pi/kws/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20";
+  const deps = (p: { configPath: string; unitPath: string }, over: Record<string, unknown> = {}) => ({
+    ...p, run: piRun, readFile: async (f: string) => PI[f as keyof typeof PI] ?? "",
+    exists: async (f: string) => f === "/dev/cec0" || f === MODEL || f.endsWith("hearth_kws.py"),
+    nodeVersion: "v26.8.2", nodePath: "/n", cliPath: "/c", ...over,
+  });
+
+  it("remembers the detector and where its model is, so the service finds it and a re-run from another shell does not lose it", async () => {
+    const p = await paths();
+    const first = await io();
+    await runSetup(
+      parseArgs(["--platform", "linux", "setup", "--asr", "openai", "--wake-detector", "kws"], { TV_AGENT_API_KEY: "sk-test" }),
+      first.sink, deps(p, { env: { HEARTH_KWS_MODEL_PATH: MODEL, HEARTH_KWS_PYTHON: "/home/pi/kws/venv/bin/python", HEARTH_KWS_THRESHOLD: "0.3" } }),
+    );
+    expect(first.out.join("")).toMatch(/✓ Wake word\s+a keyword spotter on this box \(sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20\) listens for "hearth"; nothing is recognised until it hears it/);
+    const config = await loadConfig(p.configPath);
+    expect(config).toMatchObject({ voice: true, wakeWord: "hearth", wakeDetector: "kws", kws: { modelPath: MODEL, python: "/home/pi/kws/venv/bin/python", threshold: 0.3 } });
+    expect(JSON.stringify(config)).not.toContain("sk-test");
+
+    // Later, from a plain shell with no HEARTH_KWS_* and nothing on the command line: what was remembered stands.
+    const again = parseArgs(["--platform", "linux", "setup", "--modelpilot", "official"], configAsEnv(config));
+    const envFile = join(dirname(p.configPath), "env");     // the key is in the file the service reads, not in this shell
+    await runSetup(again, (await io()).sink, deps(p, { env: {}, readFile: async (f: string) => f === envFile ? "TV_AGENT_API_KEY=sk-test\n" : PI[f as keyof typeof PI] ?? "" }));
+    expect(await loadConfig(p.configPath)).toMatchObject({ wakeDetector: "kws", kws: { modelPath: MODEL }, modelpilot: "official", voice: true });
+    // And the config, read back as environment, is what main hands the resolver.
+    expect(configAsEnv(config)).toMatchObject({ HEARTH_WAKE_DETECTOR: "kws", HEARTH_KWS_MODEL_PATH: MODEL });
+  });
+
+  it("when it cannot be started, says what is missing and does not switch the detector on — nor quietly switch it off if it was on", async () => {
+    const p = await paths();
+    const a = await io();
+    await runSetup(
+      parseArgs(["--platform", "linux", "setup", "--asr", "openai", "--wake-detector", "kws"], { TV_AGENT_API_KEY: "sk-test" }),
+      a.sink, deps(p, { env: {} }),
+    );
+    const page = a.out.join("");
+    expect(page).toMatch(/~ Wake word\s+HEARTH_KWS_MODEL_PATH is not set/);
+    expect(page).toContain("sends everything with sound in it to the recogniser");
+    expect((await loadConfig(p.configPath)).wakeDetector).toBeUndefined();
+    expect((await loadConfig(p.configPath)).voice).toBe(true);           // it still listens, the old way; it is not made deaf
+  });
+
+  it("an English wake word only: a Chinese one is refused with the way out, not sent to a lexicon that cannot spell it", async () => {
+    const p = await paths();
+    const a = await io();
+    await runSetup(
+      parseArgs(["--platform", "linux", "setup", "--asr", "openai", "--wake-detector", "kws", "--wake", "小爐"], { TV_AGENT_API_KEY: "sk-test" }),
+      a.sink, deps(p, { env: { HEARTH_KWS_MODEL_PATH: MODEL } }),
+    );
+    expect(a.out.join("")).toMatch(/English wake word.*--wake-detector transcript/);
+    expect((await loadConfig(p.configPath)).wakeDetector).toBeUndefined();
+  });
+});

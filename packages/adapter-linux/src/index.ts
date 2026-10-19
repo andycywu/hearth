@@ -172,7 +172,9 @@ export {
 } from "./cec.js";
 export {
   createSherpaStt, sherpaServerCommand, createArecordInput, createWavFileInput, createEdgeListener, gateInput, systemSpawner,
-  type SherpaSttOptions, type SherpaServerCommand, type Spawner, type SpawnedProcess,
+  createKwsDetector, createTranscriberEngine,
+  type SherpaSttOptions, type SherpaServerCommand, type Spawner, type SpawnedProcess, type KwsDetector, type KwsDetectorOptions,
+  type TranscriberEngineOptions,
 } from "./stt/index.js";
 export {
   CEC_COMMANDS, CEC_LAB_TIMEOUT_MS, labContext, findCommand, runCecCommand, runCecRaw, diagnoseCec, validateRawArgs,

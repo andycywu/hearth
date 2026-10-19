@@ -18,6 +18,7 @@ import { dirname, join } from "node:path";
 import { createLinuxCecTransport, describeHost, detectAudioBackend, detectVoice, systemRunner, type Runner } from "@hearthkit/adapter-linux";
 import type { CliOptions } from "./args.js";
 import { configPath, loadConfig, saveConfig, type HearthConfig } from "./config.js";
+import { kwsConfigAsEnv, kwsConfigFromEnv, kwsEnv, resolveKws } from "./kws-config.js";
 
 export interface SetupIo {
   out: (text: string) => void;
@@ -153,6 +154,25 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
 
   // --- what the next `hearth` will do -----------------------------------------
   const previous = await loadConfig(path);
+
+  // The wake-word detector. Remembered with its model path in config.json — like the voice, and for the same reason: a re-run
+  // from a shell that does not have HEARTH_KWS_MODEL_PATH must not quietly drop what a working box was doing.
+  const wantKws = (opts.wakeDetector ?? previous.wakeDetector) === "kws";
+  let kwsConfig: HearthConfig["kws"] | undefined;
+  if (wantKws) {
+    const merged = { ...kwsConfigAsEnv(previous.kws), ...kwsEnv(deps.env ?? process.env) };   // the environment wins
+    const word = opts.wakeWord ?? previous.wakeWord ?? "hearth";
+    const found = await resolveKws(merged, word, exists);
+    if (found.ok) {
+      kwsConfig = kwsConfigFromEnv(merged);
+      findings.push({ what: "Wake word", ok: true, detail: `a keyword spotter on this box (${found.settings.modelDir.split("/").pop()}) listens for "${word}"; nothing is recognised until it hears it` });
+    } else {
+      findings.push({
+        what: "Wake word", ok: "partial", detail: found.why,
+        fix: "Install the detector (see docs/edge-voice.md, \"A wake word that runs on the box\"), then run setup again with HEARTH_KWS_MODEL_PATH set. Until then the word is looked for in the transcript, which sends everything with sound in it to the recogniser.",
+      });
+    }
+  }
   const config: HearthConfig = {
     ...previous,
     platform: "linux",
@@ -170,6 +190,8 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
     ...(heard.capture && asr && !keyMissing && (!local || localReady) ? { wakeWord: opts.wakeWord ?? previous.wakeWord ?? "hearth" } : {}),
     ...(opts.baseUrl ? { llmBaseUrl: opts.baseUrl } : {}),
     ...(opts.modelpilot ? { modelpilot: opts.modelpilot } : {}),
+    // `kws` only when it can actually start; a request that cannot be honoured leaves what was there alone and says so above.
+    ...(wantKws && kwsConfig ? { wakeDetector: "kws" as const, kws: kwsConfig } : opts.wakeDetector === "transcript" ? { wakeDetector: "transcript" as const } : {}),
     ...(opts.baseUrl && opts.model ? { llmModel: opts.model } : {}),
     writtenBy: `hearth setup, Node ${node}`,
     writtenAt: new Date().toISOString(),

@@ -29,7 +29,7 @@ memory of every utterance.
 |---|---|---|
 | Audio in | `AudioInput` | `arecord` streaming raw PCM (`adapter-linux/src/stt/arecord-input.ts`); a scripted fake for tests |
 | Preprocessing (AEC / NS / AGC) | `AudioPreprocessor` | the interface only. `HEARTH_AUDIO_PREPROCESSING_ENABLED=true` is accepted and *says it does nothing* |
-| Wake word | `WakeWordDetector` | the interface only. `HEARTH_WAKE_WORD_ENABLED=true` likewise. The CLI's existing text attention word (`--wake`) is unchanged and lives above this |
+| Wake word | `WakeWordDetector` | **a keyword spotter that runs on the box** (`createKwsDetector`, `tools/kws/hearth_kws.py`) — see [A wake word that runs on the box](#a-wake-word-that-runs-on-the-box). The CLI's text attention word (`--wake`) still works without it, by searching the transcript |
 | VAD | `VoiceActivityDetector` | an energy gate (`createEnergyVad`) — see the caveat below |
 | Speech to text | `SpeechToTextEngine` | sherpa-onnx, over its websocket server. `whisper` and `vosk` are reserved names, not built |
 | Transcript | `Transcript` | `{ text, language, isFinal, confidence, startTimeMs, endTimeMs, backend }` |
@@ -142,6 +142,62 @@ Hearth starts the server itself and stops it on exit. Starting takes **about
 `pipeline_started` line is the signal it is listening. The server stays up for
 the life of the process — it is not restarted per utterance, which would make
 every sentence wait for the model.
+
+## A wake word that runs on the box
+
+**Why.** The attention word began as a filter on a transcript: every window with sound in it went to a recogniser — a hosted,
+paid one, by default — and the word was looked for in what came back. A television, a conversation in the next room and a
+recogniser's habit of inventing "thanks for watching" for noise (the Pi's log showed Japanese sign-offs for a quiet room) each
+cost a request. A wake word is supposed to be heard *before* anything is recognised, by something small that runs all the time
+and knows one phrase. With `--wake-detector kws` that is what happens, and **a hosted recogniser is only ever sent what was said
+after the wake word**.
+
+**What runs.** sherpa-onnx's keyword spotter — a ~5 MB streaming zipformer, on the CPU, 10 s to load on a Pi 3B — as a child
+process (`tools/kws/hearth_kws.py`): raw 16 kHz PCM in on stdin, one JSON line per detection out. Python because that is what
+the library ships for; nothing else in Hearth needs it, and a box without it **says so and does not listen** instead of quietly
+falling back to sending everything. The pipeline keeps the recogniser idle until it fires, replays the last 800 ms into the voice
+detector (the model needs a little trailing audio before it is sure, so the person has usually begun the command — without the
+replay "hearth, turn it down" arrives as "it down"), then recognises one utterance and goes back to waiting. The recogniser is either
+the on-box model (`--asr local`, nothing leaves the box) or an OpenAI-schema endpoint (`--asr openai` / `--asr <url>`), and then:
+a recording shorter than 400 ms, or whose level never rose above the room (rms 0.01), is **not uploaded** and the trace says so.
+
+**Install** (about two and a half minutes of `pip`, 33 MB of model, on a Pi 3B):
+
+```sh
+mkdir -p ~/kws && cd ~/kws
+python3 -m venv venv && ./venv/bin/pip install sherpa-onnx numpy
+curl -L -o m.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2
+tar xjf m.tar.bz2
+
+export HEARTH_KWS_PYTHON=~/kws/venv/bin/python HEARTH_KWS_MODEL_PATH=~/kws/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20
+hearth --platform linux setup --asr openai --wake-detector kws       # remembers all of it in config.json
+```
+
+The keyword is the `--wake` word, looked up in the model's English lexicon (`en.phone`) — "hearth" is there, as are "hard" and
+"heart", which is why the model does not confuse them (below). A word the lexicon does not know is an error naming the word. A
+Chinese wake word is refused with the way out (`--wake-detector transcript`): the helper builds English keywords only.
+Tuning is `HEARTH_KWS_THRESHOLD` (lower fires more easily; **leave it at the model's 0.25** — see below), `_SCORE`, `_CHUNK` (16, or 8
+for an earlier answer at more CPU) and `_PREROLL_MS`.
+
+**What has been measured (2026-10-19, Pi 3B; synthetic voices only — a person has not been heard).**
+
+| | Result |
+|---|---|
+| load | ~10 s; the helper is ready when it prints `ready` and the pipeline waits for it |
+| a neural voice (Piper "amy") saying "hearth", "hearth, turn it down", "hearth what time is it" | detected, 3 of 3, at the default threshold |
+| the same voice saying "the weather is nice today", "I love you with all my heart", "that is hard to say", "turn the volume down please" | **0 of 4** — "heart" and "hard" do not fire it |
+| "my fireplace hearth is warm" | fires, correctly: it contains the word |
+| espeak-ng's robot voice, four voices | **0 of 8** at the default, and at thresholds 0.1 and 0.05 — a robot is not evidence of anything about people, but it is why the pre-recorded self-test cannot use it |
+| looser settings on the neural voice (threshold 0.1 / score 3, and 0.05 / 5) | *worse*: "hearth" alone stopped firing. The default stays |
+| end to end on the Pi, through the real pipeline: a 17.6 s recording of four sentences that are not for it, then "hearth what time is it" | the voice detector heard all five; the detector fired **once**, on the fifth; the recogniser ran **once**, on "WHAT TIME IS IT". The other four never reached it. `get_throttled` read `0x70000` afterwards: under-voltage and throttling had happened while sherpa, the helper and node were all loading |
+
+Not measured, and the reason this is not marked verified: **any human voice**. Whether it wakes for *you*, from 3 m, over a
+television, and how often it fires for someone else, is V4, V11 and V12 in [`VOICE_TEST_PLAN.md`](VOICE_TEST_PLAN.md).
+
+**Two behaviours of the loop worth knowing.** A transcript that arrives after a detection is taken as the command whether or not it
+contains the word (a leading "hearth", from the replay, is stripped); and if all the person said was the word — "Hearth?", or
+"Hard." as the recogniser spelled it — Hearth says "Yes?" and **re-opens the recogniser for the answer** (`Pipeline.arm`), so the
+word is not made to be said twice.
 
 ## Measuring: benchmark mode
 

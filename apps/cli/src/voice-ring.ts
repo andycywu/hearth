@@ -13,6 +13,7 @@ export function ringForPipelineEvent(e: LogEvent): RingState | undefined {
   switch (e.event) {
     case "pipeline_loading": return "loading";          // the model is being read into memory
     case "pipeline_started": return "listening";        // loaded: ready, and still
+    case "wake": return "hearing";                      // the wake word was heard: whoever said it is about to say the rest
     case "speech_started": return "hearing";            // someone is talking
     case "speech_ended": return "recognizing";          // they stopped; the words are being worked out
     case "stt_empty": return "listening";               // nothing there after all: back to rest

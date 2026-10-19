@@ -26,8 +26,8 @@ const BREAK = "\\s,.!?;:\"'，。！？、";
 export interface WakeMatch {
   /** What was asked, with the wake word and its punctuation removed. May be empty: the word alone. */
   command: string;
-  /** `word` for the wake word itself; the alias that stood in for it otherwise. */
-  via: "word" | { alias: string };
+  /** `word` for the wake word itself; the alias that stood in for it; `detector` when a wake-word detector had already decided. */
+  via: "word" | "detector" | { alias: string };
 }
 
 export function matchWake(text: string, wakeWord: string | undefined, aliases?: readonly string[] | false): WakeMatch | undefined {
@@ -51,6 +51,23 @@ export function matchWake(text: string, wakeWord: string | undefined, aliases?: 
   if (!known.includes(alias)) return undefined;
   const command = tidy(first[2]!);
   return command ? { command, via: { alias } } : undefined;
+}
+
+/**
+ * An utterance that a wake-word *detector* has already addressed to us.
+ *
+ * The words in it are the command, with perhaps the tail of the wake word at the front (the detector answers late, so the
+ * audio it hands over is replayed from a little before it fired). Strip the word if it is there; either way the whole
+ * utterance is for us, because the decision was not made from the transcript.
+ */
+export function addressedTo(text: string, wakeWord: string | undefined, aliases?: readonly string[] | false): WakeMatch {
+  const found = matchWake(text, wakeWord, aliases);
+  if (found) return found;
+  // The word alone, as the recogniser spelled it: "Hard." after the detector fired is the wake word, not a command to run.
+  const bare = tidy(text.trim()).toLowerCase();
+  const known = aliases === false ? [] : (aliases ?? BUILTIN_ALIASES[wakeWord?.trim().toLowerCase() ?? ""] ?? []);
+  if (bare && known.some((a) => a.trim().toLowerCase() === bare)) return { command: "", via: { alias: bare } };
+  return { command: tidy(text.trim()), via: "detector" };
 }
 
 export function afterWakeWord(text: string, wakeWord: string | undefined, aliases?: readonly string[] | false): string | undefined {

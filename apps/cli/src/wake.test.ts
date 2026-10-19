@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { afterWakeWord, matchWake, parseWakeAliases } from "./wake.js";
+import { addressedTo, afterWakeWord, matchWake, parseWakeAliases } from "./wake.js";
 import { parseArgs } from "./args.js";
 import { configAsEnv } from "./config.js";
 
@@ -72,5 +72,19 @@ describe("spellings a transcriber produces for the wake word", () => {
     expect(parseArgs(["hi"], configAsEnv({ wakeAliases: ["harth"] })).wakeAliases).toEqual(["harth"]);
     expect(parseArgs(["hi"], configAsEnv({ wakeAliases: false })).wakeAliases).toBe(false);
     expect(parseArgs(["--no-wake-aliases", "hi"], configAsEnv({ wakeAliases: ["harth"] })).wakeAliases).toBe(false);
+  });
+});
+
+describe("an utterance a detector already addressed to us", () => {
+  it("is the command, whether or not the replayed audio still has the wake word's tail on the front", () => {
+    expect(addressedTo("turn it down", "hearth")).toEqual({ command: "turn it down", via: "detector" });
+    expect(addressedTo("Hearth, turn it down", "hearth")).toMatchObject({ command: "turn it down", via: "word" });
+    expect(addressedTo("Hard turn it down", "hearth")).toMatchObject({ command: "turn it down", via: { alias: "hard" } });
+  });
+
+  it("treats the word alone — as the recogniser spelled it — as the wake word, not as a command to run", () => {
+    expect(addressedTo("Hearth?", "hearth").command).toBe("");
+    expect(addressedTo("Hard.", "hearth")).toEqual({ command: "", via: { alias: "hard" } });
+    expect(addressedTo("Hard.", "hearth", false)).toMatchObject({ command: "Hard", via: "detector" });   // aliases off: it is just a word
   });
 });

@@ -168,3 +168,14 @@ describe("the Linux voice pipeline with a listener", () => {
     expect(seen).toEqual([]);
   });
 });
+
+describe("edge listener: arming", () => {
+  it("passes arm() to the pipeline, so the host can take an answer without the wake word", () => {
+    let armed = 0;
+    const pipeline = { run: () => new Promise<void>(() => {}), stop: async () => {}, onTranscript: () => () => {}, arm: () => { armed++; } };
+    const gate = { setOpen: () => {} };
+    const l = createEdgeListener({ pipeline, gate });
+    l.arm(); l.arm();
+    expect(armed).toBe(2);
+  });
+});

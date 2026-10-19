@@ -25,7 +25,8 @@ import { assembleRoom } from "./room.js";
 import { runReport } from "./report.js";
 import { runSetup } from "./setup.js";
 import { runStt } from "./stt.js";
-import { createLocalListener, type LocalListener } from "./local-listener.js";
+import { createLocalListener, type LocalListener, type Recogniser } from "./local-listener.js";
+import { resolveKws } from "./kws-config.js";
 import { connectModelPilot, routerChatClient } from "./modelpilot.js";
 import { runModelPilotStatus } from "./modelpilot-targets.js";
 import { createStreamSpeaker } from "./speech-stream.js";
@@ -102,9 +103,22 @@ async function main(): Promise<number> {
   // `--asr local`: recognition on this box. Built before the platform so a missing
   // model is the first thing said, not the thing found after the agent is up.
   let local: LocalListener | undefined;
-  if (opts.voice && opts.platform === "linux" && opts.asrBaseUrl === "local") {
+  const wantKws = opts.voice && opts.platform === "linux" && opts.wakeDetector === "kws";
+  if (opts.voice && opts.platform === "linux" && (opts.asrBaseUrl === "local" || wantKws)) {
     try {
-      local = await createLocalListener({ ...env }, { err: (t) => { stderr.write(t); } }, { quiet: opts.quiet || opts.json, ring });
+      // A wake-word detector that cannot start is an error, never a fall back to sending everything: the whole point of
+      // asking for it was that the room's sound does not leave the box.
+      const kws = wantKws ? await resolveKws({ ...env }, opts.wakeWord) : undefined;
+      if (kws && !kws.ok) throw new Error(`--wake-detector kws: ${kws.why}`);
+      let recogniser: Recogniser = "local";
+      if (opts.asrBaseUrl && opts.asrBaseUrl !== "local") {
+        recogniser = { baseUrl: opts.asrBaseUrl, model: opts.asrModel, apiKey: opts.apiKey };
+      } else if (!opts.asrBaseUrl) {
+        throw new Error("--wake-detector kws hears the wake word; something still has to recognise what follows. Give --asr local, --asr openai or --asr <url>");
+      }
+      local = await createLocalListener({ ...env }, { err: (t) => { stderr.write(t); } }, {
+        quiet: opts.quiet || opts.json, ring, recogniser, ...(kws?.ok ? { kws: kws.settings } : {}),
+      });
     } catch (err) {
       stderr.write(`hearth: ${err instanceof Error ? err.message : String(err)}\n`);
       return 2;
@@ -257,6 +271,8 @@ async function main(): Promise<number> {
         ring,
         wakeWord: opts.wakeWord,
         wakeAliases: opts.wakeAliases,
+        addressed: local?.addressed ?? false,
+        ...(local ? { onBareWake: () => { local!.arm(); } } : {}),
         trace: !opts.quiet && !opts.json ? (line) => stderr.write(line + "\n") : undefined,
       })
     : undefined;

@@ -8,6 +8,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The wake word is heard before anything is recognised: `--wake-detector kws`.** The attention word was a filter on a transcript, so
+  every window with sound in it went to the recogniser — hosted and paid, by default — and a television, a conversation in the next
+  room and the recogniser's habit of inventing Japanese sign-offs for a quiet room each cost a request. Now a keyword spotter on the
+  box (sherpa-onnx's, ~5 MB, as a Python helper process speaking JSON lines) listens all the time, the recogniser stays idle until it
+  fires, and a hosted recogniser is only sent what was said *after* the wake word — and not even that if the recording is shorter
+  than 400 ms or never rose above the room. A box that cannot start the detector says why and does not listen; it does not fall
+  back to sending everything. New pieces: `WakeWordDetector` gains `load`, `close` and `preRollMs` (the detector answers late, so the
+  pipeline replays the last 800 ms into the voice detector, or "hearth, turn it down" arrives as "it down"); `Pipeline.arm()` (after a
+  bare "hearth" → "Yes?", the next utterance needs no second wake word); a transcriber engine, so a hosted endpoint is an ordinary
+  edge-pipeline backend; `encodeWav`; stdin on the process spawner; `setup` remembers the detector and its model path. **Measured on
+  the Pi with a neural voice, and not with a person:** "hearth" detected 3 of 3, four sentences that merely sound like it (heart, hard)
+  0 of 4, looser thresholds *worse* than the default; and an end-to-end run of a 17.6 s recording with four sentences not for it and
+  then one command reached the recogniser exactly once. espeak-ng's robot voice never fires it. The same run read `get_throttled`
+  `0x70000` — the load of sherpa, the helper and node together sags the supply. Whether
+  it wakes for you is V4/V11/V12 in `docs/VOICE_TEST_PLAN.md`; until then it is built and measured, not verified.
 - **The boot service, run for the first time, lost volume control.** `hearth.service` was enabled with linger and the Pi rebooted: it
   started, found the television, reached ModelPilot — and logged `Read volume: unsupported on this device — no wpctl, pactl or
   amixer`, because the unit was ordered after `sound.target` and the audio stack is a *user* service that was not ready. The boot probe

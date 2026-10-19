@@ -48,13 +48,21 @@ export function fakeVad(script: Record<number, VadEvent[]>): VoiceActivityDetect
   };
 }
 
-/** Fires on the Nth chunk it is given (0-based). */
-export function fakeWake(firesOnChunk: number): WakeWordDetector & { seen: number } {
+/** Fires on the Nth chunk it is given (0-based). `preRollMs` makes it ask for a replay, as a detector that answers late would. */
+export function fakeWake(
+  firesOnChunk: number, opts: { preRollMs?: number } = {},
+): WakeWordDetector & { seen: number; loaded: boolean; closed: boolean; order: string[] } {
   const self = {
     name: "fake-wake",
     seen: 0,
+    loaded: false,
+    closed: false,
+    order: [] as string[],
+    ...(opts.preRollMs !== undefined ? { preRollMs: opts.preRollMs } : {}),
     accept: () => self.seen++ === firesOnChunk,
     reset: () => {},
+    async load() { self.order.push("wake.load"); self.loaded = true; },
+    async close() { self.order.push("wake.close"); self.closed = true; },
   };
   return self;
 }
