@@ -8,6 +8,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The boot service, run for the first time, lost volume control.** `hearth.service` was enabled with linger and the Pi rebooted: it
+  started, found the television, reached ModelPilot — and logged `Read volume: unsupported on this device — no wpctl, pactl or
+  amixer`, because the unit was ordered after `sound.target` and the audio stack is a *user* service that was not ready. The boot probe
+  withdraws what it cannot read and does not look again, so a box that booted correctly would have been deaf to "turn it down" until
+  someone restarted it. The unit now orders itself after PipeWire and WirePlumber and, since ordering is not readiness, waits (at most
+  40 s, and not at all on a box without `wpctl`) until a default sink *reports a volume* — the probe's own read; `wpctl status` is
+  not enough, and `wpctl get-volume` is not either by exit code, since it exits 0 and prints `Translate ID error` while WirePlumber is
+  down. A leading `-` lets it start anyway if the wait runs out. **The same reboot showed the supply:** `get_throttled` read `0x0` just
+  after boot and `0x50005` (under-voltage and throttled *now*) while the service came up, and `0x50000` with nothing sagging a minute
+  later — the sag is the start-up burst, not steady state, and a stop/start of the service, mic-only recording and the idle box all read
+  clean. Not yet separated: the ring's LED rail against node's start-up. **Checked, indirectly:** with WirePlumber stopped, the fixed unit's wait ran for six seconds (14:51:18 to
+  14:51:24 in systemd's own record) before the service started, where the unpatched unit started at once — and the Pi had not
+  crashed, as first feared when it stopped answering mid-test: its uptime showed no reboot, and the loss of contact was this
+  side's network. What is **not** seen: the service's own volume probe succeeding after that wait (a user journal that keeps only
+  its last 215 lines had already lost it), and a real boot through the fixed unit.
 - **A stranger's first minutes, run on a clean clone and a clean config.** The README's install path, followed to the letter on the Pi 3B
   in another directory with another launcher directory and another config directory (nothing of the real install touched): `git clone` 3 s,
   `sh tools/install.sh` 168 s, then `--version`, `setup`, `modelpilot status` and a question each answered in a second or ten — **185 s

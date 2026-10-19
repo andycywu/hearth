@@ -276,10 +276,16 @@ export function systemdUnit(o: {
   return [
     "[Unit]",
     "Description=Hearth — the living-room agent, on this box",
-    "After=network-online.target sound.target",
-    "Wants=network-online.target",
+    // The audio stack is a *user* service too, and "sound.target" says nothing about it: on 2026-10-19 the unit started at boot
+    // before WirePlumber was up, the boot probe found no `wpctl` it could talk to, and withdrew volume and mute for the whole run.
+    "After=network-online.target sound.target pipewire.service wireplumber.service pipewire-pulse.service",
+    "Wants=network-online.target wireplumber.service",
     "",
     "[Service]",
+    "# Ordering is not readiness. Wait (at most 40 s, and not at all without wpctl) until a default sink reports a volume, which is",
+    "# the very read the boot probe makes: wpctl exits 0 and prints an error while WirePlumber is not up yet. The leading '-' means",
+    "# a box that never gets there still starts, and says so in its own probe rather than not starting.",
+    "ExecStartPre=-/bin/sh -c 'command -v wpctl >/dev/null && timeout 40 sh -c \"until wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | grep -q Volume; do sleep 1; done\"'",
     "# Secrets live here, 0600, not in this file: `systemctl cat` shows this file to anyone.",
     "EnvironmentFile=-%h/.config/hearth/env",
     ...Object.entries(o.env ?? {}).map(([k, v]) => `Environment=${k}=${JSON.stringify(v)}`),

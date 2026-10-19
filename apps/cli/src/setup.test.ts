@@ -237,6 +237,21 @@ describe("the systemd unit", () => {
     expect(unit).not.toContain("--leds");
     expect(unit).toContain("WantedBy=default.target");
   });
+
+  // 2026-10-19, the first start at boot: the unit came up before WirePlumber, the probe found no audio control to talk to,
+  // and volume and mute were withdrawn for the whole run ("Read volume: unsupported on this device").
+  it("waits for the audio stack to answer, not merely to be ordered, and still starts if it never does", () => {
+    const unit = systemdUnit({ node: "/n", cli: "/c", voice: true, leds: false });
+    expect(unit).toMatch(/^After=.*\bwireplumber\.service\b/m);
+    const pre = unit.split("\n").find((l) => l.startsWith("ExecStartPre="))!;
+    expect(pre).toMatch(/^ExecStartPre=-/);                                    // '-': a failure to wait never stops the service
+    expect(pre).toContain("command -v wpctl");                                 // a box without PipeWire does not wait at all
+    expect(pre).toContain("timeout 40");                                       // and no box waits forever
+    expect(pre).toContain("wpctl get-volume @DEFAULT_AUDIO_SINK@");            // the probe's own read, not "wpctl status"
+    expect(pre).toContain("grep -q Volume");                                   // wpctl exits 0 with an error message when WirePlumber is down
+    // systemd expands $VAR and %specifier in these lines; the wait must contain neither.
+    expect(pre).not.toMatch(/[$%]/);
+  });
 });
 
 describe("a hosted transcriber", () => {
