@@ -8,6 +8,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A stranger's first minutes, run on a clean clone and a clean config.** The README's install path, followed to the letter on the Pi 3B
+  in another directory with another launcher directory and another config directory (nothing of the real install touched): `git clone` 3 s,
+  `sh tools/install.sh` 168 s, then `--version`, `setup`, `modelpilot status` and a question each answered in a second or ten — **185 s
+  in all**, against M1's fifteen minutes. What it found: `setup`'s advice for "nothing turns speech into text" named only a LAN whisper
+  server, when a stranger's first option is `--asr openai` or `--asr local`; the README did not say that the keys-free commands exist,
+  that the first command waits ~8 s on CEC discovery, or that the install takes minutes. All three are fixed. What it did **not**
+  test: a stranger — the person who runs the commands knows what they mean.
 - **The wake word has aliases, because the transcriber does not spell a made-up word.** The first live run
   heard "hearth, turn off the light" as "Hard turn off light." and dropped it as not for us; the matcher accepted
   only the exact word. Known mishearings (`hard`, `harth`, `hart`, `heart`, `hurth`, `herth`) now stand in for

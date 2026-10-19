@@ -146,7 +146,7 @@ cd ~/hearth
 sh tools/install.sh
 ```
 
-This builds the checkout and writes one launcher, `~/.local/bin/hearth`, and (if needed) one line in
+This builds the checkout (**about three minutes on a Pi 3B**, measured on a clean clone) and writes one launcher, `~/.local/bin/hearth`, and (if needed) one line in
 `~/.profile` to put that directory on `PATH`. **Log out and ssh in again** — or run `. ~/.profile` — and
 `hearth` works from any directory. The launcher puts Node first on `PATH` and reads `~/.config/hearth/env`
 if it exists, which is where keys live (step 4). `sh tools/install.sh --uninstall` removes it.
@@ -179,11 +179,16 @@ chmod 600 ~/.config/hearth/env
 **5. Check, then use it.**
 
 ```sh
-hearth modelpilot status        # reachable? key accepted? how long? (official and local)
 hearth "turn it down"           # a command; prints what it did and whether it read it back
-hearth "what is the capital of France"   # not a device goal: answered through ModelPilot
-hearth --voice                  # listen on the microphone: say "hearth, turn it down"
+hearth "what is the volume"     # a question about the room
+hearth modelpilot status        # reachable? key accepted? how long? (official and local)
+hearth "what is the capital of France"   # not a device goal: answered through ModelPilot (needs its key)
+hearth --voice                  # listen on the microphone: say "hearth, turn it down" (needs a transcriber: step 3)
 ```
+
+The first three need no keys and no network: the built-in offline brain handles volume, mute and the television's power.
+The first command after a start takes several seconds longer than the rest (about eight on a Pi 3B) because `hearth`
+discovers the HDMI-CEC bus before it answers; `--no-cec` skips that if there is nothing on the bus.
 
 Every action ends `verified`, `unverified`, `unsupported` or `failed`, and the agent says which. A
 change it could not read back is reported as `unverified`, never as done.

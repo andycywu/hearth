@@ -133,7 +133,7 @@ export async function runSetup(opts: CliOptions, io: SetupIo, deps: SetupDeps = 
             fix: "Put the key in the environment, never on the command line: `export TV_AGENT_API_KEY=sk-…` — or in ~/.config/hearth/env (see below), which the service reads." }
         : { what: "Voice", ok: true, detail: `microphone (arecord) and speech (espeak-ng); transcription at ${asr}${hosted ? " (hosted — only windows with sound in them are sent)" : ""}` }
       : { what: "Voice", ok: "partial", detail: "microphone (arecord) and speech (espeak-ng) are here, but nothing turns speech into text",
-          fix: "Re-run with `--asr http://<host>:<port>/v1` pointing at an OpenAI-compatible /audio/transcriptions (a whisper server on the LAN will do)." });
+          fix: "Re-run with `--asr openai` (hosted; needs TV_AGENT_API_KEY in ~/.config/hearth/env), `--asr local` (on this box; see docs/edge-voice.md), or `--asr http://<host>:<port>/v1` for a whisper server on the LAN." });
   } else if (heard.tts) {
     findings.push({ what: "Voice", ok: "partial", detail: "can speak (espeak-ng) but has no capture device",
       fix: "Plug in a microphone or a ReSpeaker HAT; `arecord -l` should list a card." });
