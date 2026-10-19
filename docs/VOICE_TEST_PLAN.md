@@ -19,7 +19,9 @@ that was seen. A row with no number is not a result.
 | b | `hearth modelpilot status` → both `verified` | the conversation and planning steps need it |
 | c | `hearth --platform linux setup` shows `voice: true`, a wake word, and the ring | run it from a shell that sourced `~/.config/hearth/env`, or it used to switch listening off (fixed, but check) |
 | d | the remote is within reach | V6 turns the television off |
-| e | decide the room: door closed, television **off** for V1–V10; on for V11–V12 | background is the variable that matters most |
+| e | `systemctl --user stop hearth` before running `hearth --voice` by hand | on the Pi the service (enabled 2026-10-19, with linger) owns the microphone and the status ring; two listeners fight over `arecord` and the SPI bus. `systemctl --user start hearth` afterwards. Its log is `systemctl --user status hearth -n 100 --no-pager` — there is no persistent user journal, so `journalctl --user -u hearth` finds nothing |
+| f | note `get_throttled` right after the service starts | on 2026-10-19 it read `0x0` before starting the service and `0x50000` after: the ring's LED rail switching on is the likely trigger of a brief under-voltage. Reading it before and after each start separates "the supply" from "the ring" |
+| g | decide the room: door closed, television **off** for V1–V10; on for V11–V12 | background is the variable that matters most |
 
 Say each phrase **at the distance and volume you would use to a television**. Do not enunciate for the machine; the point
 is how it copes with you.
