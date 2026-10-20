@@ -181,16 +181,25 @@ syllable it has no token for is an error that names it, not a keyword that can n
 comma: `--wake "hearth,爐火精靈"` — either wakes it, and the loop strips whichever it heard. Anything else (Japanese kana, digits) is
 refused with the way out, `--wake-detector transcript`.
 
-**Choosing a Chinese word.** What decides whether it works is the word, not the code: at least **three or four syllables** (two are in
-too much ordinary talk — "小爐" is half of "小爐子"), tones that are not a common phrase's, and not a word people already say ("電視",
-"你好"). The one chosen here is **爐火精靈** (*lú huǒ jīng líng*, "hearth spirit": tones 2-3-1-2, hearth-themed, a pairing of ordinary words
-that ordinary talk does not contain). Four candidates were tried — 爐火精靈, 小爐小爐, 赫斯赫斯, 壁爐精靈 — against two neural voices
-(Piper `xiao_ya` and Kokoro speaker 3), each saying the word alone and with a command: **爐火精靈, 小爐小爐 and 壁爐精靈 woke 4 of 4,
-赫斯赫斯 3 of 4** (it missed one voice's bare word — a transliteration is the weakest kind), and **none of the four fired for any of 19
-other sentences**, eight of them near misses built from the same syllables ("爐火很旺…", "壁爐旁邊坐著一隻貓", "森林裡住著很多小精靈",
-"他的技術已經爐火純青了", "火精靈是遊戲裡的角色") and the rest ordinary talk ("這個爐子很燙", "精靈寶可夢最近出了新的遊戲"). That does not
-rank the three that were perfect — synthetic voices, easy negatives — so the pick rests on the syllable count and tones above, and the
-real test is a person (V4c) and a television (V12).
+**Choosing a Chinese word.** What decides whether it works is the word, not the code. The name is **小爐** ("little stove"), the
+owner's choice, and what ships is **小爐小爐** — the name said twice, as 小度小度 is, for a reason measured on the Pi. Against two neural voices
+(Piper `xiao_ya`, Kokoro speaker 3) and 39 sentences that are not for it, the model's default settings gave:
+
+| Word | Woke for its own phrase (alone and with a command, two voices) | False wakes over 39 other sentences |
+|---|---|---|
+| 小爐 | **1 of 4** (the bare word 0 of 2) | **5** — "這個小爐子很好用", "小盧明天要來我們家吃飯", "小魯是我的大學同學", in both voices |
+| 小爐小爐 | **4 of 4** | 0 |
+| 爐火精靈 | 4 of 4 | 0 |
+| 壁爐精靈 | 4 of 4 | 0 |
+| 赫斯赫斯 | 3 of 4 | 0 |
+
+Two syllables are too little for this model: it misses the bare word, and the sounds *xiǎo lú* are the front of 小爐子 and the whole of 小盧 and
+(to the ear of a small model) 小魯, 小路 and 小鹿. **Tuning does not rescue it** — thresholds 0.25, 0.15, 0.1 and 0.05 with boosts of 1 to 3 all
+woke 1 of 4, and the looser ones fired for up to 12 of the 39 other sentences. Saying the name twice gives the model the length it needs and
+costs the person one more syllable pair. `--wake "hearth,小爐"` still works — the transcript matcher (`--wake-detector transcript`) finds
+小爐 in what a recogniser heard — but as a *spotter* keyword it is the poor choice above. The candidates 爐火精靈 and 壁爐精靈 woke 4 of 4 with
+none of the 39 false, which is the fallback if 小爐小爐 misbehaves with a person. None of this ranks anything for a human voice: synthetic voices and
+a fixed list of sentences are a smoke test, and the real one is V4c and V12.
 
 End to end on the Pi, through the real pipeline, with both names set: an 18 s recording of three Chinese sentences that were not for it
 and then 「爐火精靈，把音量調小一點」 — the detector fired once, on the Chinese word; the recogniser ran once. The on-box recogniser

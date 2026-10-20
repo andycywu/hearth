@@ -95,14 +95,15 @@ ten times and record every transcription verbatim. "hearth, turn off the light" 
 (`hard`, `harth`, `hart`, `heart`, `hurth`, `herth`) count only as the **first word with a command after it** and a taken line is marked
 `(taken as "hearth": heard "hard")`. If more than two in ten need an alias, prefer 4a, or change the wake word to one the transcriber can spell.
 
-**4c. The Chinese word** (both names at once: `hearth setup --wake "hearth,爐火精靈" --wake-detector kws`, needs `pip install pypinyin` in the
-detector's venv): say **「爐火精靈，把音量調小」** twenty times, 「爐火精靈」 alone ten times, and ten ordinary Chinese sentences, including
-the near misses 「爐火很旺」「壁爐旁邊坐著一隻貓」「森林裡的精靈」「他的技術已經爐火純青了」.
+**4c. The Chinese word** (both names at once: `hearth setup --wake "hearth,小爐小爐" --wake-detector kws`, needs `pip install pypinyin` in the
+detector's venv): say **「小爐小爐，把音量調小」** twenty times, 「小爐小爐」 alone ten times, and ten ordinary Chinese sentences, including the near
+misses 「這個小爐子很好用」「小盧明天要來我們家」「小火爐放在客廳裡」「小路很窄」.
 
-- **Record:** woken of 20; the lone word's "Yes?" and whether the next thing you said was taken without it; false wakes of 10 — and
-  whether the English "hearth" still works beside it.
-- **Why a different word may be needed:** it was chosen by syllable count and tones, and measured with one synthetic voice. If it fires
-  for the near misses, or misses you, the next candidates are 小爐小爐 (a repeated pair, like 小度小度) and 壁爐精靈, both measured the same way.
+- **Also say 「小爐」 once, not twice, ten times.** It is the name you chose. On synthetic voices it woke 1 of 4 and fired for 小爐子 and 小盧, so
+  expect it to be missed; the number you record is what tells us whether a person fares better than Piper.
+- **Record:** woken of 20; the lone 「小爐小爐」's "Yes?" and whether the next thing you said was taken without it; false wakes of 10 — and whether
+  the English "hearth" still works beside it.
+- **If 小爐小爐 misbehaves with you**, the next candidates are 爐火精靈 and 壁爐精靈 (4 of 4 and 0 false on the synthetic set), measured the same way.
 
 ### V5 — volume by voice
 

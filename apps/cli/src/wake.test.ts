@@ -127,3 +127,21 @@ describe("more than one wake word — one in English, one in Chinese", () => {
     expect(wakeWordList(undefined)).toEqual([]);
   });
 });
+
+describe("the Chinese name 小爐, said twice", () => {
+  // 小爐 alone woke 1 of 4 on synthetic voices and fired for 小爐子 and 小盧; 小爐小爐 woke 4 of 4 with none false. So the name is 小爐
+  // and the wake word is the name said twice.
+  const WORDS = "hearth,小爐小爐";
+
+  it("strips the doubled name from the front of a command, with or without punctuation", () => {
+    expect(afterWakeWord("小爐小爐，把音量調小", WORDS)).toBe("把音量調小");
+    expect(afterWakeWord("小爐小爐把音量調小", WORDS)).toBe("把音量調小");
+    expect(addressedTo("小爐小爐", WORDS).command).toBe("");
+  });
+
+  it("does not take the single name, or a word that merely begins with it, as the wake word", () => {
+    expect(afterWakeWord("小爐子很好用", WORDS)).toBeUndefined();
+    expect(afterWakeWord("小爐，把音量調小", WORDS)).toBeUndefined();     // that is `--wake 小爐`'s job
+    expect(afterWakeWord("小爐，把音量調小", "小爐")).toBe("把音量調小");   // …and it works when it is the setting
+  });
+});
