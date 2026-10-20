@@ -366,14 +366,24 @@ describe("the wake-word detector in setup", () => {
     expect((await loadConfig(p.configPath)).voice).toBe(true);           // it still listens, the old way; it is not made deaf
   });
 
-  it("an English wake word only: a Chinese one is refused with the way out, not sent to a lexicon that cannot spell it", async () => {
+  it("a wake word the helper cannot say to the model is refused with the way out, and Chinese and English can be had together", async () => {
     const p = await paths();
     const a = await io();
     await runSetup(
-      parseArgs(["--platform", "linux", "setup", "--asr", "openai", "--wake-detector", "kws", "--wake", "小爐"], { TV_AGENT_API_KEY: "sk-test" }),
+      parseArgs(["--platform", "linux", "setup", "--asr", "openai", "--wake-detector", "kws", "--wake", "こんにちは"], { TV_AGENT_API_KEY: "sk-test" }),
       a.sink, deps(p, { env: { HEARTH_KWS_MODEL_PATH: MODEL } }),
     );
-    expect(a.out.join("")).toMatch(/English wake word.*--wake-detector transcript/);
+    expect(a.out.join("")).toMatch(/English words or Chinese characters.*--wake-detector transcript/);
     expect((await loadConfig(p.configPath)).wakeDetector).toBeUndefined();
+
+    // Both names at once, as one setting; each is a keyword for the spotter and either is the wake word in the loop.
+    const b = await io();
+    const q = await paths();
+    await runSetup(
+      parseArgs(["--platform", "linux", "setup", "--asr", "openai", "--wake-detector", "kws", "--wake", "hearth,爐火精靈"], { TV_AGENT_API_KEY: "sk-test" }),
+      b.sink, deps(q, { env: { HEARTH_KWS_MODEL_PATH: MODEL } }),
+    );
+    expect(await loadConfig(q.configPath)).toMatchObject({ wakeWord: "hearth,爐火精靈", wakeDetector: "kws" });
+    expect(b.out.join("")).toContain("hearth,爐火精靈");
   });
 });

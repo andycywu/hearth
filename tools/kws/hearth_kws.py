@@ -17,7 +17,11 @@ Protocol (stdout, one JSON object per line, flushed):
 
 stdin is mono 16 kHz signed 16-bit little-endian PCM, no header. EOF ends the process cleanly.
 
-This file is part of the optional wake-word path. It needs `pip install sherpa-onnx numpy` and a keyword-spotting model
+Keywords are English words (looked up in the model's lexicon) or Chinese characters (turned into pinyin by `pypinyin`, split into
+initial and toned final exactly as the model's own examples are, and checked against its token table). Several may be given;
+the label that comes back is the word as written.
+
+This file is part of the optional wake-word path. It needs `pip install sherpa-onnx numpy` (and `pypinyin` for Chinese) and a keyword-spotting model
 (e.g. sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20); the Node side (`@hearthkit/adapter-linux`, `stt/kws.ts`) starts it,
 and nothing in the TypeScript depends on Python being present.
 """
@@ -25,6 +29,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import sys
 import tempfile
 
@@ -52,13 +57,54 @@ def lexicon(model_dir):
     return table
 
 
+CJK = re.compile("[一-鿿]")
+
+
+def token_table(model_dir):
+    path = os.path.join(model_dir, "tokens.txt")
+    with open(path, encoding="utf-8") as f:
+        return {line.split()[0] for line in f if line.strip()}
+
+
+def chinese_phones(text, tokens):
+    """
+    A Chinese keyword as the model wants it: each syllable's initial, then its final with the tone mark ('zh ōu w àng j ūn').
+
+    The split is pypinyin's, and it is the same one the model's own examples use ('文森特卡索' is 'w én s ēn t è k ǎ s uǒ').
+    Every piece is checked against the model's token table: a syllable the model has no token for is an error that names it,
+    not a keyword that quietly can never fire.
+    """
+    try:
+        from pypinyin import Style, pinyin
+    except ImportError:
+        fail("Chinese keywords need pypinyin (pip install pypinyin)")
+    chars = [c for c in text if not c.isspace()]
+    if not chars or not all(CJK.match(c) for c in chars):
+        fail("a Chinese keyword must be Chinese characters only (got %r)" % text)
+    inits = pinyin("".join(chars), style=Style.INITIALS, strict=False)
+    finals = pinyin("".join(chars), style=Style.FINALS_TONE, strict=False)
+    phones = []
+    for ch, ini, fin in zip(chars, inits, finals):
+        for piece in (ini[0], fin[0]):
+            if not piece:
+                continue                                  # a syllable with no initial ("er")
+            if piece not in tokens:
+                fail("the model has no token %r (from %r in %r)" % (piece, ch, text))
+            phones.append(piece)
+    return phones
+
+
 def keyword_lines(words, model_dir):
-    """`HH AA1 R TH @HEARTH` for each word: its phones, then the label that comes back on a detection."""
+    """`HH AA1 R TH @HEARTH` or `l ú h uǒ j īng l íng @爐火精靈` for each word: its phones, then the label that comes back."""
     table = lexicon(model_dir)
+    tokens = token_table(model_dir)
     lines = []
     for word in words:
         w = word.strip()
         if not w:
+            continue
+        if CJK.search(w):
+            lines.append("%s @%s" % (" ".join(chinese_phones(w, tokens)), w.replace(" ", "")))
             continue
         # A phrase is its words' phones one after another; a single unknown word is an error, never a guess.
         phones = []
@@ -82,7 +128,7 @@ def pick(model_dir, stem, chunk, int8):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model-dir", required=True)
-    ap.add_argument("--keyword", action="append", default=[], help="an English word or phrase; repeatable")
+    ap.add_argument("--keyword", action="append", default=[], help="an English word or phrase, or Chinese characters (needs pypinyin); repeatable")
     ap.add_argument("--keywords-file", help="a ready-made keywords file (phones/pinyin and @labels); overrides --keyword")
     ap.add_argument("--threshold", type=float, default=0.25, help="detection threshold: lower fires more easily")
     ap.add_argument("--score", type=float, default=1.0, help="boosting score for the keywords")
@@ -109,7 +155,7 @@ def main():
         handle.write("\n".join(lines) + "\n")
         handle.close()
         keywords_file = handle.name
-        labels = [w.upper().replace(" ", "_") for w in args.keyword if w.strip()]
+        labels = [(w.replace(" ", "") if CJK.search(w) else w.upper().replace(" ", "_")) for w in args.keyword if w.strip()]
     else:
         with open(keywords_file, encoding="utf-8") as f:
             labels = [line.rsplit("@", 1)[-1].strip() for line in f if "@" in line]

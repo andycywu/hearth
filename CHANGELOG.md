@@ -8,6 +8,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A Chinese wake word, beside the English one: `--wake "hearth,爐火精靈"`.** The keyword model was never English-only — its own
+  examples are pinyin — the helper only knew the English lexicon. Chinese characters now go through `pypinyin`, are split into initial
+  and toned final exactly as the model's examples are (`文森特卡索` → `w én s ēn t è k ǎ s uǒ`), and every piece is checked against the
+  model's token table, so a syllable it lacks is an error that names it and not a keyword that never fires. A wake word is now a list
+  (comma, English or Chinese): the spotter takes them all, the loop strips whichever it heard, and a Chinese word is found at the start of
+  an utterance with nothing after it to separate it, since Chinese has no spaces — while an English one still needs its breaks, so
+  "hearthstone" is not "hearth". The word chosen is **爐火精靈** (*lú huǒ jīng líng*, "hearth spirit"): four syllables, tones 2-3-1-2, a
+  pairing of ordinary words that ordinary talk does not contain. Four candidates against two neural voices: 爐火精靈, 小爐小爐 and 壁爐精靈
+  woke 4 of 4, 赫斯赫斯 (a transliteration) 3 of 4, and none fired for any of 19 other sentences, eight of them near misses built from the
+  same syllables ("爐火很旺", "壁爐旁邊坐著一隻貓", "森林裡住著很多小精靈", "他的技術已經爐火純青了"). Synthetic voices and easy negatives make
+  the three perfect, so this shows the keyword loads and fires and does not rank them; the test that decides is a person, V4c. End to end
+  on the Pi with both names set, an 18 s recording of three Chinese sentences not for it and then 「爐火精靈，把音量調小一點」: the detector
+  fired once, on the Chinese word, and the recogniser ran once — hearing "精灵把音量", which is the small on-box model's accuracy and not
+  the wake word's. (Found on the way: a test harness that starts `hearth --voice` with stdin closed ends at once without `--serve`; and
+  running Kokoro, Piper and the evaluation on the Pi at the same time rebooted it.)
 - **The wake word is heard before anything is recognised: `--wake-detector kws`.** The attention word was a filter on a transcript, so
   every window with sound in it went to the recogniser — hosted and paid, by default — and a television, a conversation in the next
   room and the recogniser's habit of inventing Japanese sign-offs for a quiet room each cost a request. Now a keyword spotter on the

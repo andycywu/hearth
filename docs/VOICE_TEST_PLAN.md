@@ -95,7 +95,14 @@ ten times and record every transcription verbatim. "hearth, turn off the light" 
 (`hard`, `harth`, `hart`, `heart`, `hurth`, `herth`) count only as the **first word with a command after it** and a taken line is marked
 `(taken as "hearth": heard "hard")`. If more than two in ten need an alias, prefer 4a, or change the wake word to one the transcriber can spell.
 
-**Also test Chinese** if you use a Chinese wake word — that is 4b only; the keyword spotter takes English words.
+**4c. The Chinese word** (both names at once: `hearth setup --wake "hearth,爐火精靈" --wake-detector kws`, needs `pip install pypinyin` in the
+detector's venv): say **「爐火精靈，把音量調小」** twenty times, 「爐火精靈」 alone ten times, and ten ordinary Chinese sentences, including
+the near misses 「爐火很旺」「壁爐旁邊坐著一隻貓」「森林裡的精靈」「他的技術已經爐火純青了」.
+
+- **Record:** woken of 20; the lone word's "Yes?" and whether the next thing you said was taken without it; false wakes of 10 — and
+  whether the English "hearth" still works beside it.
+- **Why a different word may be needed:** it was chosen by syllable count and tones, and measured with one synthetic voice. If it fires
+  for the near misses, or misses you, the next candidates are 小爐小爐 (a repeated pair, like 小度小度) and 壁爐精靈, both measured the same way.
 
 ### V5 — volume by voice
 

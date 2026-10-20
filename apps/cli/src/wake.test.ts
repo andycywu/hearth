@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addressedTo, afterWakeWord, matchWake, parseWakeAliases } from "./wake.js";
+import { addressedTo, afterWakeWord, matchWake, parseWakeAliases, wakeWordList } from "./wake.js";
 import { parseArgs } from "./args.js";
 import { configAsEnv } from "./config.js";
 
@@ -86,5 +86,44 @@ describe("an utterance a detector already addressed to us", () => {
     expect(addressedTo("Hearth?", "hearth").command).toBe("");
     expect(addressedTo("Hard.", "hearth")).toEqual({ command: "", via: { alias: "hard" } });
     expect(addressedTo("Hard.", "hearth", false)).toMatchObject({ command: "Hard", via: "detector" });   // aliases off: it is just a word
+  });
+});
+
+describe("more than one wake word — one in English, one in Chinese", () => {
+  const BOTH = "hearth,爐火精靈";
+
+  it("takes either, and removes whichever it was", () => {
+    expect(afterWakeWord("hearth, turn it down", BOTH)).toBe("turn it down");
+    expect(afterWakeWord("爐火精靈，把音量調小", BOTH)).toBe("把音量調小");
+    expect(afterWakeWord("把音量調小，爐火精靈", BOTH)).toBe("把音量調小");
+  });
+
+  it("finds a Chinese word with nothing after it to separate it — Chinese is written without spaces", () => {
+    expect(afterWakeWord("爐火精靈把音量調小聲一點", BOTH)).toBe("把音量調小聲一點");
+    expect(afterWakeWord("今天天氣很好", BOTH)).toBeUndefined();
+    // …but only at a boundary: the word inside a longer run of text is not the wake word.
+    expect(afterWakeWord("這個壁爐火精靈一點也不危險", BOTH)).toBeUndefined();
+  });
+
+  it("an English word still needs its breaks, so a longer word is not it", () => {
+    expect(afterWakeWord("hearthstone is a card game", BOTH)).toBeUndefined();
+  });
+
+  it("the English aliases still apply to the English word, as the first word with a command after it", () => {
+    expect(afterWakeWord("Hard turn it down", BOTH)).toBe("turn it down");
+    expect(afterWakeWord("That is hard to say", BOTH)).toBeUndefined();
+  });
+
+  it("an utterance a detector addressed to us loses either name from its front, and the bare name is the wake word", () => {
+    expect(addressedTo("爐火精靈把音量調小", BOTH)).toMatchObject({ command: "把音量調小", via: "word" });
+    expect(addressedTo("爐火精靈", BOTH).command).toBe("");
+    expect(addressedTo("turn it down", BOTH)).toEqual({ command: "turn it down", via: "detector" });
+  });
+
+  it("wakeWordList reads a setting with either comma, and nothing for an empty one", () => {
+    expect(wakeWordList("hearth,爐火精靈")).toEqual(["hearth", "爐火精靈"]);
+    expect(wakeWordList(" hearth ， 爐火精靈、小爐 ")).toEqual(["hearth", "爐火精靈", "小爐"]);
+    expect(wakeWordList("")).toEqual([]);
+    expect(wakeWordList(undefined)).toEqual([]);
   });
 });

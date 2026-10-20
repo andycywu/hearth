@@ -7,6 +7,11 @@
  * "hearth." and "Harth" for the same sound — so punctuation is ignored and the
  * word may appear anywhere, which also covers "turn it down, hearth".
  *
+ * **More than one word.** `--wake "hearth,爐火精靈"` is two wake words for one assistant — one English, one Chinese — separated
+ * by a comma. Any of them counts. A Chinese word is written without spaces, so it is also found at the very start of an
+ * utterance with nothing after it to separate it ("爐火精靈把音量調小" is the word and then "把音量調小"), where an English word
+ * needs a break on both sides so that "hearthstone" is not "hearth".
+ *
  * **Mishearings.** The first live run on the Pi heard "hearth, turn off the light" as "Hard turn off light." and
  * dropped it as not for us. A transcriber has no obligation to spell a made-up word, so the word has *aliases*:
  * spellings it is known to produce. They are weaker evidence than the word itself — "hard" and "heart" are
@@ -23,6 +28,13 @@ const BUILTIN_ALIASES: Record<string, string[]> = {
 /** Punctuation that separates words, in English and Chinese. */
 const BREAK = "\\s,.!?;:\"'，。！？、";
 
+const CJK = /[\u4e00-\u9fff]/;
+
+/** The wake words in a setting: `hearth,爐火精靈` → two. Separators are the commas English and Chinese text use. */
+export function wakeWordList(setting: string | undefined): string[] {
+  return (setting ?? "").split(/[,，、;；]/).map((w) => w.trim()).filter(Boolean);
+}
+
 export interface WakeMatch {
   /** What was asked, with the wake word and its punctuation removed. May be empty: the word alone. */
   command: string;
@@ -32,25 +44,34 @@ export interface WakeMatch {
 
 export function matchWake(text: string, wakeWord: string | undefined, aliases?: readonly string[] | false): WakeMatch | undefined {
   const spoken = text.trim();
-  if (!wakeWord) return { command: spoken, via: "word" };
-  const word = wakeWord.trim().toLowerCase();
-  const pattern = new RegExp(`(^|[${BREAK}])${escapeRegExp(word)}(?=$|[${BREAK}])`, "i");
-  const hit = pattern.exec(spoken);
-  if (hit) {
-    const before = spoken.slice(0, hit.index).trim();
-    const after = spoken.slice(hit.index + hit[0].length).trim();
-    return { command: tidy([before, after].filter(Boolean).join(" ")), via: "word" };
+  const words = wakeWordList(wakeWord);
+  if (!words.length) return { command: spoken, via: "word" };
+
+  for (const w of words) {
+    const word = w.toLowerCase();
+    const pattern = CJK.test(word)
+      ? new RegExp(`(^|[${BREAK}])${escapeRegExp(word)}`, "i")                              // no spaces in Chinese: nothing need follow
+      : new RegExp(`(^|[${BREAK}])${escapeRegExp(word)}(?=$|[${BREAK}])`, "i");
+    const hit = pattern.exec(spoken);
+    if (hit) {
+      const before = spoken.slice(0, hit.index).trim();
+      const after = spoken.slice(hit.index + hit[0].length).trim();
+      return { command: tidy([before, after].filter(Boolean).join(" ")), via: "word" };
+    }
   }
+
   if (aliases === false) return undefined;
-  const known = (aliases ?? BUILTIN_ALIASES[word] ?? []).map((a) => a.trim().toLowerCase()).filter(Boolean);
-  if (!known.length) return undefined;
   // First word only, after an optional greeting; a command must follow.
   const first = new RegExp(`^(?:(?:hey|hi|ok|okay)[${BREAK}]+)?([^${BREAK}]+)[${BREAK}]+(.+)$`, "i").exec(spoken);
   if (!first) return undefined;
   const alias = first[1]!.toLowerCase();
-  if (!known.includes(alias)) return undefined;
-  const command = tidy(first[2]!);
-  return command ? { command, via: { alias } } : undefined;
+  for (const w of words) {
+    const known = (aliases ?? BUILTIN_ALIASES[w.toLowerCase()] ?? []).map((a) => a.trim().toLowerCase()).filter(Boolean);
+    if (!known.includes(alias)) continue;
+    const command = tidy(first[2]!);
+    return command ? { command, via: { alias } } : undefined;
+  }
+  return undefined;
 }
 
 /**
@@ -65,7 +86,7 @@ export function addressedTo(text: string, wakeWord: string | undefined, aliases?
   if (found) return found;
   // The word alone, as the recogniser spelled it: "Hard." after the detector fired is the wake word, not a command to run.
   const bare = tidy(text.trim()).toLowerCase();
-  const known = aliases === false ? [] : (aliases ?? BUILTIN_ALIASES[wakeWord?.trim().toLowerCase() ?? ""] ?? []);
+  const known = aliases === false ? [] : wakeWordList(wakeWord).flatMap((w) => aliases ?? BUILTIN_ALIASES[w.toLowerCase()] ?? []);
   if (bare && known.some((a) => a.trim().toLowerCase() === bare)) return { command: "", via: { alias: bare } };
   return { command: tidy(text.trim()), via: "detector" };
 }

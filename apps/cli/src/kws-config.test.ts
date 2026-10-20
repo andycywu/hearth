@@ -25,10 +25,16 @@ describe("finding the wake-word detector", () => {
     expect(await resolveKws(ENV, "hearth", present("/home/pi/kws/model"))).toMatchObject({ ok: false, why: expect.stringContaining("detector script") });
   });
 
-  it("needs a wake word, and an English one: the model's lexicon is English", async () => {
+  it("needs a wake word; takes English words and Chinese characters, several at once, and nothing else", async () => {
     expect(await resolveKws(ENV, undefined, BOTH)).toMatchObject({ ok: false, why: expect.stringContaining("needs a wake word") });
-    expect(await resolveKws(ENV, "小爐", BOTH)).toMatchObject({ ok: false, why: expect.stringContaining("English wake word") });
     expect(await resolveKws(ENV, "hey hearth", BOTH)).toMatchObject({ ok: true });
+    expect(await resolveKws(ENV, "爐火精靈", BOTH)).toMatchObject({ ok: true, settings: { keywords: ["爐火精靈"] } });
+    // One assistant, two names: both go to the spotter, which returns whichever it heard.
+    expect(await resolveKws(ENV, "hearth,爐火精靈", BOTH)).toMatchObject({ ok: true, settings: { keywords: ["hearth", "爐火精靈"] } });
+    expect(await resolveKws(ENV, "hearth， 爐火精靈", BOTH)).toMatchObject({ ok: true, settings: { keywords: ["hearth", "爐火精靈"] } });
+    // A word the helper has no way to say to the model is refused by name, not passed on to fail at boot.
+    expect(await resolveKws(ENV, "hearth,こんにちは", BOTH)).toMatchObject({ ok: false, why: expect.stringContaining('"こんにちは"') });
+    expect(await resolveKws(ENV, "hearth 2", BOTH)).toMatchObject({ ok: false });
   });
 
   it("refuses a chunk size the model does not come in", async () => {

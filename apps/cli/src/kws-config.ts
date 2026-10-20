@@ -17,6 +17,7 @@
  */
 import { access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { wakeWordList } from "./wake.js";
 
 export interface KwsSettings {
   python: string;
@@ -93,12 +94,15 @@ export async function resolveKws(
   wakeWord: string | undefined,
   exists: (path: string) => Promise<boolean> = present,
 ): Promise<KwsResolution> {
-  if (!wakeWord?.trim()) {
+  const words = wakeWordList(wakeWord);
+  if (!words.length) {
     return { ok: false, why: "a wake-word detector needs a wake word to listen for (--wake <word>)" };
   }
-  // The model's lexicon is English. A Chinese wake word needs a model and a keywords file that this does not build.
-  if (!/^[A-Za-z' -]+$/.test(wakeWord.trim())) {
-    return { ok: false, why: `the keyword spotter takes an English wake word (got "${wakeWord}"); use --wake-detector transcript for another language` };
+  // English words come from the model's lexicon; Chinese characters become pinyin (the helper needs `pypinyin` for those).
+  // Anything else — Japanese kana, digits, symbols — is a word this does not know how to say to the model.
+  const bad = words.find((w) => !/^[A-Za-z' -]+$/.test(w) && !/^[\u4e00-\u9fff]+$/.test(w));
+  if (bad) {
+    return { ok: false, why: `the keyword spotter takes English words or Chinese characters (got "${bad}"); use --wake-detector transcript for another language` };
   }
   const modelDir = env.HEARTH_KWS_MODEL_PATH?.trim();
   if (!modelDir) {
@@ -119,7 +123,7 @@ export async function resolveKws(
   return {
     ok: true,
     settings: {
-      python: env.HEARTH_KWS_PYTHON?.trim() || "python3", script, modelDir, keywords: [wakeWord.trim()],
+      python: env.HEARTH_KWS_PYTHON?.trim() || "python3", script, modelDir, keywords: words,
       ...(threshold !== undefined ? { threshold } : {}), ...(score !== undefined ? { score } : {}),
       ...(chunk !== undefined ? { chunk } : {}), ...(preRollMs !== undefined ? { preRollMs } : {}),
     },

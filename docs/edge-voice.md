@@ -173,9 +173,29 @@ export HEARTH_KWS_PYTHON=~/kws/venv/bin/python HEARTH_KWS_MODEL_PATH=~/kws/sherp
 hearth --platform linux setup --asr openai --wake-detector kws       # remembers all of it in config.json
 ```
 
-The keyword is the `--wake` word, looked up in the model's English lexicon (`en.phone`) — "hearth" is there, as are "hard" and
-"heart", which is why the model does not confuse them (below). A word the lexicon does not know is an error naming the word. A
-Chinese wake word is refused with the way out (`--wake-detector transcript`): the helper builds English keywords only.
+The keywords are the `--wake` words. An English word is looked up in the model's lexicon (`en.phone`) — "hearth" is there, as are
+"hard" and "heart", which is why the model does not confuse them (below); a word the lexicon does not know is an error naming it.
+**A Chinese word is turned into pinyin** (`pip install pypinyin`), split into each syllable's initial and toned final — the split the
+model's own examples use (`文森特卡索` is `w én s ēn t è k ǎ s uǒ`) — and every piece is checked against the model's token table, so a
+syllable it has no token for is an error that names it, not a keyword that can never fire. **Both together** is one setting with a
+comma: `--wake "hearth,爐火精靈"` — either wakes it, and the loop strips whichever it heard. Anything else (Japanese kana, digits) is
+refused with the way out, `--wake-detector transcript`.
+
+**Choosing a Chinese word.** What decides whether it works is the word, not the code: at least **three or four syllables** (two are in
+too much ordinary talk — "小爐" is half of "小爐子"), tones that are not a common phrase's, and not a word people already say ("電視",
+"你好"). The one chosen here is **爐火精靈** (*lú huǒ jīng líng*, "hearth spirit": tones 2-3-1-2, hearth-themed, a pairing of ordinary words
+that ordinary talk does not contain). Four candidates were tried — 爐火精靈, 小爐小爐, 赫斯赫斯, 壁爐精靈 — against two neural voices
+(Piper `xiao_ya` and Kokoro speaker 3), each saying the word alone and with a command: **爐火精靈, 小爐小爐 and 壁爐精靈 woke 4 of 4,
+赫斯赫斯 3 of 4** (it missed one voice's bare word — a transliteration is the weakest kind), and **none of the four fired for any of 19
+other sentences**, eight of them near misses built from the same syllables ("爐火很旺…", "壁爐旁邊坐著一隻貓", "森林裡住著很多小精靈",
+"他的技術已經爐火純青了", "火精靈是遊戲裡的角色") and the rest ordinary talk ("這個爐子很燙", "精靈寶可夢最近出了新的遊戲"). That does not
+rank the three that were perfect — synthetic voices, easy negatives — so the pick rests on the syllable count and tones above, and the
+real test is a person (V4c) and a television (V12).
+
+End to end on the Pi, through the real pipeline, with both names set: an 18 s recording of three Chinese sentences that were not for it
+and then 「爐火精靈，把音量調小一點」 — the detector fired once, on the Chinese word; the recogniser ran once. The on-box recogniser
+(the small bilingual zipformer) heard "精灵把音量" — it dropped "爐火" and the end of the command, which is the *recogniser's* accuracy, not
+the wake word's, and is V3 (hosted `--asr openai` reads Chinese far better, and is now only paid for after the word).
 Tuning is `HEARTH_KWS_THRESHOLD` (lower fires more easily; **leave it at the model's 0.25** — see below), `_SCORE`, `_CHUNK` (16, or 8
 for an earlier answer at more CPU) and `_PREROLL_MS`.
 
