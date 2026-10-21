@@ -181,5 +181,13 @@ export async function assertProviderContract(
     await p.media.resume();
   }
 
+  // --- optional display layout, only if advertised ---
+  if (p.has("display") && p.display) {
+    for (const layout of ["panel", "fullscreen", "hearth"] as const) {
+      await p.display.setLayout(layout);
+      assert((await p.display.getLayout()) === layout, `display.setLayout(${layout}) did not read back`);
+    }
+  }
+
   void opts; // reserved for future destructive-check gating
 }

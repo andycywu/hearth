@@ -37,6 +37,42 @@ export interface SystemControl {
   powerStandby(): Promise<void>;
 }
 
+/**
+ * Where the television's picture is, relative to Hearth's own screen.
+ *
+ *  - `fullscreen` — the picture fills the screen. On Tizen the video window is drawn *above* the app, so the app keeps running and is
+ *    not seen.
+ *  - `panel` — the picture fills the top-left `PANEL_PICTURE` of the screen and the app has the rest (an L-shaped margin: a strip
+ *    along the bottom and one down the right).
+ *  - `hearth` — no picture; Hearth has the whole screen.
+ *
+ * The three are one mechanism (the video window's rectangle, or its absence), which is why a platform that can do one can do all.
+ */
+export type ScreenLayout = "fullscreen" | "panel" | "hearth";
+
+/** A rectangle as fractions of the screen, so the app can lay itself out without knowing the panel's resolution. */
+export interface PictureRect { x: number; y: number; w: number; h: number }
+
+/** The picture's rectangle in `panel` layout. 75 % × 70 % is 1440×756 on a 1080p panel, 16:9 kept. */
+export const PANEL_PICTURE: PictureRect = { x: 0, y: 0, w: 0.75, h: 0.7 };
+
+/** The rectangle the picture occupies in a layout, or `null` where there is none. */
+export function pictureRect(layout: ScreenLayout): PictureRect | null {
+  if (layout === "fullscreen") return { x: 0, y: 0, w: 1, h: 1 };
+  if (layout === "panel") return PANEL_PICTURE;
+  return null;
+}
+
+/**
+ * Where the picture is. Optional: a platform whose app *is* the picture (a set-top box rendering both) has nothing to place, and one whose
+ * web runtime has no video-window API cannot. `setLayout` resolves only once the platform has said it took effect; whether it can be read
+ * back is the adapter's to say (`getLayout` throws `TvUnsupportedError` where it cannot).
+ */
+export interface DisplayControl {
+  getLayout(): Promise<ScreenLayout>;
+  setLayout(layout: ScreenLayout): Promise<void>;
+}
+
 export interface AppControl {
   listInstalledApps(): Promise<AppEntry[]>;
   launchApp(appId: string, params?: Record<string, string>): Promise<void>;
@@ -170,6 +206,7 @@ export interface PlatformProvider {
   readonly storage: KeyValueStore;
   readonly media?: MediaControl;
   readonly voice?: VoicePipeline;
+  readonly display?: DisplayControl;
 
   /** Runtime capability probe, e.g. has("voice") or has("media"). */
   has(capability: keyof PlatformProvider): boolean;

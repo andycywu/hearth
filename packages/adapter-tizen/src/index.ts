@@ -3,7 +3,8 @@ import {
   hasCapability,
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
-  type InputSource, type RemoteKey, type KeyValueStore,
+  type InputSource, type RemoteKey, type KeyValueStore, type ScreenLayout, type DisplayControl,
+  PANEL_PICTURE,
 } from "@hearthkit/platform-api";
 
 /**
@@ -40,8 +41,8 @@ declare const webapis: any;
  */
 export interface TizenInputOptions {
   show?: "window" | "viewer" | false;
-  /** The video window's rectangle, as the television wants it (strings: x, y, width, height). Default the full 1920x1080 screen. */
-  rect?: [string, string, string, string];
+  /** Which layout `"window"` mode puts the picture in. Default `fullscreen`. */
+  layout?: "fullscreen" | "panel";
   viewer?: {
     /** The television's viewer. Default `org.tizen.tv-viewer`. */
     appId?: string;
@@ -66,6 +67,9 @@ export function createTizenAdapter(options: TizenAdapterOptions = {}): PlatformP
    */
   const voice = createWebSpeechPipeline();
 
+  // Only where the television has a video window to place: a build without it has no layouts, not layouts that throw.
+  const video = hasVideoWindow() ? createVideoWindow() : undefined;
+
   const device: DeviceInfo = {
     os: "tizen",
     osVersion: safe(() => webapis?.productinfo?.getVersion?.()) ?? "unknown",
@@ -86,7 +90,7 @@ export function createTizenAdapter(options: TizenAdapterOptions = {}): PlatformP
       getMute: async () => readMute(),
       setMute: async (m) => audio().setMute(m),
       getInputSource: async () => readInputSource(),
-      setInputSource: async (s) => switchInputSource(s, options.input),
+      setInputSource: async (s) => switchInputSource(s, options.input, video),
       powerStandby: async () => { notSupported("powerStandby"); },
     },
     apps: {
@@ -147,6 +151,7 @@ export function createTizenAdapter(options: TizenAdapterOptions = {}): PlatformP
       resume: async () => dispatchKey("playpause"),
       seek: async (_ms) => { /* app-managed; no generic Tizen seek API */ },
     },
+    ...(video ? { display: video.display } : {}),
     has: (cap) => hasCapability(provider, cap),
     init: async () => {
       // Fill in the device info Samsung's webapis would have given us. This is
@@ -366,7 +371,7 @@ function sourceError(doing: string, e: any): Error {
   return name === "SecurityError" || name === "NotSupportedError" ? new TvUnsupportedError(text) : new Error(text);
 }
 
-async function switchInputSource(source: InputSource, options: TizenInputOptions | undefined): Promise<void> {
+async function switchInputSource(source: InputSource, options: TizenInputOptions | undefined, video: VideoWindow | undefined): Promise<void> {
   const w = tvWindow();
   if (typeof w.setSource !== "function") throw new TvUnsupportedError("input source — tizen.tvwindow has no setSource on this build");
   const wanted = inputToTizen(source);
@@ -389,8 +394,7 @@ async function switchInputSource(source: InputSource, options: TizenInputOptions
 
   const mode = options?.show ?? "window";
   if (mode === "window") {
-    const shown = await showVideoWindow(w, options?.rect ?? ["0", "0", "1920", "1080"]);
-    if (shown) return;
+    if (video && (await video.tryPlace(options?.layout ?? "fullscreen"))) return;
     // The television would not place the window: the switch happened and nobody can see it. Say less than we hoped and fall through
     // to the viewer, which can.
   }
@@ -402,6 +406,89 @@ async function switchInputSource(source: InputSource, options: TizenInputOptions
       safe(() => tizen.application.launch(appId, () => {}, () => {}));
     }, delay);
   }
+}
+
+// ---- the video window -----------------------------------------------------------------------------------------------------------
+//
+// Measured on an HKC Tizen 7.0 set (tools/experiments/tizen-input-probe, 2026-10-21): `tizen.tvwindow.show(ok, err, [x, y, w, h], 'MAIN')`
+// places the video window in a rectangle without suspending the page, and the window is drawn *above* the page. `getRect(ok, err, 'px',
+// 'MAIN')` reads the rectangle back (the units argument is the one the television wanted; 'MAIN' alone is a TypeMismatchError). `hide`
+// removes the window. Nothing reads back *that* a window is hidden, so `hearth` is the adapter's own memory of having hidden it — said
+// so in the error a stale answer would produce, not claimed as measured.
+
+const SCREEN = { w: 1920, h: 1080 };
+const RECTS: Record<"fullscreen" | "panel", [string, string, string, string]> = {
+  fullscreen: ["0", "0", String(SCREEN.w), String(SCREEN.h)],
+  panel: ["0", "0", String(Math.round(SCREEN.w * PANEL_PICTURE.w)), String(Math.round(SCREEN.h * PANEL_PICTURE.h))],
+};
+
+interface VideoWindow {
+  display: DisplayControl;
+  /** Place the picture; `true` only if the television said it did and a read-back agrees. */
+  tryPlace(layout: "fullscreen" | "panel"): Promise<boolean>;
+}
+
+function hasVideoWindow(): boolean {
+  return typeof tizen !== "undefined" && typeof tizen?.tvwindow?.show === "function";
+}
+
+function createVideoWindow(): VideoWindow {
+  let hidden = false;   // our own memory: the television does not report it
+
+  const callback = <T>(run: (ok: (v: T) => void, err: (e: any) => void) => void, doing: string): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      try {
+        run(resolve, (e) => reject(sourceError(doing, e)));
+      } catch (e) {
+        reject(sourceError(doing, e));
+      }
+    });
+
+  const readRect = async (): Promise<number[]> => {
+    const r = await callback<string[]>((ok, err) => tizen.tvwindow.getRect(ok, err, "px", "MAIN"), "read the video window's rectangle");
+    return r.map((v) => Number.parseInt(String(v), 10));
+  };
+
+  const same = (got: number[], want: string[]) => got.length === 4 && got.every((v, i) => Math.abs(v - Number(want[i])) <= 2);
+
+  const place = async (layout: "fullscreen" | "panel"): Promise<void> => {
+    const rect = RECTS[layout];
+    await callback<unknown>((ok, err) => tizen.tvwindow.show(ok, err, [...rect], "MAIN"), `place the video window (${layout})`);
+    const got = await readRect();
+    if (!same(got, rect)) {
+      throw new Error(`asked the television for the ${layout} rectangle ${rect.join(",")}; it reports ${got.join(",")}`);
+    }
+    hidden = false;
+  };
+
+  const display: DisplayControl = {
+    async getLayout(): Promise<ScreenLayout> {
+      if (hidden) return "hearth";
+      const got = await readRect();
+      for (const layout of ["fullscreen", "panel"] as const) if (same(got, RECTS[layout])) return layout;
+      throw new Error(`the video window is at ${got.join(",")}, which is not a layout this adapter names`);
+    },
+    async setLayout(layout: ScreenLayout): Promise<void> {
+      if (layout === "hearth") {
+        await callback<unknown>((ok, err) => tizen.tvwindow.hide(ok, err, "MAIN"), "hide the video window");
+        hidden = true;
+        return;
+      }
+      await place(layout);
+    },
+  };
+
+  return {
+    display,
+    tryPlace: async (layout) => {
+      try {
+        await place(layout);
+        return true;
+      } catch {
+        return false;   // the switch happened and nobody can see it: the caller falls back to the viewer
+      }
+    },
+  };
 }
 
 /**
@@ -447,14 +534,3 @@ function safe<T>(fn: () => T): T | undefined { try { return fn(); } catch { retu
 /** The variadic tail just swallows the unused args at each call site. */
 function notSupported(what: string, ..._a: unknown[]): never { throw new TvUnsupportedError(what); }
 
-/** Place the MAIN video window in a rectangle, behind the page. `true` only if the television said it did. */
-function showVideoWindow(w: any, rect: string[]): Promise<boolean> {
-  if (typeof w.show !== "function") return Promise.resolve(false);
-  return new Promise((resolve) => {
-    try {
-      w.show(() => resolve(true), () => resolve(false), rect, "MAIN");
-    } catch {
-      resolve(false);
-    }
-  });
-}

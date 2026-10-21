@@ -51,6 +51,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (STATUS, Remaining 8). The same inspector run read the diagnostics row off the screen: `system.setInputSource ✅ hdmi1 -> hdmi1, read back; not restored` (the set was already on
   HDMI 1). Two apps in this repo have two ids on a television — `0 debug` takes the Tizen id from `vd_applist` (`tvaiagent0.TvAiAgent`), not the package-dir one. Two apps-cli
   timing tests (`local-listener`, `modelpilot-check`, 5 s budgets) timed out in a full run while the PC was loaded and passed alone: flaky under load, not broken. 1249 tests.
+- **A `display` slot on the platform: where the picture is — `fullscreen`, `panel`, or `hearth` (no picture).** The product wants all three (a picture alone when someone is watching, a
+  picture with Hearth beside it when the agent has something to say, Hearth alone when asked), and on Tizen they are one mechanism: the video window's rectangle, or its removal.
+  `PlatformProvider.display?: DisplayControl` (`getLayout`/`setLayout`), `PANEL_PICTURE` (75 % × 70 %, top-left, 16:9 kept) and `pictureRect()` so the app can lay itself out in the margin without knowing
+  the resolution. The Tizen adapter fills it only on a build with `tvwindow.show`. Measured on the HKC beforehand: show → full screen → panel → full screen → hide → panel all answered ok, and
+  `getRect(ok, err, 'px', 'MAIN')` — the units argument is what the television wanted; `'MAIN'` alone is a `TypeMismatchError`, which is how the earlier probe's `getRect` came back refused — reads the
+  rectangle back, so `fullscreen` and `panel` are verified and a rectangle it does not recognise is an error that prints it. **`hearth` is not read back**: nothing reports that the window is hidden, so
+  it is the adapter's own memory of having hidden it, and the code and tests say so. The input switch now places the picture through the same path (and falls back to the viewer if the window
+  does not read back). Not yet: a capability and tool for the model, the app laying itself out in the panel's margin, and a policy for who chooses the layout. 1256 tests.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.

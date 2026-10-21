@@ -255,20 +255,40 @@ describe("adapter-tizen input source", () => {
     expect(await createTizenAdapter().system.getInputSource()).toBe("hdmi1");
   });
 
+  /** The television's video window, as measured: show/getRect(px)/hide, and a rectangle that reads back what was set. */
+  function withVideoWindow(over: { show?: (ok: () => void, err: (e: any) => void, rect: string[]) => void; getRect?: any } = {}) {
+    const calls: string[] = [];
+    let rect = ["0px", "0px", "1920px", "1080px"];
+    const w = (globalThis as any).tizen.tvwindow;
+    w.show = over.show ?? ((ok: () => void, _e: unknown, r: string[]) => { calls.push("show " + r.join(",")); rect = r.map((v) => v + "px"); ok(); });
+    w.getRect = over.getRect ?? ((ok: (r: string[]) => void, _e: unknown, unit: string, type: string) => {
+      if (unit !== "px" || type !== "MAIN") throw Object.assign(new Error("Cannot convert " + unit + " to enum."), { name: "TypeMismatchError" });
+      ok(rect);
+    });
+    w.hide = (ok: () => void) => { calls.push("hide"); ok(); };
+    return calls;
+  }
+
   it("by default places the video window and does not suspend the page", async () => {
-    const shown: any[] = [];
-    (globalThis as any).tizen.tvwindow.show = (ok: () => void, _e: unknown, rect: string[], type: string) => { shown.push({ rect, type }); ok(); };
+    const calls = withVideoWindow();
     await createTizenAdapter().system.setInputSource("hdmi1");
     expect(current).toBe(HDMI1);
-    expect(shown).toEqual([{ rect: ["0", "0", "1920", "1080"], type: "MAIN" }]);
+    expect(calls).toEqual(["show 0,0,1920,1080"]);
     await new Promise((r) => setTimeout(r, 30));
     expect(launched).toEqual([]);                        // the viewer would have suspended the page
   });
 
   it("falls back to the viewer, after the read-back, when the television will not place the window", async () => {
-    (globalThis as any).tizen.tvwindow.show = (_ok: () => void, err: (e: unknown) => void) => err({ name: "SecurityError" });
+    withVideoWindow({ show: (_ok, err) => err({ name: "SecurityError" }) });
     await createTizenAdapter({ input: { viewer: { delayMs: 5 } } }).system.setInputSource("hdmi1");
     expect(launched).toEqual([]);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(launched).toEqual(["org.tizen.tv-viewer"]);
+  });
+
+  it("falls back to the viewer too when the window is placed and does not read back", async () => {
+    withVideoWindow({ getRect: (ok: (r: string[]) => void) => ok(["0px", "0px", "100px", "100px"]) });
+    await createTizenAdapter({ input: { viewer: { delayMs: 5 } } }).system.setInputSource("hdmi1");
     await new Promise((r) => setTimeout(r, 30));
     expect(launched).toEqual(["org.tizen.tv-viewer"]);
   });
@@ -316,5 +336,70 @@ describe("adapter-tizen input source", () => {
     const p = createTizenAdapter();
     await expect(p.system.getInputSource()).rejects.toSatisfy(isTvUnsupported);
     await expect(p.system.setInputSource("hdmi1")).rejects.toThrow(/tv\.window/);
+  });
+});
+
+describe("adapter-tizen display layout", () => {
+  let rect: string[];
+  let hides: number;
+
+  function install(): void {
+    installTizenMocks();
+    rect = ["0px", "0px", "1920px", "1080px"];
+    hides = 0;
+    (globalThis as any).tizen.tvwindow = {
+      show: (ok: () => void, _e: unknown, r: string[]) => { rect = r.map((v) => v + "px"); ok(); },
+      getRect: (ok: (r: string[]) => void, _e: unknown, unit: string) => {
+        if (unit !== "px") throw Object.assign(new Error("Cannot convert " + unit + " to enum."), { name: "TypeMismatchError" });
+        ok(rect);
+      },
+      hide: (ok: () => void) => { hides++; ok(); },
+    };
+  }
+
+  beforeEach(() => install());
+  afterEach(() => {
+    delete (globalThis as any).tizen;
+    delete (globalThis as any).webapis;
+  });
+
+  it("satisfies the provider contract, display included", async () => {
+    await assertProviderContract(() => createTizenAdapter());
+  });
+
+  it("moves the picture between full screen and the panel, and reads each back from the television", async () => {
+    const d = createTizenAdapter().display!;
+    await d.setLayout("panel");
+    expect(rect).toEqual(["0px", "0px", "1440px", "756px"]);
+    expect(await d.getLayout()).toBe("panel");
+    await d.setLayout("fullscreen");
+    expect(rect).toEqual(["0px", "0px", "1920px", "1080px"]);
+    expect(await d.getLayout()).toBe("fullscreen");
+  });
+
+  it("hides the window for the hearth layout, and says it is remembering that rather than reading it", async () => {
+    const d = createTizenAdapter().display!;
+    await d.setLayout("hearth");
+    expect(hides).toBe(1);
+    expect(await d.getLayout()).toBe("hearth");
+    await d.setLayout("panel");                          // placing it again ends the memory
+    expect(await d.getLayout()).toBe("panel");
+  });
+
+  it("fails — not verified — when the television accepts a rectangle and reports another", async () => {
+    (globalThis as any).tizen.tvwindow.show = (ok: () => void) => ok();   // accepted, ignored
+    (globalThis as any).tizen.tvwindow.getRect = (ok: (r: string[]) => void) => ok(["0px", "0px", "1920px", "1080px"]);
+    await expect(createTizenAdapter().display!.setLayout("panel")).rejects.toThrow(/panel rectangle 0,0,1440,756; it reports 0,0,1920,1080/);
+  });
+
+  it("names a rectangle it does not recognise instead of guessing a layout", async () => {
+    rect = ["10px", "10px", "300px", "200px"];
+    await expect(createTizenAdapter().display!.getLayout()).rejects.toThrow(/not a layout this adapter names/);
+  });
+
+  it("has no display at all on a build without tvwindow.show", () => {
+    delete (globalThis as any).tizen.tvwindow.show;
+    expect(createTizenAdapter().display).toBeUndefined();
+    expect(createTizenAdapter().has("display")).toBe(false);
   });
 });

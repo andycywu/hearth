@@ -2,7 +2,7 @@ import {
   hasCapability,
   matchAppsByName, createLocalStorageStore, createWebSpeechPipeline,
   type PlatformProvider, type DeviceInfo, type AppEntry,
-  type InputSource, type RemoteKey,
+  type InputSource, type RemoteKey, type ScreenLayout,
 } from "@hearthkit/platform-api";
 
 /**
@@ -15,6 +15,7 @@ export function createWebAdapter(): PlatformProvider {
     volume: 20,
     muted: false,
     input: "tv" as InputSource,
+    layout: "hearth" as ScreenLayout,
     apps: [
       { id: "com.netflix.ninja", name: "Netflix" },
       { id: "com.google.android.youtube.tv", name: "YouTube" },
@@ -60,6 +61,9 @@ export function createWebAdapter(): PlatformProvider {
       resume: async () => { console.info("[web] resume"); },
       seek: async (ms) => { console.info("[web] seek", ms); },
     },
+    // In memory: a browser has no video window to place, so this only holds the answer. It exists so the contract and the layers
+    // above can be exercised without a television.
+    display: { getLayout: async () => state.layout, setLayout: async (l) => { state.layout = l; } },
     has: (cap) => hasCapability(provider, cap),
     init: async () => { /* nothing to wire */ },
   };

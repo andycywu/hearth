@@ -123,8 +123,8 @@ export function createTvCapabilities(provider: string): Capability[] {
     },
     {
       ...base,
-      // Claimed, never proved: on Tizen the read works and the write is
-      // signing-gated, so `available` would be a promise this build cannot keep.
+      // Claimed until a device proves it: it works on the one Tizen set that has been tried (an ordinary developer certificate, tv.window) and is
+      // refused on others, so `available` would be a promise a build may not keep.
       status: "unverified",
       id: "tv.input.switch",
       name: "Switch input",
