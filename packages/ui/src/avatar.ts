@@ -187,6 +187,8 @@ export interface AvatarController {
   setSpeaking(speaking: boolean): void;
   /** Optional live speech energy, 0..1, when the host can measure it. */
   setLevel(level: number | undefined): void;
+  /** The mount changed size (the picture took part of the screen, or gave it back): redraw at the new size. */
+  resize(): void;
   destroy(): void;
 }
 
@@ -204,14 +206,17 @@ export function mountAgentAvatar(agent: Agent, opts: AvatarOptions = {}): Avatar
   const mount = opts.mount ?? document.body;
   const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
   const canvas = document.createElement("canvas");
-  const cssW = opts.width ?? mount.clientWidth ?? 1280;
-  const cssH = opts.height ?? mount.clientHeight ?? 720;
-  canvas.style.cssText = `width:${cssW}px;height:${cssH}px;display:block`;
-  canvas.width = Math.floor(cssW * dpr);
-  canvas.height = Math.floor(cssH * dpr);
+  let cssW = opts.width ?? mount.clientWidth ?? 1280;
+  let cssH = opts.height ?? mount.clientHeight ?? 720;
   mount.appendChild(canvas);
   const ctx = canvas.getContext("2d")!;
-  ctx.scale(dpr, dpr);
+  const fit = (): void => {
+    canvas.style.cssText = `width:${cssW}px;height:${cssH}px;display:block`;
+    canvas.width = Math.floor(cssW * dpr);    // assigning the size resets the context's transform, so scale again
+    canvas.height = Math.floor(cssH * dpr);
+    ctx.scale(dpr, dpr);
+  };
+  fit();
 
   const reducedMotion = opts.reducedMotion ?? prefersReducedMotion();
   const showText = opts.showText ?? true;
@@ -426,6 +431,12 @@ export function mountAgentAvatar(agent: Agent, opts: AvatarOptions = {}): Avatar
     setListening: (l) => vm.setListening(l),
     setSpeaking: (s) => vm.setSpeaking(s),
     setLevel: (l) => { level = l; },
+    resize: () => {
+      // A fixed logical size (`opts.width`/`height`) was asked for; honour it. Otherwise follow the mount.
+      cssW = opts.width ?? mount.clientWidth ?? cssW;
+      cssH = opts.height ?? mount.clientHeight ?? cssH;
+      fit();
+    },
     destroy: () => {
       vm.destroy();
       if (raf) cancelAnimationFrame(raf);

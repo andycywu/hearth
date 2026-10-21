@@ -11,6 +11,7 @@ import {
  * adapter must implement.
  */
 export function createWebAdapter(): PlatformProvider {
+  const layoutListeners = new Set<(layout: ScreenLayout) => void>();
   const state = {
     volume: 20,
     muted: false,
@@ -63,7 +64,11 @@ export function createWebAdapter(): PlatformProvider {
     },
     // In memory: a browser has no video window to place, so this only holds the answer. It exists so the contract and the layers
     // above can be exercised without a television.
-    display: { getLayout: async () => state.layout, setLayout: async (l) => { state.layout = l; } },
+    display: {
+      getLayout: async () => state.layout,
+      setLayout: async (l) => { state.layout = l; layoutListeners.forEach((cb) => cb(l)); },
+      onLayoutChange: (cb) => { layoutListeners.add(cb); return () => { layoutListeners.delete(cb); }; },
+    },
     has: (cap) => hasCapability(provider, cap),
     init: async () => { /* nothing to wire */ },
   };

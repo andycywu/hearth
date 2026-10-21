@@ -2,7 +2,7 @@ import {
   launchSearch, launchSearchSource, redactSecrets, collectDeviceReport, deviceReportToMarkdown,
   type Agent, type ConfirmRequest,
 } from "@hearthkit/core";
-import type { PlatformProvider } from "@hearthkit/platform-api";
+import { PANEL_PICTURE, type PlatformProvider, type ScreenLayout } from "@hearthkit/platform-api";
 import { mountAgentOverlay, type OverlayController } from "./overlay.js";
 import { mountAgentAvatar } from "./avatar.js";
 import { mountOnScreenKeyboard } from "./keyboard.js";
@@ -291,6 +291,12 @@ export function planRequested(search = launchSearch()): boolean {
 export interface DeviceShellController extends OverlayController {
   setListening?(listening: boolean): void;
   setSpeaking?(speaking: boolean): void;
+  /**
+   * The picture moved: give its corner back or take the screen. In the `panel` layout the picture holds the top-left `PANEL_PICTURE` of the
+   * screen and is drawn *above* the app (Tizen), so the avatar moves into the strip along the bottom, where nothing covers it; in the other
+   * two it has the whole screen. Only the avatar renderer lays itself out so far.
+   */
+  setLayout?(layout: ScreenLayout): void;
 }
 
 /**
@@ -331,6 +337,17 @@ export function mountDeviceShell(
         showActivity: debugRequested(),
       })
     : mountAgentOverlay(agent);
+
+  // The picture can take the top-left of the screen and is drawn above the app, so when it does the avatar moves down into the strip beneath it.
+  // The keyboard owns the bottom of the screen on the bench, and the two do not fit together, so a keyboard build leaves the avatar alone.
+  const layer = document.getElementById("avatar-layer");
+  if (layer && !opts.keyboard) {
+    ui.setLayout = (layout: ScreenLayout) => {
+      layer.style.top = layout === "panel" ? `${Math.round(PANEL_PICTURE.h * 100)}vh` : "0";
+      (ui as { resize?: () => void }).resize?.();
+    };
+  }
+  const unsubscribeLayout = platform.has("display") ? platform.display?.onLayoutChange?.((layout) => ui.setLayout?.(layout)) : undefined;
 
   // With plan mode on, every way in — the keyboard, the microphone, `?ask=`, the
   // demo script — goes through the agent's own routing: a goal it can plan is
@@ -448,12 +465,14 @@ export function mountDeviceShell(
 
   if (hint) hint.textContent = hintText;
 
-  if (!keyboard && !micButton) return ui;
+  if (!keyboard && !micButton) {
+    return unsubscribeLayout ? { ...ui, destroy: () => { unsubscribeLayout(); ui.destroy(); } } : ui;
+  }
   // Tear these down with the shell, so a host that remounts doesn't stack a
   // second listener on document.
   return {
     ...ui,
-    destroy: () => { keyboard?.destroy(); micButton?.destroy(); ui.destroy(); },
+    destroy: () => { unsubscribeLayout?.(); keyboard?.destroy(); micButton?.destroy(); ui.destroy(); },
   };
 }
 

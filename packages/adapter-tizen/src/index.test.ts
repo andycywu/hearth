@@ -399,6 +399,21 @@ describe("adapter-tizen display layout", () => {
     await expect(createTizenAdapter().display!.getLayout()).rejects.toThrow(/not a layout this adapter names/);
   });
 
+  it("tells listeners about a layout the television accepted, and not about one it refused or after they leave", async () => {
+    const d = createTizenAdapter().display!;
+    const heard: string[] = [];
+    const off = d.onLayoutChange!((l) => heard.push(l));
+    await d.setLayout("panel");
+    await d.setLayout("hearth");
+    (globalThis as any).tizen.tvwindow.show = (_ok: () => void, err: (e: unknown) => void) => err({ name: "SecurityError" });
+    await expect(d.setLayout("fullscreen")).rejects.toBeDefined();
+    expect(heard).toEqual(["panel", "hearth"]);
+    off();
+    (globalThis as any).tizen.tvwindow.show = (ok: () => void) => ok();
+    await d.setLayout("hearth");
+    expect(heard).toEqual(["panel", "hearth"]);
+  });
+
   it("has no display at all on a build without tvwindow.show", () => {
     delete (globalThis as any).tizen.tvwindow.show;
     expect(createTizenAdapter().display).toBeUndefined();

@@ -433,6 +433,8 @@ function hasVideoWindow(): boolean {
 }
 
 function createVideoWindow(): VideoWindow {
+  const listeners = new Set<(layout: ScreenLayout) => void>();
+  const announce = (layout: ScreenLayout) => listeners.forEach((cb) => { try { cb(layout); } catch { /* a listener's fault is not the television's */ } });
   let hidden = false;   // our own memory: the television does not report it, so it is used only to refuse to answer
 
   const callback = <T>(run: (ok: (v: T) => void, err: (e: any) => void) => void, doing: string): Promise<T> =>
@@ -459,6 +461,7 @@ function createVideoWindow(): VideoWindow {
       throw new Error(`asked the television for the ${layout} rectangle ${rect.join(",")}; it reports ${got.join(",")}`);
     }
     hidden = false;
+    announce(layout);
   };
 
   const display: DisplayControl = {
@@ -472,9 +475,14 @@ function createVideoWindow(): VideoWindow {
       if (layout === "hearth") {
         await callback<unknown>((ok, err) => tizen.tvwindow.hide(ok, err, "MAIN"), "hide the video window");
         hidden = true;
+        announce("hearth");
         return;
       }
       await place(layout);
+    },
+    onLayoutChange(cb) {
+      listeners.add(cb);
+      return () => { listeners.delete(cb); };
     },
   };
 

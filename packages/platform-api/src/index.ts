@@ -74,6 +74,12 @@ export function pictureRect(layout: ScreenLayout): PictureRect | null {
 export interface DisplayControl {
   getLayout(): Promise<ScreenLayout | undefined>;
   setLayout(layout: ScreenLayout): Promise<void>;
+  /**
+   * Called after a layout the platform *accepted* — from anyone: the agent's policy, the model's tool, a diagnostic. It is a cue for the app to lay
+   * itself out (give the picture's corner back, take the screen), not a reading: what the television shows is `getLayout`'s to say.
+   * Returns an unsubscribe. Optional; an adapter that cannot tell when its layout changes omits it.
+   */
+  onLayoutChange?(cb: (layout: ScreenLayout) => void): () => void;
 }
 
 export interface AppControl {

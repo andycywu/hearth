@@ -67,6 +67,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (Hearth is already visible); two engagements in one tick make one call. Best-effort: a display that refuses is logged, never thrown into the turn. Wired in the host behind `?layout=auto`, **off by
   default**: on Tizen the video window is drawn above the page, so shrinking the picture today would leave the page's avatar half-covered until the app lays itself out in the panel's margin
   (not yet). 9 tests; 1269 tests.
+- **The app moves its avatar when the picture moves.** `DisplayControl.onLayoutChange` (Tizen and the in-memory adapter) calls back after a layout the platform *accepted* — a cue to lay out, not a reading — and
+  the device shell, on `panel`, moves the avatar's layer into the strip beneath the picture (the bottom 30 %, where nothing covers it) and tells the avatar to `resize()` (its canvas was fixed at mount; it
+  now follows its mount). A build with the on-screen keyboard leaves the avatar alone: the keyboard owns that strip. Only the avatar renderer does this; the right-hand margin is unused. Written
+  without a way to see it — the UI package has no DOM in CI — so what it looks like on the television is the next thing to check, and the bundles are at 95 % of budget now. 1270 tests.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.
