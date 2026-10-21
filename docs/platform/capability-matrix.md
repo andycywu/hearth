@@ -93,7 +93,7 @@ deferred until a self-signed eng board — see [`../POC.md`](../POC.md).
 | mute              | ✅       | ❔       | ❔       | ❔⁴       | ✅⁵       |
 | list apps         | ✅       | ❔       | ❔       | ❔        | ✅⁵       |
 | launch app        | ✅       | ❔       | ❔       | ❔        | ✅⁵       |
-| input source      | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ⛔⁵       |
+| input source      | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ❔⁶       |
 | key injection     | ✅¹      | ⚠️       | ⚠️       | ❔        | ✅⁵       |
 | power standby     | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ⏭️⁵       |
 | network status    | ✅       | ❔       | ❔       | ❔        | ✅⁵       |
@@ -124,11 +124,17 @@ only reason it is filed under NVT: the string says so, while `?diag` reports
 `soc=unknown` because the adapter has no rule that reads it. One set is not a
 column, and a Samsung-branded NVT set may answer differently — in particular
 this one has `webapis` **without** `audiocontrol`, so it takes the standard-API
-path that a retail Samsung TV would not. `⛔` for input source is the honest
-answer rather than `⚠️`: this build refuses `setInputSource` outright, so the
-capability is withdrawn and the tool is never offered. Power standby was not
+path that a retail Samsung TV would not. Input source reads `❔`, not the `⛔` this
+row said until 2026-10-21 — see ⁶. Power standby was not
 run — it is destructive and the probe never auto-runs it. Full run:
 [reports/tizen-ttq55uq1cs.md](reports/tizen-ttq55uq1cs.md).
+
+⁶ **Correction, 2026-10-21.** This cell said `⛔` — *the device refuses it* — and the note said the build "refuses `setInputSource`
+outright". It was never asked: `adapter-tizen`'s `setInputSource` is a hard-coded `TvUnsupportedError` that calls no API, and its
+`getInputSource` returns the constant `"tv"` whatever `webapis.tvinfo` answered. So the honest cell is `❔` (untested), and the earlier
+"read ✅, write signing-gated forever" (`capability-graph.md`) was a belief, not a measurement. Another project's working Samsung code uses
+`tizen.tvwindow.setSource` and `tizen.systeminfo VIDEOSOURCE` and declares a `tv.window` privilege we do not; whether that works on this set
+is the first experiment in [`free-my-tv-reference.md`](free-my-tv-reference.md).
 
 Record firmware version, WebView/Chromium version, and required privileges next
 to each result.

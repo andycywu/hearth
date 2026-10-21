@@ -8,6 +8,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
+  (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
+  them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.
+  [`docs/platform/free-my-tv-reference.md`](docs/platform/free-my-tv-reference.md) sets its calls beside ours (nothing run, only the README, `web/tv.js` and
+  the two manifests read). What it turned up: LG treats an input as an app (`launch com.webos.app.hdmi1`), reads which ports have a device and
+  **the name the owner gave it** ("PS5") from `com.webos.service.eim/getAllInputStatus`, and Samsung offers `tizen.tvwindow.setSource` and
+  `tizen.systeminfo VIDEOSOURCE` under a `tv.window` privilege our `config.xml` lacks. And the reading exposed that **our Tizen adapter never asks
+  the television to switch input** — `setInputSource` is a hard-coded refusal that calls no API, and `getInputSource` returns the constant `"tv"`
+  whatever `webapis.tvinfo` answered. So the capability matrix's `⛔` ("the device refuses it") and the earlier "read works, write signing-gated
+  forever" were beliefs, not measurements; the cell is now `❔` with a dated correction, the HKC report has a dated note, and `capability-graph.md` no
+  longer says it. Also recorded: our webOS permission names differ from the ones a working LG app declares, and our `es2020` bundle target leaves
+  out the 2016–2019 sets `free-my-tv` reaches with hand-written ES5. Five experiments are listed, the first on the HKC; none is run.
 - **A Chinese wake word, beside the English one: `--wake "hearth,小爐小爐"`.** The keyword model was never English-only — its own
   examples are pinyin — the helper only knew the English lexicon. Chinese characters now go through `pypinyin`, are split into initial
   and toned final exactly as the model's examples are (`文森特卡索` → `w én s ēn t è k ǎ s uǒ`), and every piece is checked against the

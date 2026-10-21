@@ -77,3 +77,5 @@ Living Room
 - the PS5/STB in the room section are seeded by `room=demo`, not real hardware
 - no independent volume readback (vconftool absent or a different key on this build) — volume figures below are the adapter reporting on itself
 
+_Note, 2026-10-21:_ the `system.getInputSource ✅ tv` row above is the adapter's constant, not a reading, and `setInputSource` was never attempted
+(see capability-matrix footnote 6). Neither row says anything about what this television can do.

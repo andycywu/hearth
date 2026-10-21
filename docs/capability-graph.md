@@ -111,7 +111,9 @@ device discovery (CEC/mDNS)  --/
 Three states, and the middle one matters: `unverified` means "the device claims
 it, nothing has proved it". A capability with no side-effect-free read can only
 ever be `unverified` until it is used — `tv.input.switch` on Tizen is exactly
-that case, where the *read* works and the *write* is signing-gated forever.
+that case: a read that vouches only for itself, and a write nobody has yet tried. (This paragraph used to say the read
+"works" and the write is "signing-gated forever". The read is the constant `"tv"` and the write was never attempted: see
+[`platform/free-my-tv-reference.md`](platform/free-my-tv-reference.md), 2026-10-21.)
 
 Rules carried over from `capability-probe.ts`, unchanged because they are right:
 
@@ -121,8 +123,8 @@ Rules carried over from `capability-probe.ts`, unchanged because they are right:
 - **A read vouches only for what it declares.** `vouchesFor` on the read
   capability names the ids it speaks for — usually its own group, because read
   and write share one platform object, and sometimes only itself:
-  `tv.input.get_source` reads fine on Tizen while `tv.input.switch` is
-  signing-gated forever.
+  `tv.input.get_source` and `tv.input.switch` are the standing example of a read that
+  cannot speak for its write, whatever either turns out to do on a given set.
 
 ## Relationship to tools
 
