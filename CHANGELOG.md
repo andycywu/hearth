@@ -58,7 +58,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `getRect(ok, err, 'px', 'MAIN')` — the units argument is what the television wanted; `'MAIN'` alone is a `TypeMismatchError`, which is how the earlier probe's `getRect` came back refused — reads the
   rectangle back, so `fullscreen` and `panel` are verified and a rectangle it does not recognise is an error that prints it. **`hearth` is not read back**: after `hide`, `getRect` still answers the rectangle the window last held (measured), so `getLayout` answers `undefined` — cannot tell — rather
   than naming a layout from a stale rectangle or `hearth` from memory, and the planner reads that as `unverified`. The input switch now places the picture through the same path (and falls back to the viewer if the window
-  does not read back). Not yet: a capability and tool for the model, the app laying itself out in the panel's margin, and a policy for who chooses the layout. 1256 tests.
+  does not read back). The model now has it too: `tv.display.get_layout` / `tv.display.set_layout` (tools `get_screen_layout` / `set_screen_layout`, offered only where the device has a display slot; low risk, because it
+  moves the picture and nothing else, and the agent will do it while it talks). A read that answers nothing leaves our optimistic write standing and the planner calls it `unverified` — which is how
+  `hearth` ends on Tizen; a rectangle that does not match is `failed`. Not yet: the app laying itself out in the panel's margin, and a policy for who chooses the layout. 1260 tests.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.
