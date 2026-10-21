@@ -413,8 +413,8 @@ async function switchInputSource(source: InputSource, options: TizenInputOptions
 // Measured on an HKC Tizen 7.0 set (tools/experiments/tizen-input-probe, 2026-10-21): `tizen.tvwindow.show(ok, err, [x, y, w, h], 'MAIN')`
 // places the video window in a rectangle without suspending the page, and the window is drawn *above* the page. `getRect(ok, err, 'px',
 // 'MAIN')` reads the rectangle back (the units argument is the one the television wanted; 'MAIN' alone is a TypeMismatchError). `hide`
-// removes the window. Nothing reads back *that* a window is hidden, so `hearth` is the adapter's own memory of having hidden it — said
-// so in the error a stale answer would produce, not claimed as measured.
+// removes the window. Nothing reads back *that* a window is hidden: after `hide`, `getRect` still answers the rectangle it last held (measured
+// 2026-10-21). So once the adapter has hidden the window it does not name a layout, rather than naming `hearth` from memory.
 
 const SCREEN = { w: 1920, h: 1080 };
 const RECTS: Record<"fullscreen" | "panel", [string, string, string, string]> = {
@@ -433,7 +433,7 @@ function hasVideoWindow(): boolean {
 }
 
 function createVideoWindow(): VideoWindow {
-  let hidden = false;   // our own memory: the television does not report it
+  let hidden = false;   // our own memory: the television does not report it, so it is used only to refuse to answer
 
   const callback = <T>(run: (ok: (v: T) => void, err: (e: any) => void) => void, doing: string): Promise<T> =>
     new Promise<T>((resolve, reject) => {
@@ -462,8 +462,8 @@ function createVideoWindow(): VideoWindow {
   };
 
   const display: DisplayControl = {
-    async getLayout(): Promise<ScreenLayout> {
-      if (hidden) return "hearth";
+    async getLayout(): Promise<ScreenLayout | undefined> {
+      if (hidden) return undefined;   // cannot tell: getRect still says where the window last was
       const got = await readRect();
       for (const layout of ["fullscreen", "panel"] as const) if (same(got, RECTS[layout])) return layout;
       throw new Error(`the video window is at ${got.join(",")}, which is not a layout this adapter names`);

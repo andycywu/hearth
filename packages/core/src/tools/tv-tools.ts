@@ -1,7 +1,7 @@
-import type { PlatformProvider, InputSource, RemoteKey } from "@hearthkit/platform-api";
+import type { PlatformProvider, InputSource, RemoteKey, ScreenLayout } from "@hearthkit/platform-api";
 import type { Capability } from "../capabilities/types.js";
 import {
-  createTvCapabilities, createMediaCapabilities,
+  createTvCapabilities, createMediaCapabilities, createDisplayCapabilities,
 } from "../capabilities/tv-capabilities.js";
 import { toolsFromCapabilities, type CapabilityHandler } from "../capabilities/to-tools.js";
 import type { Tool } from "./registry.js";
@@ -25,6 +25,7 @@ export function capabilitiesForPlatform(platform: PlatformProvider): Capability[
     ...createTvCapabilities(provider),
     // Optional HAL member: a device without it must never be offered the tools.
     ...(platform.has("media") && platform.media ? createMediaCapabilities(provider) : []),
+    ...(platform.has("display") && platform.display ? createDisplayCapabilities(provider) : []),
   ];
 }
 
@@ -80,6 +81,19 @@ export function tvHandlers(platform: PlatformProvider): Record<string, Capabilit
     handlers["content.pause"] = async () => { await media.pause(); };
     handlers["content.resume"] = async () => { await media.resume(); };
     handlers["content.seek"] = async (args) => { await media.seek(Number(args.positionMs)); };
+  }
+
+  const display = platform.display;
+  if (platform.has("display") && display) {
+    // `layout` is left out of the answer when the adapter cannot tell, so the world is not told something the television did not say.
+    handlers["tv.display.get_layout"] = async () => {
+      const layout = await display.getLayout();
+      return layout === undefined ? {} : { layout };
+    };
+    handlers["tv.display.set_layout"] = async (args) => {
+      await display.setLayout(args.layout as ScreenLayout);
+      return undefined;
+    };
   }
 
   return handlers;

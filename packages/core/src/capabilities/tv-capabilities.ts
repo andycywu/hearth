@@ -1,4 +1,4 @@
-import type { InputSource, RemoteKey } from "@hearthkit/platform-api";
+import type { InputSource, RemoteKey, ScreenLayout } from "@hearthkit/platform-api";
 import { W } from "../world/state.js";
 import type { Capability } from "./types.js";
 
@@ -265,6 +265,54 @@ export function createDevicePowerCapabilities(deviceId: string, provider: string
  * Media transport, offered only where the platform advertises `media` — an
  * optional HAL member must not become a promise on a device without it.
  */
+const SCREEN_LAYOUTS: ScreenLayout[] = ["fullscreen", "panel", "hearth"];
+
+/**
+ * Where the picture is relative to Hearth's own screen. Offered only on a device with a `display` slot (`platform.has("display")`).
+ *
+ * The read vouches for the write: both go through the one video window, so a read that reports it absent means the write cannot work either.
+ * And the read may answer *nothing* — on Tizen once the window has been hidden — in which case a `set_layout hearth` ends `unverified`, the
+ * planner's reading of a reader that succeeded without answering, not `verified` from our own optimistic write.
+ */
+export function createDisplayCapabilities(provider: string): Capability[] {
+  const base = { device: "tv", provider, confidence: 1, status: "available", domain: "display" } as const;
+  return [
+    {
+      ...base,
+      id: "tv.display.get_layout",
+      name: "Read screen layout",
+      description:
+        "Where the TV picture is relative to the assistant: 'fullscreen' (picture only), 'panel' (picture in the top-left, the assistant around it) or 'hearth' (no picture). May answer nothing if the layout cannot be read.",
+      parameters: {},
+      tool: "get_screen_layout",
+      reads: { layout: W.tvLayout },
+      vouchesFor: ["tv.display.get_layout", "tv.display.set_layout"],
+      riskLevel: "low",
+      verification: { kind: "none", because: "a read has nothing to verify" },
+    },
+    {
+      ...base,
+      id: "tv.display.set_layout",
+      name: "Set screen layout",
+      description:
+        "Change where the TV picture is: 'fullscreen' to watch with nothing else on screen, 'panel' to shrink the picture to the top-left and leave room for the assistant, 'hearth' to hide the picture and show only the assistant.",
+      parameters: {
+        layout: { type: "string", description: "fullscreen, panel or hearth", required: true, enum: SCREEN_LAYOUTS },
+      },
+      tool: "set_screen_layout",
+      sideEffects: [{ path: W.tvLayout, set: "{layout}" }],
+      // Low: it is reversible with the next word, it only moves the picture (it does not take the input away), and the agent does it itself
+      // while talking — a confirmation on every reply would be the prompt that teaches people to press OK without reading.
+      riskLevel: "low",
+      verification: {
+        kind: "read_back",
+        capability: "tv.display.get_layout",
+        predicate: { path: W.tvLayout, equals: "{layout}" },
+      },
+    },
+  ];
+}
+
 export function createMediaCapabilities(provider: string): Capability[] {
   const base = { device: "tv", provider, confidence: 1, status: "available", domain: "content" } as const;
   return [

@@ -85,6 +85,8 @@ export type LivingRoomState = Record<string, unknown>;
 export const W = {
   tvPower: "tv.power",
   tvInput: "tv.input",
+  /** Where the picture is: `fullscreen`, `panel` or `hearth` (see `ScreenLayout`). */
+  tvLayout: "tv.layout",
   tvVolume: "tv.volume",
   tvMuted: "tv.muted",
   tvPictureMode: "tv.pictureMode",

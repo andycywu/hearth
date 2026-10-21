@@ -377,11 +377,13 @@ describe("adapter-tizen display layout", () => {
     expect(await d.getLayout()).toBe("fullscreen");
   });
 
-  it("hides the window for the hearth layout, and says it is remembering that rather than reading it", async () => {
+  it("hides the window for the hearth layout, and then does not claim to read it", async () => {
     const d = createTizenAdapter().display!;
+    await d.setLayout("panel");
     await d.setLayout("hearth");
     expect(hides).toBe(1);
-    expect(await d.getLayout()).toBe("hearth");
+    expect(rect).toEqual(["0px", "0px", "1440px", "756px"]);     // the television still reports where the window last was
+    expect(await d.getLayout()).toBeUndefined();                // so the adapter must not name "panel", or "hearth" from memory
     await d.setLayout("panel");                          // placing it again ends the memory
     expect(await d.getLayout()).toBe("panel");
   });

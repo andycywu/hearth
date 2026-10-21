@@ -61,10 +61,11 @@ describe("cross-target acceptance", () => {
    * The vocabulary is allowed to vary in exactly one way — an optional
    * capability the device doesn't have. That is deliberate and is the opposite
    * of an OS-specific schema: a TV with no media transport shouldn't be offered
-   * `media_play` at all, whatever OS it runs. So the *core* vocabulary must be
+   * `media_play` at all, whatever OS it runs — and one with no video window to place (everything but a Tizen build with `tvwindow.show`, and the in-memory
+   * adapter) shouldn't be offered `set_screen_layout`. So the *core* vocabulary must be
    * identical everywhere, and every difference must be a capability-gated tool.
    */
-  const CAPABILITY_GATED = /^media_/;
+  const CAPABILITY_GATED = /^media_|_screen_layout$/;
 
   it("exposes one tool vocabulary, not one per OS", () => {
     const byTarget = targets().map((target) => {

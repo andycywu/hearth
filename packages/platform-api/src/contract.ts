@@ -185,7 +185,9 @@ export async function assertProviderContract(
   if (p.has("display") && p.display) {
     for (const layout of ["panel", "fullscreen", "hearth"] as const) {
       await p.display.setLayout(layout);
-      assert((await p.display.getLayout()) === layout, `display.setLayout(${layout}) did not read back`);
+      const got = await p.display.getLayout();
+      // `undefined` is an honest "cannot tell" for the one layout that is the absence of a picture; for the others it is a failure to read back.
+      assert(got === layout || (layout === "hearth" && got === undefined), `display.setLayout(${layout}) did not read back (got ${String(got)})`);
     }
   }
 

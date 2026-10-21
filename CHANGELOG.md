@@ -56,8 +56,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `PlatformProvider.display?: DisplayControl` (`getLayout`/`setLayout`), `PANEL_PICTURE` (75 % × 70 %, top-left, 16:9 kept) and `pictureRect()` so the app can lay itself out in the margin without knowing
   the resolution. The Tizen adapter fills it only on a build with `tvwindow.show`. Measured on the HKC beforehand: show → full screen → panel → full screen → hide → panel all answered ok, and
   `getRect(ok, err, 'px', 'MAIN')` — the units argument is what the television wanted; `'MAIN'` alone is a `TypeMismatchError`, which is how the earlier probe's `getRect` came back refused — reads the
-  rectangle back, so `fullscreen` and `panel` are verified and a rectangle it does not recognise is an error that prints it. **`hearth` is not read back**: nothing reports that the window is hidden, so
-  it is the adapter's own memory of having hidden it, and the code and tests say so. The input switch now places the picture through the same path (and falls back to the viewer if the window
+  rectangle back, so `fullscreen` and `panel` are verified and a rectangle it does not recognise is an error that prints it. **`hearth` is not read back**: after `hide`, `getRect` still answers the rectangle the window last held (measured), so `getLayout` answers `undefined` — cannot tell — rather
+  than naming a layout from a stale rectangle or `hearth` from memory, and the planner reads that as `unverified`. The input switch now places the picture through the same path (and falls back to the viewer if the window
   does not read back). Not yet: a capability and tool for the model, the app laying itself out in the panel's margin, and a policy for who chooses the layout. 1256 tests.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens

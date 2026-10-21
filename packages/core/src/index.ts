@@ -51,7 +51,7 @@ export {
   type StatePredicate, type StateEffect, type Constraint, type Verification,
 } from "./capabilities/types.js";
 export {
-  createTvCapabilities, createMediaCapabilities, createDevicePowerCapabilities,
+  createTvCapabilities, createMediaCapabilities, createDisplayCapabilities, createDevicePowerCapabilities,
 } from "./capabilities/tv-capabilities.js";
 export { DeviceGraph, runDiscovery, createManualSource } from "./devices/graph.js";
 export { createPlatformSource } from "./devices/platform-source.js";

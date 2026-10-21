@@ -65,11 +65,14 @@ export function pictureRect(layout: ScreenLayout): PictureRect | null {
 
 /**
  * Where the picture is. Optional: a platform whose app *is* the picture (a set-top box rendering both) has nothing to place, and one whose
- * web runtime has no video-window API cannot. `setLayout` resolves only once the platform has said it took effect; whether it can be read
- * back is the adapter's to say (`getLayout` throws `TvUnsupportedError` where it cannot).
+ * web runtime has no video-window API cannot. `setLayout` resolves only once the platform has said it took effect.
+ *
+ * `getLayout` answers `undefined` when it cannot tell — on Tizen, once the window has been hidden: nothing reports a hidden window, and the
+ * rectangle it last held is still what `getRect` returns, so naming a layout from it would be wrong and naming `hearth` from memory would be a
+ * claim, not a reading. The planner treats a read that answers nothing as `unverified`, which is the truth.
  */
 export interface DisplayControl {
-  getLayout(): Promise<ScreenLayout>;
+  getLayout(): Promise<ScreenLayout | undefined>;
   setLayout(layout: ScreenLayout): Promise<void>;
 }
 
