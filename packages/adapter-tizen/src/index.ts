@@ -23,15 +23,26 @@ declare const webapis: any;
 /**
  * What happens after a successful input switch.
  *
- * `tizen.tvwindow.setSource` changes the source of the television's MAIN video window. A web app is drawn *over* that window, so
- * after `setSource` alone the person still sees the app (measured on an HKC Tizen 7.0 set, 2026-10-21: the television reported
- * HDMI 1 and the owner saw only the app's page). The picture appears when the television's own viewer is brought to the front,
- * which is what Samsung's launcher-style apps do after `setSource` — and launching another application suspends this page, so it
- * is done *after* the switch has been read back and after the agent has had a moment to say what it did.
+ * `tizen.tvwindow.setSource` changes the source of the television's MAIN video window, but the picture does not show on its own
+ * (measured on an HKC Tizen 7.0 set, 2026-10-21: the television reported HDMI 1 and the owner saw only the app's page). Two ways to
+ * make it show were measured there:
+ *
+ *  - `"window"` (default): `tizen.tvwindow.show` places the video window in a rectangle (the whole screen by default). The page is
+ *    **not suspended** — it keeps running and answering — but the video window is drawn **above** the page, not under it: with the
+ *    page's backdrop removed and its background transparent, a full-screen window still hid every pixel of the page (the owner saw
+ *    only the picture; the inspector found the page's text in place and unobscured by anything in the DOM). With a *partial* rectangle
+ *    the page and the picture are both visible, side by side. So the agent stays alive but, at full screen, invisible, and the way
+ *    back is `tvwindow.hide`.
+ *  - `"viewer"`: bring the television's own viewer (`org.tizen.tv-viewer`) to the front. It works, and it **suspends the page**,
+ *    so the person has to find the app in the list to get it back. The fallback if `show` is refused, and the only choice on a build
+ *    that has no `tvwindow.show`.
+ *  - `false`: switch and leave it; the source changes and nothing shows it.
  */
 export interface TizenInputOptions {
-  /** `false` leaves the page in front: the source changes, and nothing shows it. Default: bring the viewer up. */
-  showAfterSwitch?: false | {
+  show?: "window" | "viewer" | false;
+  /** The video window's rectangle, as the television wants it (strings: x, y, width, height). Default the full 1920x1080 screen. */
+  rect?: [string, string, string, string];
+  viewer?: {
     /** The television's viewer. Default `org.tizen.tv-viewer`. */
     appId?: string;
     /** How long after the switch is confirmed to launch it, so the read-back and the reply can happen first. Default 2500 ms. */
@@ -376,15 +387,23 @@ async function switchInputSource(source: InputSource, options: TizenInputOptions
     throw new Error(`asked the television for ${source}; it reports ${now}`);
   }
 
-  if (options?.showAfterSwitch !== false) {
-    const appId = options?.showAfterSwitch?.appId ?? "org.tizen.tv-viewer";
-    const delay = options?.showAfterSwitch?.delayMs ?? 2500;
+  const mode = options?.show ?? "window";
+  if (mode === "window") {
+    const shown = await showVideoWindow(w, options?.rect ?? ["0", "0", "1920", "1080"]);
+    if (shown) return;
+    // The television would not place the window: the switch happened and nobody can see it. Say less than we hoped and fall through
+    // to the viewer, which can.
+  }
+  if (mode !== false) {
+    const appId = options?.viewer?.appId ?? "org.tizen.tv-viewer";
+    const delay = options?.viewer?.delayMs ?? 2500;
     // Last, because this suspends the page. A launch that fails leaves the source switched and the picture hidden behind the app.
     setTimeout(() => {
       safe(() => tizen.application.launch(appId, () => {}, () => {}));
     }, delay);
   }
 }
+
 /**
  * Prefer Tizen's own `preference` API — it is the only store that survives an
  * app *reinstall* as well as a restart — and fall back to localStorage, then
@@ -427,3 +446,15 @@ const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 function safe<T>(fn: () => T): T | undefined { try { return fn(); } catch { return undefined; } }
 /** The variadic tail just swallows the unused args at each call site. */
 function notSupported(what: string, ..._a: unknown[]): never { throw new TvUnsupportedError(what); }
+
+/** Place the MAIN video window in a rectangle, behind the page. `true` only if the television said it did. */
+function showVideoWindow(w: any, rect: string[]): Promise<boolean> {
+  if (typeof w.show !== "function") return Promise.resolve(false);
+  return new Promise((resolve) => {
+    try {
+      w.show(() => resolve(true), () => resolve(false), rect, "MAIN");
+    } catch {
+      resolve(false);
+    }
+  });
+}

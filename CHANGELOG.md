@@ -39,6 +39,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   guessing. (The name was already `Hearth` in `config.xml`; what showed as "TV AI Agent" is only the package file name.) Still drawn in code, still placeholder artwork. No code path changed; 1247 tests.
   **Then the owner asked for the hearth itself — 圍爐, the family closed round a fire — and it became a flame inside a ring of five arcs** (the gathering, and five people sitting;
   the gaps shrink and it stays a clean ring at 80 px). The flame's belly is a true circle now: the first drawing cut it flat at the bottom. Code-drawn placeholder, to be overwritten by real artwork.
+- **Experiment 2: the video window can be placed without suspending the page — but it is drawn above the page, not under it.** After an input switch the only way to
+  show the picture we had was the television's viewer, which suspends the agent. `tizen.tvwindow.show(ok, err, [x, y, w, h], 'MAIN')` places the video window in a
+  rectangle instead (the signature is the television's own: `getRect` takes callbacks then the window type, and `show` takes callbacks, a string array, then the type).
+  On the HKC, the page kept running through the 20 s hold (four checks, all answered) and with a quarter-screen rectangle the owner saw the page's text and HDMI 1 side by side.
+  **But at full screen the owner saw only HDMI 1**: the inspector, run against the real app, found the page intact — its backdrop `display:none`, `html`/`body` transparent,
+  the report's text at the centre with nothing opaque over it — so the video plane is above the web layer, and a transparent page does not show through. (A first guess that
+  removing the page's backdrop would let it show through was wrong, and the host plumbing written for it was removed again.) The adapter's default is therefore `show: "window"`
+  (full screen, falling back to the viewer if the television refuses): the agent stays alive and, at full screen, invisible, and the way back is `tvwindow.hide`, which
+  the television accepts but nothing yet calls. Choosing between that, a partial rectangle with a Hearth panel beside it, and the old viewer is a product decision
+  (STATUS, Remaining 8). The same inspector run read the diagnostics row off the screen: `system.setInputSource ✅ hdmi1 -> hdmi1, read back; not restored` (the set was already on
+  HDMI 1). Two apps in this repo have two ids on a television — `0 debug` takes the Tizen id from `vd_applist` (`tvaiagent0.TvAiAgent`), not the package-dir one. Two apps-cli
+  timing tests (`local-listener`, `modelpilot-check`, 5 s budgets) timed out in a full run while the PC was loaded and passed alone: flaky under load, not broken. 1249 tests.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.

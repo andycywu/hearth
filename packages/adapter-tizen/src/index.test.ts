@@ -255,17 +255,37 @@ describe("adapter-tizen input source", () => {
     expect(await createTizenAdapter().system.getInputSource()).toBe("hdmi1");
   });
 
-  it("switches, reads back, and only then brings the viewer up", async () => {
-    const p = createTizenAdapter({ input: { showAfterSwitch: { delayMs: 5 } } });
-    await p.system.setInputSource("hdmi1");
+  it("by default places the video window and does not suspend the page", async () => {
+    const shown: any[] = [];
+    (globalThis as any).tizen.tvwindow.show = (ok: () => void, _e: unknown, rect: string[], type: string) => { shown.push({ rect, type }); ok(); };
+    await createTizenAdapter().system.setInputSource("hdmi1");
     expect(current).toBe(HDMI1);
-    expect(launched).toEqual([]);                       // the read-back happens before the page is suspended
+    expect(shown).toEqual([{ rect: ["0", "0", "1920", "1080"], type: "MAIN" }]);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(launched).toEqual([]);                        // the viewer would have suspended the page
+  });
+
+  it("falls back to the viewer, after the read-back, when the television will not place the window", async () => {
+    (globalThis as any).tizen.tvwindow.show = (_ok: () => void, err: (e: unknown) => void) => err({ name: "SecurityError" });
+    await createTizenAdapter({ input: { viewer: { delayMs: 5 } } }).system.setInputSource("hdmi1");
+    expect(launched).toEqual([]);
     await new Promise((r) => setTimeout(r, 30));
     expect(launched).toEqual(["org.tizen.tv-viewer"]);
   });
 
-  it("does not launch the viewer when asked not to", async () => {
-    await createTizenAdapter({ input: { showAfterSwitch: false } }).system.setInputSource("hdmi1");
+  it("uses the viewer when asked to, and on a build with no tvwindow.show", async () => {
+    await createTizenAdapter({ input: { show: "viewer", viewer: { delayMs: 5 } } }).system.setInputSource("hdmi1");
+    await new Promise((r) => setTimeout(r, 30));
+    expect(launched).toEqual(["org.tizen.tv-viewer"]);
+    launched = [];
+    await createTizenAdapter({ input: { viewer: { delayMs: 5 } } }).system.setInputSource("hdmi3");   // default mode, but no show()
+    await new Promise((r) => setTimeout(r, 30));
+    expect(launched).toEqual(["org.tizen.tv-viewer"]);
+  });
+
+  it("shows nothing when asked to show nothing", async () => {
+    const p = createTizenAdapter({ input: { show: false } });
+    await p.system.setInputSource("hdmi1");
     await new Promise((r) => setTimeout(r, 20));
     expect(launched).toEqual([]);
   });
@@ -273,7 +293,7 @@ describe("adapter-tizen input source", () => {
   it("fails — not verified — when the television says ok and then reports another source", async () => {
     install({ setSource: (_s, ok) => ok() });           // accepted and ignored
     const { isTvUnsupported } = await import("@hearthkit/platform-api");
-    const err = await createTizenAdapter({ input: { showAfterSwitch: false } }).system.setInputSource("hdmi1").catch((e) => e);
+    const err = await createTizenAdapter({ input: { show: false } }).system.setInputSource("hdmi1").catch((e) => e);
     expect(err).toBeInstanceOf(Error);
     expect(isTvUnsupported(err)).toBe(false);
     expect(String(err.message)).toMatch(/hdmi1.*reports hdmi3/);

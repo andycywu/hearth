@@ -24,7 +24,7 @@ has: webOS stubs audio and app management, no Samsung-branded set has run
 anything, and CEC, IR, an AVR, a console, a camera and a far-field microphone
 need a room rather than a television.
 
-**1247 tests green**, across 19 packages.
+**1249 tests green**, across 19 packages.
 
 ## At a glance
 
@@ -54,7 +54,7 @@ need a room rather than a television.
 | **Spoken commands, end to end** | ⛔ **none verified.** Files, a robot voice and a scripted microphone only; no person has been heard yet. Attention word, silence gate, recognition accuracy, distance, false accepts, the boot service: [`VOICE_TEST_PLAN.md`](VOICE_TEST_PLAN.md) (V1–V16) |
 | `--stream-speech` | 🟡 built, off by default: first word ~1.5 s sooner on typed input, ~0.5 s audio-device gap per sentence; nobody has judged it by ear (V9) |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1247 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1249 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
@@ -68,11 +68,11 @@ need a room rather than a television.
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (1247 tests)
+## Test coverage (1249 tests)
 
 core 203 · ui 167 · adapter-linux 213 · modelpilot 77 · llm-connectors 66 ·
 skill-manifest 56 · adapter-cec 46 · cli 233 · edge-voice 52 · adapter-aosp 28 · acceptance 20 ·
-adapter-tizen 23 · perception-mock 14 · skills-example 13 · adapter-webos 10 ·
+adapter-tizen 25 · perception-mock 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 
 ## What has been verified on a device, and what it cost
@@ -154,7 +154,9 @@ Report.
 8. **What a person sees when the television switches input, and how they get back.** On a Tizen set the picture only appears once the television's own
    viewer is in front, and that **suspends the Hearth page** (measured 2026-10-21 on the HKC: a read-back said HDMI 1 and the screen still showed the app; with
    the viewer up the owner watched HDMI 1 with a signal, and a no-signal screen on a port with nothing). The adapter does this now. What nobody has designed or tried
-   is the other half: the page should say what it is doing before it goes ("switching to HDMI 1"), and the person needs a way back that is not a wiped screen
+   is the other half. (Update, later the same day: the video window can be placed *without* suspending the page — `tvwindow.show` — but it is drawn **above** the page, so
+   at full screen the agent runs unseen; `tvwindow.hide` is the way back and nothing calls it yet. A partial rectangle shows page and picture side by side. Which of those
+   the product does is undecided.) The page should say what it is doing before it goes ("switching to HDMI 1"), and the person needs a way back that is not a wiped screen
    — a spoken "back to Hearth", the remote's return key — with the agent relaunching itself or being relaunched. The experiment's own page printed raw JSON and the
    owner, reasonably, took it for a fault; the real app has not been run through this flow on a device, so what it shows after the switch is unverified.
 
