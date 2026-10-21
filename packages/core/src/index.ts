@@ -1,4 +1,5 @@
 export { Agent, TurnTimeoutError, type AgentOptions, type ConfirmRequest } from "./agent/agent.js";
+export { createLayoutPolicy, type LayoutPolicy, type LayoutPolicyOptions } from "./agent/layout-policy.js";
 export {
   ToolRegistry,
   validateArgs,

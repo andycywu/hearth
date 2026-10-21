@@ -1,7 +1,7 @@
 import {
   Agent, runDiagnostics, reportToMarkdown, launchSearch, turnTimeoutFromUrl,
   discoverRoom, deviceTreeText, describeFeatures, loadInstallId, RUNTIME_VERSION,
-  attachTransports, transportSources,
+  attachTransports, transportSources, createLayoutPolicy,
   type DeviceTransport,
 } from "@hearthkit/core";
 import { createOpenAiCompatibleClient, createScriptedClient, resolveLlmEndpoint } from "@hearthkit/llm-connectors";
@@ -210,6 +210,12 @@ export async function bootRuntime(host: HostDefinition): Promise<BootedRuntime |
 
     // After the shell exists, so the avatar can be told when it is speaking.
     speakReplies(agent, platform, { onSpeaking: (s) => ui.setSpeaking?.(s) });
+    // Where the picture is, decided by who needs the screen (packages/core/src/agent/layout-policy.ts). Opt-in with `?layout=auto` until the
+    // app lays itself out in the panel's margin: on Tizen the video window is drawn above the page, so shrinking the picture to a panel
+    // today would leave the page's avatar half-covered. Only on a device that can place the picture at all.
+    if (platform.display && platform.has("display") && /(^|[?&])layout=auto(?=[&=]|$)/.test(launchSearch())) {
+      createLayoutPolicy({ events: agent.events, display: platform.display });
+    }
     // `?demo` runs the built-in script, `?ask=…` runs your own — either way the
     // television does something without a keyboard.
     await runStartupCommands(ui);

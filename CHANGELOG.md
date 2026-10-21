@@ -61,6 +61,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   does not read back). The model now has it too: `tv.display.get_layout` / `tv.display.set_layout` (tools `get_screen_layout` / `set_screen_layout`, offered only where the device has a display slot; low risk, because it
   moves the picture and nothing else, and the agent will do it while it talks). A read that answers nothing leaves our optimistic write standing and the planner calls it `unverified` — which is how
   `hearth` ends on Tizen; a rectangle that does not match is `failed`. Not yet: the app laying itself out in the panel's margin, and a policy for who chooses the layout. 1260 tests.
+- **Who decides where the picture is: a resting layout the agent only borrows from.** `createLayoutPolicy` (core) keeps one idea: the picture rests on `fullscreen` (someone is watching); when a turn or a plan
+  starts it shrinks to the panel so the agent can be seen, and a few seconds after the agent is done (so the reply can be read) it returns. A layout the *person* asks for — the model calling
+  `set_screen_layout`, or a planned step for it that ran — becomes the new resting layout and is not undone by the next reply; a refused one is not adopted; resting on `panel` or `hearth` changes nothing
+  (Hearth is already visible); two engagements in one tick make one call. Best-effort: a display that refuses is logged, never thrown into the turn. Wired in the host behind `?layout=auto`, **off by
+  default**: on Tizen the video window is drawn above the page, so shrinking the picture today would leave the page's avatar half-covered until the app lays itself out in the panel's margin
+  (not yet). 9 tests; 1269 tests.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.
