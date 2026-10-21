@@ -73,7 +73,7 @@ Run before every commit. CI runs the same thing:
 pnpm build && pnpm typecheck && pnpm lint && pnpm test && pnpm bundle:all && pnpm check:size
 ```
 
-Currently: **1239 tests**, 19 packages, clean lint.
+Currently: **1246 tests**, 19 packages, clean lint.
 
 ## Conventions that are load-bearing
 

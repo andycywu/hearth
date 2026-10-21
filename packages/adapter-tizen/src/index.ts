@@ -20,7 +20,30 @@ import {
 declare const tizen: any;
 declare const webapis: any;
 
-export function createTizenAdapter(): PlatformProvider {
+/**
+ * What happens after a successful input switch.
+ *
+ * `tizen.tvwindow.setSource` changes the source of the television's MAIN video window. A web app is drawn *over* that window, so
+ * after `setSource` alone the person still sees the app (measured on an HKC Tizen 7.0 set, 2026-10-21: the television reported
+ * HDMI 1 and the owner saw only the app's page). The picture appears when the television's own viewer is brought to the front,
+ * which is what Samsung's launcher-style apps do after `setSource` — and launching another application suspends this page, so it
+ * is done *after* the switch has been read back and after the agent has had a moment to say what it did.
+ */
+export interface TizenInputOptions {
+  /** `false` leaves the page in front: the source changes, and nothing shows it. Default: bring the viewer up. */
+  showAfterSwitch?: false | {
+    /** The television's viewer. Default `org.tizen.tv-viewer`. */
+    appId?: string;
+    /** How long after the switch is confirmed to launch it, so the read-back and the reply can happen first. Default 2500 ms. */
+    delayMs?: number;
+  };
+}
+
+export interface TizenAdapterOptions {
+  input?: TizenInputOptions;
+}
+
+export function createTizenAdapter(options: TizenAdapterOptions = {}): PlatformProvider {
   const kv = tizenKeyValueStore();
 
   /**
@@ -51,8 +74,8 @@ export function createTizenAdapter(): PlatformProvider {
       // and `getVolume` on the same build threw. One of those was wrong.
       getMute: async () => readMute(),
       setMute: async (m) => audio().setMute(m),
-      getInputSource: async () => mapTizenSource(safe(() => webapis?.tvinfo?.getCurrentSource?.())),
-      setInputSource: async (s) => { notSupported("setInputSource on this firmware", s); },
+      getInputSource: async () => readInputSource(),
+      setInputSource: async (s) => switchInputSource(s, options.input),
       powerStandby: async () => { notSupported("powerStandby"); },
     },
     apps: {
@@ -256,7 +279,112 @@ function dispatchKey(k: RemoteKey): void {
   if (keyCode == null || typeof document === "undefined") return;
   document.dispatchEvent(new KeyboardEvent("keydown", { keyCode } as any));
 }
-function mapTizenSource(_raw: unknown): InputSource { return "tv"; }
+// ---- input source ----------------------------------------------------------------------------------------------------------
+//
+// Until 2026-10-21 this adapter answered "tv" to every read (it called webapis.tvinfo.getCurrentSource, which does not exist on the one
+// set it has met, and threw the answer away) and refused every write without calling anything — and the documentation called that
+// "signing-gated". Neither was measured. A page signed with an ordinary developer certificate, declaring tv.window, reads the source
+// with tizen.tvwindow.getSource() and switches it with setSource on an HKC Tizen 7.0 set; see tools/experiments/tizen-input-probe and
+// docs/platform/free-my-tv-reference.md.
+
+interface TizenSource { type: string; number: number; [k: string]: unknown }
+
+/** The VIDEOSOURCE type names the television uses, against ours. */
+const TYPE_TO_INPUT: Record<string, (n: number) => InputSource | undefined> = {
+  HDMI: (n) => (n >= 1 && n <= 4 ? (`hdmi${n}` as InputSource) : undefined),
+  TV: () => "tv",
+  AV: () => "av",
+  COMPONENT: () => "component",
+};
+
+function tvWindow(): any {
+  const w = typeof tizen !== "undefined" ? tizen?.tvwindow : undefined;
+  if (w && typeof w.getSource === "function") return w;
+  throw new TvUnsupportedError(
+    "input source — this build has no tizen.tvwindow (the page needs the http://tizen.org/privilege/tv.window privilege in config.xml)",
+  );
+}
+
+/** What the television reports it is showing in its main window, as one of our ids — or an error that says what it saw. */
+function readInputSource(): InputSource {
+  const w = tvWindow();
+  let raw: TizenSource | undefined;
+  try {
+    raw = w.getSource("MAIN");
+  } catch (e) {
+    throw sourceError("read the input source", e);
+  }
+  const mapped = raw ? TYPE_TO_INPUT[String(raw.type).toUpperCase()]?.(Number(raw.number)) : undefined;
+  if (!mapped) {
+    throw new Error(`the television reported an input this adapter has no name for: ${JSON.stringify(raw)}`);
+  }
+  return mapped;
+}
+
+function inputToTizen(source: InputSource): { type: string; number: number } {
+  const hdmi = /^hdmi([1-4])$/.exec(source);
+  if (hdmi) return { type: "HDMI", number: Number(hdmi[1]) };
+  if (source === "tv") return { type: "TV", number: 1 };
+  if (source === "av") return { type: "AV", number: 1 };
+  if (source === "component") return { type: "COMPONENT", number: 1 };
+  throw new TvUnsupportedError(`input ${source} — not a source the television's main window can show`);
+}
+
+/** Every source the television lists, with a signal or without: a port with nothing on it is still a port it can be put on. */
+function listSources(): Promise<TizenSource[]> {
+  return new Promise((resolve, reject) => {
+    try {
+      tizen.systeminfo.getPropertyValue(
+        "VIDEOSOURCE",
+        (v: any) => resolve([...(v?.connected ?? []), ...(v?.disconnected ?? [])]),
+        (e: any) => reject(sourceError("list the input sources", e)),
+      );
+    } catch (e) {
+      reject(sourceError("list the input sources", e));
+    }
+  });
+}
+
+/**
+ * A privilege the page was not given is the platform saying no, which is `unsupported`; anything else is a switch that was asked for
+ * and did not happen, which is `failed`. The television's own words (name and message) stay in the text.
+ */
+function sourceError(doing: string, e: any): Error {
+  const name = String(e?.name ?? "Error");
+  const text = `could not ${doing}: ${name}: ${String(e?.message ?? e)}`;
+  return name === "SecurityError" || name === "NotSupportedError" ? new TvUnsupportedError(text) : new Error(text);
+}
+
+async function switchInputSource(source: InputSource, options: TizenInputOptions | undefined): Promise<void> {
+  const w = tvWindow();
+  if (typeof w.setSource !== "function") throw new TvUnsupportedError("input source — tizen.tvwindow has no setSource on this build");
+  const wanted = inputToTizen(source);
+  const listed = (await listSources()).find((x) => String(x.type).toUpperCase() === wanted.type && Number(x.number) === wanted.number);
+  if (!listed) throw new TvUnsupportedError(`input ${source} — this television does not list it`);
+
+  await new Promise<void>((resolve, reject) => {
+    try {
+      w.setSource(listed, () => resolve(), (e: any) => reject(sourceError(`switch to ${source}`, e)));
+    } catch (e) {
+      reject(sourceError(`switch to ${source}`, e));
+    }
+  });
+
+  // The television's success callback is its word that it did something. Ask what it is showing now before saying so.
+  const now = readInputSource();
+  if (now !== source) {
+    throw new Error(`asked the television for ${source}; it reports ${now}`);
+  }
+
+  if (options?.showAfterSwitch !== false) {
+    const appId = options?.showAfterSwitch?.appId ?? "org.tizen.tv-viewer";
+    const delay = options?.showAfterSwitch?.delayMs ?? 2500;
+    // Last, because this suspends the page. A launch that fails leaves the source switched and the picture hidden behind the app.
+    setTimeout(() => {
+      safe(() => tizen.application.launch(appId, () => {}, () => {}));
+    }, delay);
+  }
+}
 /**
  * Prefer Tizen's own `preference` API — it is the only store that survives an
  * app *reinstall* as well as a restart — and fall back to localStorage, then

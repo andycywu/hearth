@@ -20,7 +20,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the television's own viewer (`org.tizen.tv-viewer`) is brought to the front, which is what `free-my-tv` does and the probe at first did not. With
   the viewer, the owner watched the picture go to a no-signal screen on HDMI 3 (and `VIDEOSOURCE` listed HDMI 1 as connected once a device was
   plugged into it). Launching the viewer suspends the page, so an adapter inside the television must verify first and expect to be suspended.
-  Still one set, one certificate, and a port *with* a signal not yet watched. The adapter is not changed yet.
+  Still one set, one certificate, and a port *with* a signal not yet watched. The adapter now does this (next entry).
+- **The Tizen adapter reads and switches the input for real.** `getInputSource` used to answer `"tv"` to everything and `setInputSource` refused without
+  calling anything; both claims had never been tested. Now `getInputSource` is `tizen.tvwindow.getSource('MAIN')` mapped to our ids (an input it has no
+  name for is an error that prints what the television said, not a guess), and `setInputSource` checks the port against `systeminfo VIDEOSOURCE` (connected
+  *and* disconnected — a port with nothing on it is still a port), calls `setSource`, **reads it back and fails if the television reports anything else**, and
+  only then launches `org.tizen.tv-viewer` after a delay (`createTizenAdapter({ input: { showAfterSwitch } })`; `false` to leave the page in front), because
+  that launch suspends the page and a `setSource` without it changes nothing anyone can see. `SecurityError`/`NotSupportedError` and a missing
+  `tizen.tvwindow` are `unsupported`; anything else is `failed`. `apps/tizen-app/config.xml` declares `tv.window`. Seven tests; the plan-acceptance Tizen mock,
+  which has no `tvwindow`, now correctly reports its input as unreadable instead of `tv`. Unobserved: a port with a signal, a Samsung-branded set, the
+  `SamsungCerti` profile. 1246 tests.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.

@@ -218,3 +218,83 @@ describe("a build with no audio control API", () => {
       .rejects.toThrow(/webapis\.audiocontrol.*tizen\.tvaudiocontrol/s);
   });
 });
+
+describe("adapter-tizen input source", () => {
+  // The shapes are the ones read from the HKC Tizen 7.0 set (tools/experiments/tizen-input-probe/results):
+  // getSource('MAIN') is synchronous and returns {type, number}; VIDEOSOURCE lists connected and disconnected.
+  const HDMI1 = { type: "HDMI", number: 1 };
+  const HDMI3 = { type: "HDMI", number: 3 };
+  let current: any;
+  let launched: string[];
+
+  function install(over: { setSource?: (s: any, ok: () => void, err: (e: any) => void) => void; connected?: any[]; disconnected?: any[] } = {}): void {
+    installTizenMocks();
+    current = HDMI3;
+    launched = [];
+    const t = (globalThis as any).tizen;
+    t.application.launch = (id: string, ok: () => void) => { launched.push(id); ok(); };
+    t.systeminfo = {
+      getPropertyValue: (_p: string, ok: (v: any) => void) =>
+        ok({ connected: over.connected ?? [HDMI1], disconnected: over.disconnected ?? [HDMI3] }),
+    };
+    t.tvwindow = {
+      getSource: (_w: string) => current,
+      setSource: over.setSource ?? ((s: any, ok: () => void) => { current = s; ok(); }),
+    };
+  }
+
+  beforeEach(() => { install(); });
+  afterEach(() => {
+    delete (globalThis as any).tizen;
+    delete (globalThis as any).webapis;
+  });
+
+  it("reads the input from tizen.tvwindow, not from a constant", async () => {
+    expect(await createTizenAdapter().system.getInputSource()).toBe("hdmi3");
+    current = HDMI1;
+    expect(await createTizenAdapter().system.getInputSource()).toBe("hdmi1");
+  });
+
+  it("switches, reads back, and only then brings the viewer up", async () => {
+    const p = createTizenAdapter({ input: { showAfterSwitch: { delayMs: 5 } } });
+    await p.system.setInputSource("hdmi1");
+    expect(current).toBe(HDMI1);
+    expect(launched).toEqual([]);                       // the read-back happens before the page is suspended
+    await new Promise((r) => setTimeout(r, 30));
+    expect(launched).toEqual(["org.tizen.tv-viewer"]);
+  });
+
+  it("does not launch the viewer when asked not to", async () => {
+    await createTizenAdapter({ input: { showAfterSwitch: false } }).system.setInputSource("hdmi1");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(launched).toEqual([]);
+  });
+
+  it("fails — not verified — when the television says ok and then reports another source", async () => {
+    install({ setSource: (_s, ok) => ok() });           // accepted and ignored
+    const { isTvUnsupported } = await import("@hearthkit/platform-api");
+    const err = await createTizenAdapter({ input: { showAfterSwitch: false } }).system.setInputSource("hdmi1").catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(isTvUnsupported(err)).toBe(false);
+    expect(String(err.message)).toMatch(/hdmi1.*reports hdmi3/);
+  });
+
+  it("is unsupported when the television does not list the source", async () => {
+    const { isTvUnsupported } = await import("@hearthkit/platform-api");
+    await expect(createTizenAdapter().system.setInputSource("hdmi4")).rejects.toSatisfy(isTvUnsupported);
+  });
+
+  it("is unsupported when the platform refuses with SecurityError", async () => {
+    install({ setSource: (_s, _ok, err) => err({ name: "SecurityError", message: "denied" }) });
+    const { isTvUnsupported } = await import("@hearthkit/platform-api");
+    await expect(createTizenAdapter().system.setInputSource("hdmi1")).rejects.toSatisfy(isTvUnsupported);
+  });
+
+  it("is unsupported, and says which privilege, when there is no tvwindow", async () => {
+    delete (globalThis as any).tizen.tvwindow;
+    const { isTvUnsupported } = await import("@hearthkit/platform-api");
+    const p = createTizenAdapter();
+    await expect(p.system.getInputSource()).rejects.toSatisfy(isTvUnsupported);
+    await expect(p.system.setInputSource("hdmi1")).rejects.toThrow(/tv\.window/);
+  });
+});

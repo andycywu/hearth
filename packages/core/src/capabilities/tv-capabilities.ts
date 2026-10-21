@@ -114,8 +114,8 @@ export function createTvCapabilities(provider: string): Capability[] {
       parameters: {},
       tool: "get_input_source",
       reads: { source: W.tvInput },
-      // Only itself. `tv.input.switch` is a separate, usually signing-gated API —
-      // on Tizen this read works and that write never will — so inferring one
+      // Only itself. `tv.input.switch` is a separate API, signing-gated on some platforms —
+      // and on a given build one can work without the other — so inferring one
       // from the other would withdraw a working capability or keep a dead one.
       vouchesFor: ["tv.input.get_source"],
       riskLevel: "low",

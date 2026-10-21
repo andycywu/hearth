@@ -20,9 +20,9 @@ import { targets, type Target } from "./mocks.js";
  * adapter. That is the point: 「我要打 PS5」 must resolve to HDMI2 through the
  * device graph on all six, and the string `hdmi2` must appear in no goal.
  *
- * What is *not* asserted is that every target succeeds. Tizen cannot switch
- * inputs at all — `setInputSource` is a partner-signed API and the adapter says
- * so — and a test that demanded success everywhere could only pass by pretending
+ * What is *not* asserted is that every target succeeds. This suite's Tizen mock
+ * has no `tizen.tvwindow`, so it cannot switch inputs (a real HKC set with the
+ * `tv.window` privilege can; the adapter's own tests cover that) — and a test that demanded success everywhere could only pass by pretending
  * otherwise. So the **plan** must be identical everywhere, and where a platform
  * genuinely cannot perform a step the outcome must be `unsupported`, the
  * capability must be withdrawn, and the TV must be left alone. That is the
@@ -36,8 +36,9 @@ import { targets, type Target } from "./mocks.js";
  * useful thing this file records:
  *
  *  - `verified` — the write took and the read-back agrees.
- *  - `unsupported` — the adapter refuses up front, because the API is
- *    partner-signed. Tizen and webOS both say so rather than pretending.
+ *  - `unsupported` — the adapter refuses up front: webOS because the API is
+ *    signing-gated, Tizen here because the mock exposes no `tizen.tvwindow`.
+ *    Both say so rather than pretending.
  *  - `failed` — the write was *accepted* and nothing happened. That is what this
  *    mock does, and it is the shape that matters: `execute -> assume success`
  *    would have reported it as done. (The real AOSP adapter is blunter — it
@@ -228,7 +229,8 @@ describe("plan-level acceptance", () => {
         // not have done it never gets asked.
         expect(shape(outcome!), target.name).toEqual(["tv.input.switch:denied"]);
         // Declining is not failing, and the TV was left alone.
-        expect(await platform.system.getInputSource(), target.name).not.toBe("hdmi2");
+        // (A target that cannot read its input says so by throwing; that is not hdmi2 either.)
+        expect(await platform.system.getInputSource().catch(() => "unknown"), target.name).not.toBe("hdmi2");
       } finally {
         target.teardown();
       }

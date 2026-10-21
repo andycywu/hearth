@@ -24,6 +24,8 @@
   <tizen:privilege name="http://tizen.org/privilege/tv.audio"/>
   <tizen:privilege name="http://tizen.org/privilege/internet"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <!-- tizen.tvwindow: read and switch the television's input source. Measured on an HKC Tizen 7.0 set (docs/platform/free-my-tv-reference.md). -->
+  <tizen:privilege name="http://tizen.org/privilege/tv.window"/>
 
   <!--
     Required for the app to reach *any* network host. The `internet` privilege
