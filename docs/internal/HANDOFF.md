@@ -42,6 +42,20 @@ sentence — off by default).
 **Waiting on someone else:** ModelPilot streaming for `claude-sonnet` and `gemini-flash` (`422 streaming_provider_not_supported`;
 only openai models stream), and the hosted service's default reasoning effort (`medium`; `none` measured ~0.9 s faster).
 
+**Waiting on ModelPilot — speech endpoints (decided 2026-10-21).** A Pi 3B cannot run neural TTS (Piper RTF 1.7, Kokoro 14), and
+espeak-ng is robotic by construction, so speech moves behind ModelPilot, which chooses the provider as it does for chat:
+`POST /v1/audio/speech` (first backend Cloudflare Workers AI MeloTTS; the owner listened to zh and en samples and found it much
+better than espeak; one voice per language) and `POST /v1/audio/transcriptions` (Cloudflare `whisper-large-v3-turbo` and OpenAI
+`whisper-1` as eligible targets). The prompt for the ModelPilot session was written; the owner will say when it lands. **Then, in
+this repo:**
+1. Cloud synthesis for *conversational* replies only, one sentence at a time (it composes with `--stream-speech`); replies to local
+   device commands stay on the box (espeak or pre-recorded clips); on any failure fall back to espeak-ng. Measure first-byte latency from the Pi.
+2. Point the existing OpenAI-schema transcriber at ModelPilot instead of OpenAI, then **benchmark Cloudflare Whisper against OpenAI
+   whisper-1 on real recordings** (Chinese especially) before changing any default — the price gap (about 12x) is known, the accuracy gap is not.
+3. `hearth modelpilot check` rows for both endpoints.
+4. Pre-recorded clips for the ~20 fixed replies ("Yes?", "音量已調低"), usable offline and on any Pi.
+Housekeeping: the Cloudflare API token used for the listening samples (`D:\tts-samples\`, outside the repo) should be deleted in the Cloudflare dashboard.
+
 **Blocked on hardware**
 
 | Blocked on | Items |
