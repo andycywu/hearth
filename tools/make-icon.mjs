@@ -7,7 +7,8 @@
  * Both `apps/tizen-app/config.xml` and `apps/webos-app/appinfo.json` reference an
  * `icon.png` that didn't exist, which breaks packaging on both platforms. Rather
  * than commit an opaque binary, the icon is drawn here so it can be tweaked and
- * regenerated: a lit, warm tile with a flame (a hearth), because a dark icon on a television's dark app list is no icon.
+ * regenerated: a lit, warm tile with a flame inside a ring of five arcs — a fire and the people gathered round it, 圍爐 — because a dark icon on a
+ * television's dark app list is no icon.
  *
  * Placeholder-quality on purpose — swap in real artwork when there is any.
  *
@@ -65,30 +66,50 @@ const mix = (a, b, t) => a + (b - a) * t;
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 /**
- * Half-width of a flame at height t (0 = bottom, 1 = tip), as a fraction of its own full width: a round belly that tapers to a
- * point, leaning a little with height so it reads as flame rather than a drop.
+ * A flame: a true circle for the belly (so the bottom is round, not cut flat), and above it a taper to a point that leans a little
+ * with height, so it reads as flame rather than a drop. `w` is the belly's width, `h` the whole height from `bottom` to the tip.
  */
-function flameHalfWidth(t) {
-  if (t < 0 || t > 1) return 0;
-  const belly = 0.34;
-  if (t < belly) return Math.sqrt(Math.max(0, 1 - ((t - belly) / belly) ** 2));
-  return Math.max(0, 1 - (t - belly) / (1 - belly)) ** 1.35;
-}
-
-/** Coverage of a flame whose box is [cx±w/2] × [bottom..bottom-h] in pixel space. */
 function flame(size, x, y, cx, bottom, w, h, lean) {
-  const t = (bottom - y) / h;
-  if (t < 0 || t > 1) return 0;
-  const half = (flameHalfWidth(t) * w) / 2;
+  const r = w / 2;
+  const cyBelly = bottom - r;
+  const aa = size * 0.003 + 0.75;
+  if (y >= cyBelly) return clamp01(0.5 - (Math.hypot(x - cx, y - cyBelly) - r) / aa);
+  const t = (cyBelly - y) / (h - r);
+  if (t > 1) return 0;
+  const half = r * (1 - t) ** 1.35;
   const centre = cx + lean * t * t * w;
-  // Distance to the edge, in pixels, across the nearer horizontal side: good enough to anti-alias a soft shape.
-  return clamp01(0.5 + (half - Math.abs(x - centre)) / (size * 0.004 + 0.75));
+  return clamp01(0.5 + (half - Math.abs(x - centre)) / aa);
 }
 
 function set(px, i, rgb, alpha) {
   px[i] = mix(px[i], rgb[0], alpha);
   px[i + 1] = mix(px[i + 1], rgb[1], alpha);
   px[i + 2] = mix(px[i + 2], rgb[2], alpha);
+}
+
+/**
+ * The ring: five arcs with a gap between each, round-capped. Read as a circle, it is the gathering (the 圍 of 圍爐, a family
+ * closing round a fire); read as five arcs, it is five people sitting. At 80 px the gaps shrink and it is still a clean ring.
+ */
+const RING_PEOPLE = 5;
+const RING_GAP = 0.2;            // fraction of each person's share of the circle left empty
+
+function ring(size, x, y) {
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = size * 0.385;
+  const half = size * 0.026;
+  const dx = x - cx;
+  const dy = y - cy;
+  const r = Math.hypot(dx, dy);
+  const share = (Math.PI * 2) / RING_PEOPLE;
+  const arc = share * (1 - RING_GAP);
+  // Angle measured from straight up, so one person sits at the top and the ring is the same either side.
+  const theta = (Math.atan2(dx, -dy) + Math.PI * 2 + share / 2) % share - share / 2;
+  const along = Math.abs(theta) * radius;                  // pixels along the arc from its middle
+  const reach = (arc * radius) / 2 - half;                  // where the straight part ends and the round cap begins
+  const capDist = Math.hypot(Math.max(along - reach, 0), r - radius) - half;
+  return clamp01(0.5 - capDist / (size * 0.003 + 0.75));
 }
 
 /** The icon at one size, as RGB triples. Every proportion is a fraction of it. */
@@ -102,9 +123,12 @@ function render(size) {
       px[i + 1] = mix(TILE_TOP[1], TILE_BOTTOM[1], v);
       px[i + 2] = mix(TILE_TOP[2], TILE_BOTTOM[2], v);
 
-      const outer = flame(size, x, y, size * 0.5, size * 0.8, size * 0.46, size * 0.62, 0.05);
+      const people = ring(size, x, y);
+      if (people > 0) set(px, i, FLAME_OUTER, people);
+
+      const outer = flame(size, x, y, size * 0.5, size * 0.69, size * 0.30, size * 0.46, 0.07);
       if (outer > 0) set(px, i, FLAME_OUTER, outer);
-      const inner = flame(size, x, y, size * 0.5, size * 0.78, size * 0.24, size * 0.34, 0.03);
+      const inner = flame(size, x, y, size * 0.5, size * 0.665, size * 0.16, size * 0.25, 0.045);
       if (inner > 0) set(px, i, FLAME_INNER, inner);
     }
   }

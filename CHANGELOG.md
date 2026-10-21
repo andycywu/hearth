@@ -37,6 +37,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ignored the flags and died with "No model endpoint": diag is a build feature, not a launch flag. 1247 tests.
 - **The app icon is a flame on a lit tile, not a dim blue television on near-black.** On the HKC's app list the old icon read as no icon at all, and the owner found Hearth by
   guessing. (The name was already `Hearth` in `config.xml`; what showed as "TV AI Agent" is only the package file name.) Still drawn in code, still placeholder artwork. No code path changed; 1247 tests.
+  **Then the owner asked for the hearth itself — 圍爐, the family closed round a fire — and it became a flame inside a ring of five arcs** (the gathering, and five people sitting;
+  the gaps shrink and it stays a clean ring at 80 px). The flame's belly is a true circle now: the first drawing cut it flat at the bottom. Code-drawn placeholder, to be overwritten by real artwork.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.
