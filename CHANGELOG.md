@@ -35,6 +35,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Packaged as the real app (`package-tizen.mjs --with diag --flags diag --flags writes --flags input=hdmi1`) and run on the HKC, the owner saw the report, then HDMI 1,
   and found the way back by picking the app from the television's list — where it has no recognisable icon, so it is found by guessing. A first package without `--with diag`
   ignored the flags and died with "No model endpoint": diag is a build feature, not a launch flag. 1247 tests.
+- **The app icon is a flame on a lit tile, not a dim blue television on near-black.** On the HKC's app list the old icon read as no icon at all, and the owner found Hearth by
+  guessing. (The name was already `Hearth` in `config.xml`; what showed as "TV AI Agent" is only the package file name.) Still drawn in code, still placeholder artwork. No code path changed; 1247 tests.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.

@@ -7,8 +7,7 @@
  * Both `apps/tizen-app/config.xml` and `apps/webos-app/appinfo.json` reference an
  * `icon.png` that didn't exist, which breaks packaging on both platforms. Rather
  * than commit an opaque binary, the icon is drawn here so it can be tweaked and
- * regenerated: a 10-foot-friendly dark tile, a screen outline in the UI's accent
- * colour, and three dots suggesting a reply being composed.
+ * regenerated: a lit, warm tile with a flame (a hearth), because a dark icon on a television's dark app list is no icon.
  *
  * Placeholder-quality on purpose — swap in real artwork when there is any.
  *
@@ -53,23 +52,37 @@ function parseOutput(spec) {
   return { path: resolve(root, spec), size: 512 };
 }
 
-// --- palette (same values the UI uses) ---
-const BG = [0x05, 0x06, 0x0a];
-const GLOW = [0x1b, 0x2b, 0x4a];
-const ACCENT = [0x8a, 0xa0, 0xd0];
-const BRIGHT = [0xe8, 0xee, 0xfc];
+// --- palette ---
+// A flame on a warm tile. The first icon was a dim blue television outline on near-black, which on a television's app list —
+// itself dark — read as no icon at all: the owner found the app by guessing (2026-10-21). A hearth is a fire, and a lit tile
+// is what a ten-foot list needs.
+const TILE_TOP = [0xff, 0x9a, 0x3c];
+const TILE_BOTTOM = [0xb8, 0x2e, 0x1c];
+const FLAME_OUTER = [0xff, 0xf1, 0xd6];
+const FLAME_INNER = [0xff, 0xb3, 0x47];
 
 const mix = (a, b, t) => a + (b - a) * t;
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
-/** 1 inside the shape, 0 outside, smoothly across ~1.5px so edges aren't jagged. */
-const coverage = (sdf) => clamp01(0.5 - sdf / 1.5);
 
-/** Signed distance to a rounded rectangle centred on a `size`×`size` canvas. */
-function roundedRectSdf(size, x, y, halfW, halfH, radius) {
-  const dx = Math.abs(x - size / 2) - (halfW - radius);
-  const dy = Math.abs(y - size / 2) - (halfH - radius);
-  const outside = Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
-  return outside + Math.min(Math.max(dx, dy), 0) - radius;
+/**
+ * Half-width of a flame at height t (0 = bottom, 1 = tip), as a fraction of its own full width: a round belly that tapers to a
+ * point, leaning a little with height so it reads as flame rather than a drop.
+ */
+function flameHalfWidth(t) {
+  if (t < 0 || t > 1) return 0;
+  const belly = 0.34;
+  if (t < belly) return Math.sqrt(Math.max(0, 1 - ((t - belly) / belly) ** 2));
+  return Math.max(0, 1 - (t - belly) / (1 - belly)) ** 1.35;
+}
+
+/** Coverage of a flame whose box is [cx±w/2] × [bottom..bottom-h] in pixel space. */
+function flame(size, x, y, cx, bottom, w, h, lean) {
+  const t = (bottom - y) / h;
+  if (t < 0 || t > 1) return 0;
+  const half = (flameHalfWidth(t) * w) / 2;
+  const centre = cx + lean * t * t * w;
+  // Distance to the edge, in pixels, across the nearer horizontal side: good enough to anti-alias a soft shape.
+  return clamp01(0.5 + (half - Math.abs(x - centre)) / (size * 0.004 + 0.75));
 }
 
 function set(px, i, rgb, alpha) {
@@ -81,41 +94,18 @@ function set(px, i, rgb, alpha) {
 /** The icon at one size, as RGB triples. Every proportion is a fraction of it. */
 function render(size) {
   const px = new Uint8Array(size * size * 3);
-
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 3;
+      const v = y / size;
+      px[i] = mix(TILE_TOP[0], TILE_BOTTOM[0], v);
+      px[i + 1] = mix(TILE_TOP[1], TILE_BOTTOM[1], v);
+      px[i + 2] = mix(TILE_TOP[2], TILE_BOTTOM[2], v);
 
-      // Backdrop: a soft glow lifting the centre off the near-black base.
-      const dCentre = Math.hypot(x - size / 2, y - size * 0.46) / (size * 0.62);
-      const g = clamp01(1 - dCentre) ** 2;
-      px[i] = mix(BG[0], GLOW[0], g * 0.85);
-      px[i + 1] = mix(BG[1], GLOW[1], g * 0.85);
-      px[i + 2] = mix(BG[2], GLOW[2], g * 0.85);
-
-      // Screen outline: the difference of two rounded rects = a ring.
-      const outer = roundedRectSdf(size, x, y, size * 0.33, size * 0.23, size * 0.05);
-      const inner = roundedRectSdf(
-        size, x, y, size * 0.33 - size * 0.028, size * 0.23 - size * 0.028, size * 0.035,
-      );
-      const ring = coverage(outer) * (1 - coverage(inner));
-      if (ring > 0) set(px, i, ACCENT, ring);
-
-      // Stand, so it reads as a TV rather than a window.
-      const standTop = size / 2 + size * 0.23;
-      const stand = coverage(Math.max(
-        Math.abs(x - size / 2) - size * 0.09,
-        Math.max(y - (standTop + size * 0.045), standTop - y),
-      ));
-      if (stand > 0) set(px, i, ACCENT, stand * 0.9);
-
-      // Three dots: a reply being composed. Brightness rises left→right.
-      for (let d = 0; d < 3; d++) {
-        const cx = size / 2 + (d - 1) * size * 0.105;
-        const dist = Math.hypot(x - cx, y - size / 2) - size * 0.032;
-        const dot = coverage(dist);
-        if (dot > 0) set(px, i, d === 2 ? BRIGHT : ACCENT, dot * (0.55 + d * 0.225));
-      }
+      const outer = flame(size, x, y, size * 0.5, size * 0.8, size * 0.46, size * 0.62, 0.05);
+      if (outer > 0) set(px, i, FLAME_OUTER, outer);
+      const inner = flame(size, x, y, size * 0.5, size * 0.78, size * 0.24, size * 0.34, 0.03);
+      if (inner > 0) set(px, i, FLAME_INNER, inner);
     }
   }
   return px;
