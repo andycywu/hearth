@@ -8,6 +8,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Experiment 1 on the HKC: a Tizen page signed with an ordinary developer certificate can read and switch the television's input.** The
+  `⛔` in the capability matrix and "signing-gated forever" were wrong. A throwaway probe (`tools/experiments/tizen-input-probe/`: build, sign
+  with `tizen-dev`, install, launch under the Web Inspector, read the page) called `tizen.tvwindow.setSource` for HDMI 3, HDMI 1 and HDMI 3 again;
+  all succeeded (~1.5 s each) and `getSource()` read back 3 → 3, 3 → 1, 1 → 3, with the set restored to where it started. `systeminfo VIDEOSOURCE`
+  lists which ports have a signal (`TV 1` connected, `AV 1`/`HDMI 1–3` not — unconfirmed against a plugged-in device). Also learned: `webapis.tvinfo`
+  has **no `getCurrentSource`** here, so the call the adapter makes never answered and its constant `"tv"` stood in for it; `webapis.productinfo` is
+  `SecurityError` without its own privilege; the probe's first run taught two signatures from the television's own `TypeMismatchError`s
+  (`getSource` takes the window type, not callbacks). Caveats: the read-back is the TV's own report, the picture has not been independently
+  observed, and this is one set with one certificate. The adapter is not changed yet.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.

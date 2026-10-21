@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:tizen="http://tizen.org/ns/widgets"
+        id="http://aiagent.tv/inputprobe"
+        version="0.0.1" viewmodes="maximized">
+  <!-- package MUST be exactly 10 alphanumeric characters (see apps/tizen-app/config.xml). -->
+  <tizen:application id="tvprobe000.InputProbe" package="tvprobe000" required_version="6.0"/>
+  <content src="index.html"/>
+  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+  <icon src="icon.png"/>
+  <name>Input probe</name>
+  <tizen:profile name="tv"/>
+
+  <!--
+    A throwaway experiment: does this television let a page read, and switch, its input source?
+    The privileges are the ones the working Samsung home screen `free-my-tv` declares for it
+    (tv.window, tv.inputdevice, application.launch), plus application.info for getAppsInfo.
+    Not part of the Hearth runtime; see docs/platform/free-my-tv-reference.md.
+  -->
+  <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+  <tizen:privilege name="http://tizen.org/privilege/application.info"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.window"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <access origin="*" subdomains="true"/>
+</widget>

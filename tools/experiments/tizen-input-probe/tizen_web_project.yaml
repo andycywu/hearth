@@ -1,0 +1,25 @@
+project_type: web_app
+profile: tv
+api_version: "6.0"
+build_type: Debug
+output_name: InputProbe
+output_path: ""
+opt: false
+signing_profile: ""
+trust_anchor: []
+files:
+  - config.xml
+  - icon.png
+  - index.html
+  - probe.js
+excludes:
+  - node_modules/*
+  - README.md
+  - run.mjs
+  - results/*
+  - Build/*
+  - Debug/*
+  - Release/*
+  - Test/*
+  - tizen_web_project.yaml
+deps: []

@@ -1,0 +1,9 @@
+# Build output of `tz build` / `tz pack`; the package is rebuilt by run.mjs.
+Debug/
+Release/
+.buildResult/
+.sign/
+.manifest.tmp
+*.wgt
+signature1.xml
+author-signature.xml

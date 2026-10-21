@@ -30,6 +30,29 @@ switch input.** `setInputSource` is a hard-coded `throw new TvUnsupportedError(.
 `http://tizen.org/privilege/tv.window` and `…/tv.inputdevice`. Our `config.xml` does not declare `tv.window`, and `tvwindow` appears
 nowhere in this repository. Whether it works on a given set, and with what signing, is open: it is the first experiment below.
 
+## Experiment 1, run 2026-10-21 on the HKC TTQ55UQ1CS (Tizen 7.0): the claim was wrong
+
+[`tools/experiments/tizen-input-probe/`](../../tools/experiments/tizen-input-probe) — a throwaway page, built with the **`tizen-dev` certificate (not a partner
+certificate)**, declaring `tv.window`, `tv.inputdevice`, `application.launch` and `application.info`. It installed without complaint and ran. Results in
+`results/`. What the television *answered*:
+
+| Call | Answer |
+|---|---|
+| `tizen.tvwindow.getSource()` | **`{type: "HDMI", number: 3}`** — the television's own report of what it is showing |
+| `tizen.tvwindow.setSource(HDMI 3)`, then `(HDMI 1)`, then `(HDMI 3)` | **all three succeeded** (`ok: true`, ~1.5 s each) and each was read back with `getSource()`: 3 → 3, 3 → 1, 1 → 3. The probe put the set back on HDMI 3 itself |
+| `tizen.systeminfo VIDEOSOURCE` | `connected: [TV 1]`, `disconnected: [AV 1, HDMI 1, HDMI 2, HDMI 3]` — which ports have a signal. **Not yet checked against a device plugged in**, so "connected" is unconfirmed |
+| `tizen.tvwindow.getAvailableWindows()` | `["MAIN"]` |
+| `webapis.tvinfo` | present, but its functions are `getMenuValue`, `getTvInfoValue`, `getVersion`, `setMenuValue`, caption helpers… — **there is no `getCurrentSource`**, the call our adapter makes. It has no constants to ask `getTvInfoValue` about |
+| `webapis.productinfo` | **`SecurityError: Permission denied`** with these privileges — our adapter reads the model from it |
+| `tizen.application.getAppsInfo` | 280 apps, with `application.info` declared |
+| `tvwindow.getRect("MAIN")` | `TypeMismatchError` — the signature takes a callback first; not pursued |
+
+So: **a page signed with an ordinary developer certificate can read and switch the input on this set.** The `⛔` and the "signing-gated forever"
+were wrong, and so was reading the source through `tvinfo.getCurrentSource`, which does not exist here. Two caveats that keep this from being the
+last word. The read-back is the television's own report through the same API family that did the switching; the *picture* changing has to be seen
+(a person at the set, or a capture) before this is called independently confirmed. And it is one set, signed one way: a Samsung-branded set, or
+the Samsung certificate profile, may answer differently — the probe takes `--profile` for exactly that.
+
 ## webOS (LG): their calls, ours
 
 | What | `free-my-tv` | Our `adapter-webos` | Gap |

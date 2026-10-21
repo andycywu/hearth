@@ -93,7 +93,7 @@ deferred until a self-signed eng board — see [`../POC.md`](../POC.md).
 | mute              | ✅       | ❔       | ❔       | ❔⁴       | ✅⁵       |
 | list apps         | ✅       | ❔       | ❔       | ❔        | ✅⁵       |
 | launch app        | ✅       | ❔       | ❔       | ❔        | ✅⁵       |
-| input source      | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ❔⁶       |
+| input source      | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ✅⁶       |
 | key injection     | ✅¹      | ⚠️       | ⚠️       | ❔        | ✅⁵       |
 | power standby     | ⏭️       | ⚠️       | ⚠️       | ⚠️        | ⏭️⁵       |
 | network status    | ✅       | ❔       | ❔       | ❔        | ✅⁵       |
@@ -124,15 +124,19 @@ only reason it is filed under NVT: the string says so, while `?diag` reports
 `soc=unknown` because the adapter has no rule that reads it. One set is not a
 column, and a Samsung-branded NVT set may answer differently — in particular
 this one has `webapis` **without** `audiocontrol`, so it takes the standard-API
-path that a retail Samsung TV would not. Input source reads `❔`, not the `⛔` this
+path that a retail Samsung TV would not. Input source reads `✅`, not the `⛔` this
 row said until 2026-10-21 — see ⁶. Power standby was not
 run — it is destructive and the probe never auto-runs it. Full run:
 [reports/tizen-ttq55uq1cs.md](reports/tizen-ttq55uq1cs.md).
 
 ⁶ **Correction, 2026-10-21.** This cell said `⛔` — *the device refuses it* — and the note said the build "refuses `setInputSource`
 outright". It was never asked: `adapter-tizen`'s `setInputSource` is a hard-coded `TvUnsupportedError` that calls no API, and its
-`getInputSource` returns the constant `"tv"` whatever `webapis.tvinfo` answered. So the honest cell is `❔` (untested), and the earlier
-"read ✅, write signing-gated forever" (`capability-graph.md`) was a belief, not a measurement. Another project's working Samsung code uses
+`getInputSource` returns the constant `"tv"` whatever `webapis.tvinfo` answered. So the honest cell was `❔` (untested), and the earlier
+"read ✅, write signing-gated forever" (`capability-graph.md`) was a belief, not a measurement. **Then it was tested** (same day, HKC, a page
+signed with the ordinary `tizen-dev` certificate): `tizen.tvwindow.setSource` switched HDMI 3 → 1 → 3 and `getSource()` read each back; the cell is
+`✅`. Read-back is the television's own report — the picture was not independently observed — and it is one set and one certificate.
+`webapis.tvinfo.getCurrentSource`, which the adapter calls, does not exist on this set. Details and the probe:
+[`tools/experiments/tizen-input-probe`](../../tools/experiments/tizen-input-probe). Another project's working Samsung code uses
 `tizen.tvwindow.setSource` and `tizen.systeminfo VIDEOSOURCE` and declares a `tv.window` privilege we do not; whether that works on this set
 is the first experiment in [`free-my-tv-reference.md`](free-my-tv-reference.md).
 
