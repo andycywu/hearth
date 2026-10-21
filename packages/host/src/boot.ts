@@ -12,7 +12,7 @@ import {
 import {
   createModelPilotWiring, resolveModelPilotConfig, type ModelPilotWiring,
 } from "@hearthkit/modelpilot";
-import type { PlatformProvider } from "@hearthkit/platform-api";
+import type { InputSource, PlatformProvider } from "@hearthkit/platform-api";
 
 /**
  * The boot sequence, once.
@@ -317,6 +317,11 @@ function logPlanLifecycle(agent: Agent): void {
     console.info(`[plan] done: achieved=${outcome.achieved} — ${agent.describe(outcome)}`));
 }
 
+function inputFromSearch(search: string): InputSource | undefined {
+  const m = /[?&]input=(hdmi[1-4]|tv|av|component)(?:&|$)/.exec(search);
+  return m ? (m[1] as InputSource) : undefined;
+}
+
 /**
  * `?diag`, and `?diag&reach` to prove the set has a route: its own model
  * endpoint, plus a public one, so "cannot reach the host" can be told apart from
@@ -330,6 +335,8 @@ async function showDiagnostics(
   const search = launchSearch();
   const report = await runDiagnostics(platform, {
     allowWrites: search.includes("writes"),
+    // `?diag&writes&input=hdmi1`: also switch the input, which moves the picture, so it is named, never implied.
+    ...(inputFromSearch(search) ? { inputTarget: inputFromSearch(search)! } : {}),
     ...(search.includes("reach")
       ? {
           reachUrls: [

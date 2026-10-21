@@ -72,3 +72,4 @@ CLAUDE.local.md
 # STT benchmark recordings are people's voices; the manifest is committed, the audio is not.
 bench/stt/recordings/
 bench/stt/results/
+apps/tizen-app/.tizen-rds/

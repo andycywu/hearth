@@ -1,4 +1,4 @@
-import type { PlatformProvider } from "@hearthkit/platform-api";
+import type { InputSource, PlatformProvider } from "@hearthkit/platform-api";
 import { detectSpeechEngines } from "@hearthkit/platform-api";
 
 /**
@@ -37,6 +37,12 @@ export interface DiagnosticsReport {
 export interface DiagnosticsOptions {
   /** Allow mutating probes (volume set/restore, key press). Default false. */
   allowWrites?: boolean;
+  /**
+   * With `allowWrites`, switch the television to this input and read it back. Opt-in by name because it changes the picture, and
+   * **not restored**: on a platform that needs a viewer in front for the switch to show (Tizen), the switch suspends this page, so a
+   * restore would never run. The report says where the set was and where it was put.
+   */
+  inputTarget?: InputSource;
   /**
    * URLs to actually fetch, to prove the device has a route rather than
    * trusting an adapter's `isOnline`. Opt-in: a diagnostics run shouldn't
@@ -82,9 +88,15 @@ export async function runDiagnostics(
 
   // --- system: input source ---
   await probe(results, "system.getInputSource", async () => `${await platform.system.getInputSource()}`);
-  await probe(results, "system.setInputSource", async () =>
-    skip(allowWrites ? "vendor-gated; not auto-exercised" : "write-guarded"),
-  );
+  await probe(results, "system.setInputSource", async () => {
+    if (!allowWrites) return skip("write-guarded");
+    if (!opts.inputTarget) return skip("changes the picture; name a target (inputTarget) to exercise it");
+    const before = await platform.system.getInputSource().catch(() => "unreadable");
+    await platform.system.setInputSource(opts.inputTarget);
+    const after = await platform.system.getInputSource();
+    if (after !== opts.inputTarget) throw new Error(`asked for ${opts.inputTarget}; the device reports ${after}`);
+    return `${before} -> ${after}, read back; not restored`;
+  });
   await probe(results, "system.powerStandby", async () => skip("destructive; never auto-run"));
 
   // --- apps ---

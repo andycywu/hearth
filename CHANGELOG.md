@@ -30,6 +30,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `tizen.tvwindow` are `unsupported`; anything else is `failed`. `apps/tizen-app/config.xml` declares `tv.window`. Seven tests; the plan-acceptance Tizen mock,
   which has no `tvwindow`, now correctly reports its input as unreadable instead of `tv`. Unobserved: a port with a signal, a Samsung-branded set, the
   `SamsungCerti` profile. 1246 tests.
+- **`?diag&writes&input=hdmi1` exercises the input switch on a device, and a first run of the real app through it.** The diagnostics used to skip `setInputSource` as
+  "vendor-gated"; with a named target it now switches, reads back, and reports where the set was and where it went (not restored: on Tizen the viewer suspends the page).
+  Packaged as the real app (`package-tizen.mjs --with diag --flags diag --flags writes --flags input=hdmi1`) and run on the HKC, the owner saw the report, then HDMI 1,
+  and found the way back by picking the app from the television's list — where it has no recognisable icon, so it is found by guessing. A first package without `--with diag`
+  ignored the flags and died with "No model endpoint": diag is a build feature, not a launch flag. 1247 tests.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.

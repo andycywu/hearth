@@ -41,6 +41,17 @@ describe("runDiagnostics", () => {
     expect(status(report, "system.setInputSource")).toBe("skipped");
   });
 
+  it("switches the input only when a target is named, and reads it back", async () => {
+    const platform = createWebAdapter();
+    const named = await runDiagnostics(platform, { allowWrites: true, inputTarget: "hdmi2" });
+    expect(status(named, "system.setInputSource")).toBe("ok");
+    expect(detail(named, "system.setInputSource")).toMatch(/-> hdmi2, read back; not restored/);
+    expect(await platform.system.getInputSource()).toBe("hdmi2");
+    // A target without allowWrites is still just a write-guarded skip.
+    const guarded = await runDiagnostics(createWebAdapter(), { inputTarget: "hdmi2" });
+    expect(status(guarded, "system.setInputSource")).toBe("skipped");
+  });
+
   it("reports navigation ready on the web adapter and sends a key when allowed", async () => {
     const readOnly = await runDiagnostics(createWebAdapter());
     expect(status(readOnly, "navigation.available")).toBe("ok");
