@@ -1,0 +1,259 @@
+{
+  "profile": "tizen-dev",
+  "capability": [
+    "secure_protocol:enabled\r",
+    "intershell_support:disabled\r",
+    "sdk_toolpath:/home/owner/share/tmp/sdk_tools\r",
+    "profile_name:tv\r",
+    "platform_version:7.0\r"
+  ],
+  "report": {
+    "startedAt": "2026-10-21T02:44:15.539Z",
+    "steps": [
+      {
+        "name": "globals",
+        "value": {
+          "ok": true,
+          "value": {
+            "tizen": true,
+            "webapis": true,
+            "tizenTv": [
+              "application",
+              "systeminfo",
+              "time",
+              "tvaudiocontrol",
+              "tvchannel",
+              "tvdisplaycontrol",
+              "tvinfo",
+              "tvinputdevice",
+              "tvwindow"
+            ],
+            "webapisKeys": [
+              "avplay",
+              "avplaystore",
+              "bixby",
+              "featureconfig",
+              "productinfo",
+              "tvinfo",
+              "voiceinteraction"
+            ]
+          }
+        }
+      },
+      {
+        "name": "productinfo",
+        "value": {
+          "ok": false,
+          "error": {
+            "name": "SecurityError",
+            "message": "Permission denied",
+            "code": 18
+          }
+        }
+      },
+      {
+        "name": "webapis.tvinfo",
+        "value": {
+          "ok": true,
+          "value": {
+            "functions": [
+              "addCaptionChangeListener",
+              "addTvInfoChangeListener",
+              "getMenuValue",
+              "getTvInfoValue",
+              "getVersion",
+              "isTvsPicSizeResized",
+              "registerInAppCaptionControl",
+              "removeCaptionChangeListener",
+              "removeTvInfoChangeListener",
+              "setMenuValue",
+              "showCaption"
+            ],
+            "getters": {
+              "getVersion": "4.4"
+            }
+          }
+        }
+      },
+      {
+        "name": "webapis.tvinfo: constants and getTvInfoValue",
+        "value": {
+          "ok": true,
+          "value": {
+            "constantNames": [],
+            "asked": {}
+          }
+        }
+      },
+      {
+        "name": "tizen.tvwindow",
+        "value": {
+          "ok": true,
+          "value": {
+            "functions": [
+              "_getVersion",
+              "addVideoResolutionChangeListener",
+              "getAvailableWindows",
+              "getRect",
+              "getSource",
+              "getVideoResolution",
+              "hide",
+              "removeVideoResolutionChangeListener",
+              "setSource",
+              "show"
+            ]
+          }
+        }
+      },
+      {
+        "name": "tvwindow.getSource(\"MAIN\")",
+        "value": {
+          "ok": true,
+          "value": {
+            "type": "HDMI",
+            "number": 3,
+            "signal": null,
+            "editName": null
+          }
+        }
+      },
+      {
+        "name": "tvwindow.getSource()",
+        "value": {
+          "ok": true,
+          "value": {
+            "type": "HDMI",
+            "number": 3,
+            "signal": null,
+            "editName": null
+          }
+        }
+      },
+      {
+        "name": "tvwindow.getRect(\"MAIN\")",
+        "value": {
+          "ok": false,
+          "error": {
+            "name": "TypeMismatchError",
+            "message": "Cannot convert MAIN to function.",
+            "code": 17
+          }
+        }
+      },
+      {
+        "name": "tvwindow.getAvailableWindows",
+        "value": {
+          "ok": true,
+          "value": [
+            "MAIN"
+          ]
+        }
+      },
+      {
+        "name": "systeminfo VIDEOSOURCE",
+        "value": {
+          "ok": true,
+          "value": {
+            "connected": [
+              {
+                "type": "TV",
+                "number": 1,
+                "signal": null,
+                "editName": null
+              },
+              {
+                "type": "HDMI",
+                "number": 1,
+                "signal": null,
+                "editName": null
+              }
+            ],
+            "disconnected": [
+              {
+                "type": "AV",
+                "number": 1,
+                "signal": null,
+                "editName": null
+              },
+              {
+                "type": "HDMI",
+                "number": 2,
+                "signal": null,
+                "editName": null
+              },
+              {
+                "type": "HDMI",
+                "number": 3,
+                "signal": null,
+                "editName": null
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "application.getAppsInfo (count, first 3)",
+        "value": {
+          "ok": true,
+          "value": {
+            "count": 280,
+            "sample": [
+              {
+                "id": "com.samsung.tv.coss.provider.d2d",
+                "name": "ContentSharing.Provider.Ftp",
+                "show": true
+              },
+              {
+                "id": "org.tizen.cloning",
+                "name": "cloning",
+                "show": true
+              },
+              {
+                "id": "com.samsung.tv.csfs",
+                "name": "csfs",
+                "show": true
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "done": true,
+    "lastSources": {
+      "connected": [
+        {
+          "type": "TV",
+          "number": 1,
+          "signal": null,
+          "editName": null
+        },
+        {
+          "type": "HDMI",
+          "number": 1,
+          "signal": null,
+          "editName": null
+        }
+      ],
+      "disconnected": [
+        {
+          "type": "AV",
+          "number": 1,
+          "signal": null,
+          "editName": null
+        },
+        {
+          "type": "HDMI",
+          "number": 2,
+          "signal": null,
+          "editName": null
+        },
+        {
+          "type": "HDMI",
+          "number": 3,
+          "signal": null,
+          "editName": null
+        }
+      ]
+    }
+  }
+}

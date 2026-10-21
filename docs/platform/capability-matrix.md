@@ -133,8 +133,11 @@ run — it is destructive and the probe never auto-runs it. Full run:
 outright". It was never asked: `adapter-tizen`'s `setInputSource` is a hard-coded `TvUnsupportedError` that calls no API, and its
 `getInputSource` returns the constant `"tv"` whatever `webapis.tvinfo` answered. So the honest cell was `❔` (untested), and the earlier
 "read ✅, write signing-gated forever" (`capability-graph.md`) was a belief, not a measurement. **Then it was tested** (same day, HKC, a page
-signed with the ordinary `tizen-dev` certificate): `tizen.tvwindow.setSource` switched HDMI 3 → 1 → 3 and `getSource()` read each back; the cell is
-`✅`. Read-back is the television's own report — the picture was not independently observed — and it is one set and one certificate.
+signed with the ordinary `tizen-dev` certificate): `tizen.tvwindow.setSource` switched HDMI 3 → 1 → 3 and `getSource()` read each back — **and the
+picture did not change**: the page was drawn over the video window, and the owner saw only the page. With the television's own viewer brought to the front
+(`org.tizen.tv-viewer`) after `setSource`, the owner watched the set go to a no-signal screen on HDMI 3. So the cell is `✅` **for `setSource` plus the
+viewer**, and a `setSource` alone is a read-back that is not a switch. Switching to a port with a signal has not been watched; it is one set and one
+certificate.
 `webapis.tvinfo.getCurrentSource`, which the adapter calls, does not exist on this set. Details and the probe:
 [`tools/experiments/tizen-input-probe`](../../tools/experiments/tizen-input-probe). Another project's working Samsung code uses
 `tizen.tvwindow.setSource` and `tizen.systeminfo VIDEOSOURCE` and declares a `tv.window` privilege we do not; whether that works on this set

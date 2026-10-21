@@ -15,8 +15,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lists which ports have a signal (`TV 1` connected, `AV 1`/`HDMI 1–3` not — unconfirmed against a plugged-in device). Also learned: `webapis.tvinfo`
   has **no `getCurrentSource`** here, so the call the adapter makes never answered and its constant `"tv"` stood in for it; `webapis.productinfo` is
   `SecurityError` without its own privilege; the probe's first run taught two signatures from the television's own `TypeMismatchError`s
-  (`getSource` takes the window type, not callbacks). Caveats: the read-back is the TV's own report, the picture has not been independently
-  observed, and this is one set with one certificate. The adapter is not changed yet.
+  (`getSource` takes the window type, not callbacks). **Caveat that mattered:** the television's read-back said HDMI 1
+  and the owner, looking at the screen, saw only the probe's page — `setSource` changes the video window beneath the app, and nothing shows until
+  the television's own viewer (`org.tizen.tv-viewer`) is brought to the front, which is what `free-my-tv` does and the probe at first did not. With
+  the viewer, the owner watched the picture go to a no-signal screen on HDMI 3 (and `VIDEOSOURCE` listed HDMI 1 as connected once a device was
+  plugged into it). Launching the viewer suspends the page, so an adapter inside the television must verify first and expect to be suspended.
+  Still one set, one certificate, and a port *with* a signal not yet watched. The adapter is not changed yet.
 - **A reading note on `free-my-tv`, and two of our own claims found untested.** [`simbasjungles/free-my-tv`](https://github.com/simbasjungles/free-my-tv)
   (MIT) is a replacement home screen for Google TV, LG and Samsung; it is not a voice agent, but to be a home screen it lists apps, opens
   them and switches and reads inputs on real LG and Samsung sets — which is where our webOS and Tizen adapters are stubs.

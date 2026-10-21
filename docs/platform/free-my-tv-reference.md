@@ -47,6 +47,21 @@ certificate)**, declaring `tv.window`, `tv.inputdevice`, `application.launch` an
 | `tizen.application.getAppsInfo` | 280 apps, with `application.info` declared |
 | `tvwindow.getRect("MAIN")` | `TypeMismatchError` — the signature takes a callback first; not pursued |
 
+**Then somebody looked at the screen, and the read-back turned out not to be enough.** The first switch ended with the television reporting
+HDMI 1 and the owner seeing only the probe's own page: `setSource` moves the television's MAIN video window, and the probe is an
+application drawn *over* it. Nothing on screen changed until the television's own viewer (`org.tizen.tv-viewer`, launched with
+`tizen.application.launch` — which is what `free-my-tv` does after `setSource`) was brought to the front. Run that way, from HDMI 1 to HDMI 3 (a
+port with nothing on it), the owner watched the picture go to a **no-signal screen** for the 15 seconds the probe held it, and back to the probe's page
+when it was relaunched. So `setSource` + the viewer **visibly switches the television**, and a `setSource` that reports `ok` with the viewer
+not shown is a switch nobody can see — the "read back" that was never the same thing as "happened". (The 12-second run from HDMI 1 to HDMI 1 was
+not observed either way: the owner was not sure what was on screen. Switching *to* a port with a signal, and seeing that device's picture, is not yet
+observed.) `VIDEOSOURCE` was checked against the owner: with a device plugged into HDMI 1 it listed HDMI 1 as connected where it had listed it
+disconnected before.
+
+One consequence for any adapter that runs *inside* the television: bringing the viewer to the front **suspends the page** (the Web Inspector
+stops answering until it is relaunched — see `tools/tizen-device.mjs`). Verification has to happen before the viewer is launched, and the agent has to
+expect to be suspended, as it is when it launches any other app.
+
 So: **a page signed with an ordinary developer certificate can read and switch the input on this set.** The `⛔` and the "signing-gated forever"
 were wrong, and so was reading the source through `tvinfo.getCurrentSource`, which does not exist here. Two caveats that keep this from being the
 last word. The read-back is the television's own report through the same API family that did the switching; the *picture* changing has to be seen

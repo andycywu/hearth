@@ -25,6 +25,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const opt = (name, fallback) => { const i = args.indexOf(name); return i === -1 ? fallback : args[i + 1]; };
 const profile = opt("--profile", null);
+const holdMs = Number(opt("--hold", 0)) * 1000;   // stay on each source this long, so a person watching can see it
 const appId = "tvprobe000.InputProbe";
 
 const sdk = findTizenSdk();
@@ -63,19 +64,52 @@ if (!args.includes("--no-install")) {
 }
 
 // ---- run it with the Web Inspector and read the page
-const launched = launchWithInspector(sdb, appId);
+let launched = launchWithInspector(sdb, appId);
 console.log(`[probe] launched: ${launched.via}  (inspector port ${launched.port})`);
 forwardInspector(sdb, launched.port);
 let report;
 try {
   const target = await findPageTarget(launched.port);
-  const cdp = await Cdp.connect(target.webSocketDebuggerUrl);
+  let cdp = await Cdp.connect(target.webSocketDebuggerUrl);
   cdp.timeoutMs = 20_000;
   if (!(await waitFor(cdp, "!!(window.__probe && window.__probe.done)", 60))) throw new Error("the probe page did not finish");
   report = JSON.parse(await cdp.eval("JSON.stringify(window.__probe)"));
 
   const sw = opt("--switch", null);
-  if (sw) {
+  if (sw && args.includes("--yes-switch") && args.includes("--show")) {
+    // setSource moves the television's MAIN video window; this page is an application drawn over it, so the picture does not
+    // appear until another application — the television's own viewer — is brought to the front (what free-my-tv does after
+    // setSource). A person has to be looking. Then this page is brought back and the television is put on where it started.
+    const [type, number] = sw.split(":");
+    const getSource = "JSON.stringify((function(){ try { return tizen.tvwindow.getSource(); } catch (e) { return null; } })())";
+    const original = JSON.parse(await cdp.eval(getSource));
+    const switchTo = async (t, n) => {
+      await cdp.eval(`window.__probeSwitch(${JSON.stringify(t)}, ${Number(n)})`);
+      for (let i = 0; i < 30; i++) {
+        const r = JSON.parse(await cdp.eval("JSON.stringify(window.__probe.switchResult || null)"));
+        if (r) return r;
+        await sleep(500);
+      }
+      return { error: "no answer from setSource in 15 s" };
+    };
+    console.log(`[probe] >>> WATCH THE TELEVISION: switching to ${type} ${number} and bringing the TV viewer to the front for ${holdMs / 1000} s`);
+    report.switchSequence = [await switchTo(type, number)];
+    const launchedViewer = await cdp.attempt("(window.__probeLaunch('org.tizen.tv-viewer'), true)");
+    console.log(`[probe] viewer launch requested: ${JSON.stringify(launchedViewer)}`);
+    await sleep(holdMs);
+    // The page was suspended when the viewer came up; start it again and reconnect.
+    try { cdp.close(); } catch { /* already gone */ }
+    unforward(sdb, launched.port);
+    launched = launchWithInspector(sdb, appId);
+    forwardInspector(sdb, launched.port);
+    cdp = await Cdp.connect((await findPageTarget(launched.port)).webSocketDebuggerUrl);
+    cdp.timeoutMs = 20_000;
+    await waitFor(cdp, "!!(window.__probe && window.__probe.done)", 60);
+    console.log(`[probe] putting the television back on ${original.type} ${original.number}`);
+    report.switchSequence.push({ restore: true, ...(await switchTo(original.type, original.number)) });
+    report.switchResult = report.switchSequence;
+    report.viewerLaunch = launchedViewer;
+  } else if (sw) {
     if (!args.includes("--yes-switch")) {
       console.error(`[probe] --switch ${sw} would change what the television shows; add --yes-switch to do it. Not switching.`);
     } else {
@@ -88,7 +122,7 @@ try {
         await cdp.eval(`window.__probeSwitch(${JSON.stringify(type)}, ${Number(number)})`);
         for (let i = 0; i < 30; i++) {
           const r = JSON.parse(await cdp.eval("JSON.stringify(window.__probe.switchResult || null)"));
-          if (r) return r;
+          if (r) { await sleep(holdMs); return r; }
           await sleep(500);
         }
         return { error: "no answer from setSource in 15 s (neither success nor error callback)" };

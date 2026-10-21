@@ -167,5 +167,18 @@
     }
   };
 
+  /**
+   * Bring another application to the foreground (e.g. the television's own viewer, 'org.tizen.tv-viewer').
+   * setSource changes the source of the television's MAIN video window; this page is an application drawn over that window, so a
+   * person looking at the screen sees this page until something else is brought up. Only run.mjs --show calls it.
+   */
+  window.__probeLaunch = function (id) {
+    probe.launchResult = null;
+    try {
+      tizen.application.launch(id, function () { probe.launchResult = { ok: true, id: id }; },
+        function (e) { probe.launchResult = { ok: false, id: id, error: errInfo(e) }; });
+    } catch (e) { probe.launchResult = { ok: false, id: id, threw: errInfo(e) }; }
+  };
+
   setTimeout(run, 300);
 })();
