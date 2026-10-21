@@ -137,3 +137,8 @@ Until then every row above marked unverified stays that way.
 4. **A Device Graph source from `VIDEOSOURCE` / `getAllInputStatus`**, if (1) and (3) answer: ports with something on them, with the
    owner's own names, from the television itself.
 5. **A rule for older engines**: decide whether a 2016–2019 target is a goal before spending effort on it.
+
+**2026-10-21, later: a port with a signal.** With a device on HDMI 1, `setSource` plus the viewer took the HKC from TV 1 to HDMI 1 (read back, 1.6 s,
+`signal: true`), and the owner, watching, saw that device's picture for the whole 30 s hold; the probe then put the television back on TV 1. That closes the
+"port with a signal not yet watched" caveat for this one set and this one certificate. The JSON page the owner kept seeing is the probe's own, which prints its
+findings and relaunches itself after the viewer; it is not what a person should ever see (STATUS, Remaining 8).

@@ -151,6 +151,12 @@ Report.
    one key across a fleet is one household spending everyone's month).
    [ADR-0004 amendment](adr/0004-modelpilot-boundary.md).
 7. **npm publish.** Waiting on the `@hearthkit` npm organisation.
+8. **What a person sees when the television switches input, and how they get back.** On a Tizen set the picture only appears once the television's own
+   viewer is in front, and that **suspends the Hearth page** (measured 2026-10-21 on the HKC: a read-back said HDMI 1 and the screen still showed the app; with
+   the viewer up the owner watched HDMI 1 with a signal, and a no-signal screen on a port with nothing). The adapter does this now. What nobody has designed or tried
+   is the other half: the page should say what it is doing before it goes ("switching to HDMI 1"), and the person needs a way back that is not a wiped screen
+   — a spoken "back to Hearth", the remote's return key — with the agent relaunching itself or being relaunched. The experiment's own page printed raw JSON and the
+   owner, reasonably, took it for a fault; the real app has not been run through this flow on a device, so what it shows after the switch is unverified.
 
 ## How to run
 
