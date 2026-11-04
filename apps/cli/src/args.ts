@@ -71,6 +71,11 @@ export interface CliOptions {
   /** `--cec <device>`: the CEC adapter to try on linux. `--no-cec` leaves the bus alone. */
   cec: string | false;
   /**
+   * `--tv-module <path>`: a module that drives the television from this box (see tv-module.ts). Its volume, input,
+   * layout and keys replace the box's own; anything it does not offer stays the box's.
+   */
+  tvModule?: string;
+  /**
    * `hearth setup`: look at this box, write `~/.config/hearth/config.json` so
    * the next `hearth` needs no flags, and say what the box can do.
    */
@@ -198,6 +203,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (env.TV_AGENT_ASR_MODEL) opts.asrModel = env.TV_AGENT_ASR_MODEL;
   // These three exist so `hearth setup` can write a config that stands in for
   // flags (see config.ts); they are read from the environment the same way.
+  if (env.HEARTH_TV_MODULE) opts.tvModule = env.HEARTH_TV_MODULE;
   if (env.HEARTH_CEC) opts.cec = env.HEARTH_CEC === "off" ? false : env.HEARTH_CEC;
   if (env.HEARTH_VOICE === "1") opts.voice = true;
   if (env.HEARTH_LEDS === "1") opts.leds = true;
@@ -308,6 +314,7 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       case "--no-cec": opts.cec = false; break;
       case "--no-save": opts.save = false; break;
       case "--cec": { const v = takeValue("--cec"); if (v !== undefined) opts.cec = v; break; }
+      case "--tv-module": { const v = takeValue("--tv-module"); if (v !== undefined) opts.tvModule = v.trim() || undefined; break; }
       case "--intents": {
         const v = takeValue("--intents");
         if (v !== undefined) opts.intents = v.split(";").map((x) => x.trim()).filter(Boolean);
@@ -488,6 +495,8 @@ OPTIONS
                           for it ("Hard, turn it down" counts for "hearth" by default; $HEARTH_WAKE_ALIASES=a,b replaces the list)
       --cec <device>      CEC adapter to discover with (default /dev/cec0, linux)
       --no-cec            do not touch the CEC bus
+      --tv-module <path>  a module that drives the television from this box (or $HEARTH_TV_MODULE):
+                          its volume, input, picture layout and keys replace this box's own
       --modelpilot <t>    official|local|off — which named ModelPilot to use (or $MODELPILOT_TARGET;
                           keys: $MODELPILOT_OFFICIAL_API_KEY, $MODELPILOT_LOCAL_API_KEY)
       --stream-speech     speak a streamed reply sentence by sentence as it arrives (needs --voice and a

@@ -35,6 +35,7 @@ import { runCecTool, runLab } from "./lab-run.js";
 import { runRingTool } from "./ring-tool.js";
 import { answer, listenForever, showOutcomes } from "./voice-loop.js";
 import { configAsEnv, loadConfig } from "./config.js";
+import { loadTvModule, withTv, type TvModule } from "./tv-module.js";
 
 const VERSION = "0.3.0";
 
@@ -125,7 +126,25 @@ async function main(): Promise<number> {
     }
   }
 
-  const platform = await openPlatform(opts, local);
+  // A television this box drives over the network, if one was named: its controls are laid over the box's before
+  // anything asks what the platform can do, so the report, the probe and the agent all see the same TV.
+  let tv: TvModule | undefined;
+  if (opts.tvModule) {
+    try {
+      tv = await loadTvModule(opts.tvModule, { ...env });
+    } catch (err) {
+      stderr.write(`hearth: --tv-module ${opts.tvModule}: ${err instanceof Error ? err.message : String(err)}\n`);
+      return 2;
+    }
+  }
+  let platform: PlatformProvider;
+  try {
+    platform = await openPlatform(opts, local, tv);
+  } catch (err) {
+    stderr.write(`hearth: ${tv?.name ?? "the television"}: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 2;
+  }
+  if (tv && !opts.quiet && !opts.json) stderr.write(`hearth: driving ${tv.name ?? opts.tvModule}\n`);
 
   // `hearth report`: the same platform and the same room, a different question.
   if (opts.report) {
@@ -238,6 +257,8 @@ async function main(): Promise<number> {
       stdout.write(opts.json
         ? JSON.stringify({ ok: true, input: command, output }) + "\n"
         : output + "\n");
+      // Shown on the television before it is spoken, so the words are there while they are heard.
+      await Promise.resolve(tv?.onTurn?.(command, output)).catch(() => {});
       // The text is printed the moment the reply is complete; what is still being said is waited for before the turn ends,
       // so the microphone is not reopened mid-sentence.
       if (live) {
@@ -298,6 +319,7 @@ async function main(): Promise<number> {
   await spoken?.stop();
   await local?.stop();            // waits for the model server to be shut down, or it outlives us
   await ring?.off();
+  await Promise.resolve(tv?.close?.()).catch(() => {});
   // A non-zero exit for a failed turn, so this composes in a shell script.
   return failures ? 1 : 0;
 }
@@ -359,7 +381,7 @@ function confirmer(opts: CliOptions): (req: { name: string; args: Record<string,
   };
 }
 
-async function openPlatform(opts: CliOptions, local?: LocalListener): Promise<PlatformProvider> {
+async function openPlatform(opts: CliOptions, local?: LocalListener, tv?: TvModule): Promise<PlatformProvider> {
   if (opts.platform === "linux") {
     // Deliberately a clear error rather than a silent fall back to the mock:
     // "it ran and did nothing to my TV" is a much worse afternoon than "that
@@ -397,10 +419,12 @@ async function openPlatform(opts: CliOptions, local?: LocalListener): Promise<Pl
           }
         : {}),
     });
-    await platform.init();
-    return platform;
+    const driven = tv ? withTv(platform, tv) : platform;
+    await driven.init();
+    return driven;
   }
-  const platform = createWebAdapter();
+  const web = createWebAdapter();
+  const platform = tv ? withTv(web, tv) : web;
   await platform.init();
   return platform;
 }

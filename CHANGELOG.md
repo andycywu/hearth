@@ -8,6 +8,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`hearth --tv-module <path>`: the Pi drives a television over the network through a module that does not live in this repository.** On a Pi the
+  platform adapter describes the Pi — its microphone, its speaker, its own ALSA volume — and the television is somewhere else, reached in a way that
+  differs per set and is sometimes not ours to publish. A module (`createTv(env)` or a default export, `apps/cli/src/tv-module.ts`) returns HAL-typed
+  `system`, `display` and `navigation` members, and `withTv` lays them over the box's adapter **per method**: whatever the module does not offer stays
+  the box's, which for input switching on a Pi is an honest `unsupported`, not an imitation. An `onTurn(input, output)` hook lets a module show the
+  exchange on the screen; `init()` failing stops the start, because a television that cannot be reached is not one to pretend to drive.
+  `$HEARTH_TV_MODULE` and `tvModule` in `config.json` carry it like every other flag. `private/` is git-ignored for such modules. Learned getting
+  here: the architecture is now *always* a Pi beside the television, and the television's own app surface is not where control has to live — on one
+  development set it could not reach the platform at all from an app page, while the Pi could. Nine tests, including "turn it down" lowering the far
+  television's volume and leaving the box's alone; run once from a workstation against a real set (volume read through the module, nothing changed).
+  1279 tests.
 - **Experiment 1 on the HKC: a Tizen page signed with an ordinary developer certificate can read and switch the television's input.** The
   `⛔` in the capability matrix and "signing-gated forever" were wrong. A throwaway probe (`tools/experiments/tizen-input-probe/`: build, sign
   with `tizen-dev`, install, launch under the Web Inspector, read the page) called `tizen.tvwindow.setSource` for HDMI 3, HDMI 1 and HDMI 3 again;

@@ -20,6 +20,8 @@ export interface HearthConfig {
   platform?: "mock" | "linux";
   /** CEC adapter path, or `false` to leave the bus alone. */
   cec?: string | false;
+  /** A module that drives the television from this box; see tv-module.ts. A path, so the module can live outside the repository. */
+  tvModule?: string;
   /** Listen on the microphone by default. */
   voice?: boolean;
   asrBaseUrl?: string;
@@ -84,6 +86,7 @@ export function configAsEnv(config: HearthConfig): Record<string, string> {
   if (config.llmModel) env.TV_AGENT_MODEL = config.llmModel;
   if (config.asrBaseUrl) env.TV_AGENT_ASR = config.asrBaseUrl;
   if (config.asrModel) env.TV_AGENT_ASR_MODEL = config.asrModel;
+  if (config.tvModule) env.HEARTH_TV_MODULE = config.tvModule;
   if (config.cec !== undefined) env.HEARTH_CEC = config.cec === false ? "off" : config.cec;
   if (config.voice) env.HEARTH_VOICE = "1";
   if (config.leds) env.HEARTH_LEDS = "1";

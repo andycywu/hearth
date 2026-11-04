@@ -24,7 +24,7 @@ has: webOS stubs audio and app management, no Samsung-branded set has run
 anything, and CEC, IR, an AVR, a console, a camera and a far-field microphone
 need a room rather than a television.
 
-**1270 tests green**, across 19 packages.
+**1279 tests green**, across 19 packages.
 
 ## At a glance
 
@@ -38,7 +38,7 @@ need a room rather than a television.
 | Planning cost meter (`agent.planning`) | ✅ done — the four P0 scenarios plan for **zero tokens**, 1.7 ms average |
 | Perception boundary + mock camera | ✅ done — no grant no sensor, raw capture stripped, revocation beats `stop()` |
 | Platform HAL + adapters (web, Tizen, AOSP, webOS, Linux) | ✅ 5 implemented, one shared contract test |
-| Titan OS / Xumo adapters | 🟡 stubs: bridge shape + contract test, no integration. Both in the 6-target acceptance run |
+| Titan OS / Xumo adapters | 🟡 stubs: bridge shape + contract test, no integration. Both in the 6-target acceptance run. **Titan, 2026-11-04:** a private module (git-ignored, `--tv-module`) drives one development set from the Pi — input, volume, mute and all three layouts verified with the owner watching; details withheld, see the capability matrix |
 | Host boot (`@hearthkit/host`) | ✅ one boot sequence for all four hosts, replacing four divergent copies |
 | Build profiles (`--full` / `--with` / `--without`) | ✅ optional code removed at build time, not skipped at runtime — 74 / 95 / 121 KB |
 | Install identity + service metrics | ✅ random, local, resettable id on ModelPilot calls only; no analytics endpoint exists |
@@ -54,7 +54,7 @@ need a room rather than a television.
 | **Spoken commands, end to end** | ⛔ **none verified.** Files, a robot voice and a scripted microphone only; no person has been heard yet. Attention word, silence gate, recognition accuracy, distance, false accepts, the boot service: [`VOICE_TEST_PLAN.md`](VOICE_TEST_PLAN.md) (V1–V16) |
 | `--stream-speech` | 🟡 built, off by default: first word ~1.5 s sooner on typed input, ~0.5 s audio-device gap per sentence; nobody has judged it by ear (V9) |
 | Skills — code and JSON manifests | ✅ guide, runnable example, installable manifests |
-| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1270 tests, CI green |
+| Tests / CI / lint / bundle-size / license / SBOM / secrets gate | ✅ 1279 tests, CI green |
 | **Android TV emulator bring-up** | ✅ 11 ok / 0 errors, acceptance script passes |
 | **Goal mode on the Android TV emulator** | ✅ verified 2026-08-18, two device-only defects found and fixed |
 | **Local model driving a real TV** | ✅ on the Android **and** Tizen emulators; 1.5B is too weak to chain tools |
@@ -68,10 +68,10 @@ need a room rather than a television.
 | **Blits promoted to default UI** | ⛔ needs browser/GPU testing |
 | **On-device model benchmark** | ⛔ needs hardware |
 
-## Test coverage (1270 tests)
+## Test coverage (1279 tests)
 
 core 216 · ui 167 · adapter-linux 213 · modelpilot 77 · llm-connectors 66 ·
-skill-manifest 56 · adapter-cec 46 · cli 233 · edge-voice 52 · adapter-aosp 28 · acceptance 20 ·
+skill-manifest 56 · adapter-cec 46 · cli 242 · edge-voice 52 · adapter-aosp 28 · acceptance 20 ·
 adapter-tizen 33 · perception-mock 14 · skills-example 13 · adapter-webos 10 ·
 platform-api 8 · adapter-titan 7 · adapter-xumo 6 · adapter-web 5.
 
