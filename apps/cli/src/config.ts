@@ -47,6 +47,8 @@ export interface HearthConfig {
   /** The voice replies are spoken in: an espeak-ng voice (`en-us`, `cmn+f3`), words per minute, pitch 0–99. */
   ttsVoice?: string;
   ttsSpeed?: number;
+  /** The status ring's brightness, percent of its built-in levels. */
+  ledBrightness?: number;
   ttsPitch?: number;
   /** When and by what this was written — for the person reading the file, not the code. */
   writtenBy?: string;
@@ -99,6 +101,7 @@ export function configAsEnv(config: HearthConfig): Record<string, string> {
   if (config.avatar) env.HEARTH_AVATAR = config.avatar;
   if (config.ttsVoice) env.HEARTH_TTS_VOICE = config.ttsVoice;
   if (config.ttsSpeed !== undefined) env.HEARTH_TTS_SPEED = String(config.ttsSpeed);
+  if (config.ledBrightness !== undefined) env.HEARTH_LED_BRIGHTNESS = String(config.ledBrightness);
   if (config.ttsPitch !== undefined) env.HEARTH_TTS_PITCH = String(config.ttsPitch);
   return env;
 }

@@ -33,6 +33,7 @@ import { createStreamSpeaker } from "./speech-stream.js";
 import { runModelPilotCheck } from "./modelpilot-targets.js";
 import { runCecTool, runLab } from "./lab-run.js";
 import { runRingTool } from "./ring-tool.js";
+import { DEFAULT_LED_BRIGHTNESS, ringBrightnessTools } from "./ring-brightness.js";
 import { answer, listenForever, showOutcomes } from "./voice-loop.js";
 import { configAsEnv, loadConfig } from "./config.js";
 import { loadTvModule, withTv, type TvModule } from "./tv-module.js";
@@ -43,7 +44,10 @@ async function main(): Promise<number> {
   // What `hearth setup` wrote sits underneath the real environment, so the
   // parser keeps its one rule — flag > env > default — and the file is the
   // quietest voice of the three.
-  const opts = parseArgs(argv.slice(2), { ...configAsEnv(await loadConfig()), ...env });
+  // Everything below reads `settings`, never `env` alone: the KWS model path and the like are written to the file by setup, and a
+  // reader that looked only at the environment found them missing on the very box setup had configured.
+  const settings: Record<string, string | undefined> = { ...configAsEnv(await loadConfig()), ...env };
+  const opts = parseArgs(argv.slice(2), settings);
 
   if (opts.help) { stdout.write(HELP); return 0; }
   if (opts.version) { stdout.write(`${VERSION}\n`); return 0; }
@@ -62,22 +66,25 @@ async function main(): Promise<number> {
   // `hearth ring` is the lights alone, to see them without running the rest.
   if (opts.ringTool) {
     const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
-    return runRingTool(opts.ringTool, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, { interrupted });
+    const { createStatusRing } = await import("@hearthkit/adapter-linux");
+    return runRingTool(opts.ringTool, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, {
+      interrupted, ring: createStatusRing({ level: (opts.ledBrightness ?? DEFAULT_LED_BRIGHTNESS) / 100 }),
+    });
   }
 
   // `hearth modelpilot status` asks the two named services what they are and needs nothing else.
-  if (opts.modelpilotCheck) return runModelPilotCheck(opts, { ...env }, { out: (t) => { stdout.write(t); } });
-  if (opts.modelpilotStatus) return runModelPilotStatus({ ...env }, { out: (t) => { stdout.write(t); } });
+  if (opts.modelpilotCheck) return runModelPilotCheck(opts, { ...settings }, { out: (t) => { stdout.write(t); } });
+  if (opts.modelpilotStatus) return runModelPilotStatus({ ...settings }, { out: (t) => { stdout.write(t); } });
 
   // The ring is opened first and shared by everything below: a light is the one status a person across the
   // room can see, and every command that works — the agent, the lab, a CEC command, the recogniser —
   // should show that it is working and what came of it. Still means nothing is happening.
-  const ring = opts.leds && opts.platform === "linux" ? await openRing() : undefined;
+  const ring = opts.leds && opts.platform === "linux" ? await openRing((opts.ledBrightness ?? DEFAULT_LED_BRIGHTNESS) / 100) : undefined;
 
   // `hearth lab` and `hearth cec` talk to the adapter directly: no agent, no room.
   if (opts.lab) {
     const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
-    const code = await runLab(opts, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, { env: { ...env }, interrupted, ring });
+    const code = await runLab(opts, { out: (t) => { stdout.write(t); }, err: (t) => { stderr.write(t); } }, { env: { ...settings }, interrupted, ring });
     await ring?.off();
     return code;
   }
@@ -91,7 +98,7 @@ async function main(): Promise<number> {
   if (opts.stt) {
     const interrupted = new Promise<void>((resolve) => { process.once("SIGINT", () => resolve()); process.once("SIGTERM", () => resolve()); });
     const code = await runStt(opts, {
-      env: { ...env },
+      env: { ...settings },
       io: { out: (text) => { stdout.write(text); }, err: (text) => { stderr.write(text); } },
       interrupted,
       rssMb: () => Math.round(process.memoryUsage.rss() / 1048576),
@@ -109,7 +116,7 @@ async function main(): Promise<number> {
     try {
       // A wake-word detector that cannot start is an error, never a fall back to sending everything: the whole point of
       // asking for it was that the room's sound does not leave the box.
-      const kws = wantKws ? await resolveKws({ ...env }, opts.wakeWord) : undefined;
+      const kws = wantKws ? await resolveKws({ ...settings }, opts.wakeWord) : undefined;
       if (kws && !kws.ok) throw new Error(`--wake-detector kws: ${kws.why}`);
       let recogniser: Recogniser = "local";
       if (opts.asrBaseUrl && opts.asrBaseUrl !== "local") {
@@ -117,7 +124,7 @@ async function main(): Promise<number> {
       } else if (!opts.asrBaseUrl) {
         throw new Error("--wake-detector kws hears the wake word; something still has to recognise what follows. Give --asr local, --asr openai or --asr <url>");
       }
-      local = await createLocalListener({ ...env }, { err: (t) => { stderr.write(t); } }, {
+      local = await createLocalListener({ ...settings }, { err: (t) => { stderr.write(t); } }, {
         quiet: opts.quiet || opts.json, ring, recogniser, ...(kws?.ok ? { kws: kws.settings } : {}),
       });
     } catch (err) {
@@ -131,7 +138,7 @@ async function main(): Promise<number> {
   let tv: TvModule | undefined;
   if (opts.tvModule) {
     try {
-      tv = await loadTvModule(opts.tvModule, { ...env });
+      tv = await loadTvModule(opts.tvModule, { ...settings });
     } catch (err) {
       stderr.write(`hearth: --tv-module ${opts.tvModule}: ${err instanceof Error ? err.message : String(err)}\n`);
       return 2;
@@ -167,7 +174,7 @@ async function main(): Promise<number> {
   }
 
   // ModelPilot, if a key was provisioned: a planner for goals the local one cannot close, and the router for conversation.
-  const modelPilot = await connectModelPilot({ ...env }, platform.storage, {   // opts.modelpilot: flag > env > config
+  const modelPilot = await connectModelPilot({ ...settings }, platform.storage, {   // opts.modelpilot: flag > env > config
     explicitLlm: Boolean(opts.baseUrl),
     ...(opts.modelpilot ? { target: opts.modelpilot } : {}),
     compare: opts.compare,
@@ -185,7 +192,7 @@ async function main(): Promise<number> {
     platform,
     devices: room.devices,
     ...(room.capabilities.length ? { capabilities: room.capabilities } : {}),
-    ...(room.tools.length ? { tools: room.tools } : {}),
+    ...(room.tools.length || ring ? { tools: [...room.tools, ...(ring ? ringBrightnessTools(ring) : [])] } : {}),
     llm: opts.baseUrl
       ? createOpenAiCompatibleClient({
           baseUrl: opts.baseUrl,
@@ -341,11 +348,11 @@ async function finishRing(ring: StatusRing | undefined): Promise<void> {
  * and no GPIO5 to switch, and none of that should stop the agent running. A ring
  * that cannot be opened is reported once and then forgotten about.
  */
-async function openRing(): Promise<StatusRing | undefined> {
+async function openRing(level: number): Promise<StatusRing | undefined> {
   try {
     const { createStatusRing, withStateFile } = await import("@hearthkit/adapter-linux");
     // Wrapped so the lab's avatar can look like the real ring: each state change is also written to a small file on the tmpfs.
-    const ring = withStateFile(createStatusRing());
+    const ring = withStateFile(createStatusRing({ level }));
     await ring.off();          // proves the power gate and the bus before relying on them
     return ring;
   } catch (err) {

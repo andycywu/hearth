@@ -8,6 +8,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The status ring is dimmer by default, and Hearth can be asked to change it.** The ring was reported too bright in a living room. Its levels
+  were already low in the APA102's five-bit header (idle is 3 of 31), so a quarter of them rounds towards nothing; the new `level` option of
+  `createStatusRing` scales the colours instead, which have 256 steps, and keeps the order between idle, work and an answer. The owner watched the
+  ring at 10, 25 and 75 % of the old levels and chose **5 % as the default**. `--led-brightness <percent>`, `$HEARTH_LED_BRIGHTNESS` and
+  `ledBrightness` in `config.json` set it; `set_led_brightness` / `get_led_brightness` let the model change it when asked ("make your lights
+  brighter"), repaint at once, and write the new value to the config so it outlasts a restart. The tool says `read_back: false` every time: the ring
+  is write-only, so the level reported is the one written, never one seen. Its description sends "brighter" about the picture elsewhere. 1301 tests.
+- **Spoken commands, recorded once and replayed against the television: `tools/voice-record.mjs`, `tools/voice-synth.py`,
+  `tools/voice-replay.mjs`.** `bench/voice/commands.json` lists ten commands with the wake word and what the television should read back after
+  each (`volume` up/down/a number, `mute`, `input`, `layout`, words the answer must contain). The replay plays each clip into Hearth as its
+  microphone, reads the television through the same `--tv-module` before and after, judges (`apps/cli/src/voice-replay.ts`: `verified` only from a
+  reading, never from the answer's own words), and puts the set back. Clips stay on the box — a person's voice — and a synthetic set can be made
+  offline with the neural voices sherpa-onnx already runs there. Learned on the first runs, Pi 3B to a development television, synthetic voices:
+  the wake word was caught 10 of 10 times and the command after it was not — the on-box recogniser turned "小聲一點" into "小声鼎鼎" and "HDMI 3"
+  into "H", 4 of 10 verified. That recogniser is a fallback, not the product: recognition, speech and understanding go through ModelPilot next.
+  Worse than a miss, the model **acted on a garbled transcript** ("小音量" → volume 10, answered as if asked); a low-confidence sentence should be
+  asked back, not guessed at, and that is the next thing to build. And the television **lowers its own volume, a step at a time, while the box's
+  HDMI audio plays for more than about three seconds** — reproduced with espeak-ng alone and nothing of Hearth running — so the replay reads the
+  set when the answer is printed, before it is spoken, and every long spoken reply is for now a quiet "turn it down" of its own.
+
 - **`hearth --tv-module <path>`: the Pi drives a television over the network through a module that does not live in this repository.** On a Pi the
   platform adapter describes the Pi — its microphone, its speaker, its own ALSA volume — and the television is somewhere else, reached in a way that
   differs per set and is sometimes not ours to publish. A module (`createTv(env)` or a default export, `apps/cli/src/tv-module.ts`) returns HAL-typed
@@ -542,6 +562,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **What `hearth setup` wrote to `config.json` reached the parser and nothing else.** The keyword spotter's model path, among others, is read where
+  the listener is built, from the environment alone, so a Pi that setup had configured for `--wake-detector kws` refused to start with
+  "HEARTH_KWS_MODEL_PATH is not set" — the setting was in the file it had just been told to trust. `main.ts` now builds the config-under-environment
+  settings once and hands the same object to everything that reads them. Found starting the Pi by hand for the first spoken command to a television.
 - README's HDMI-CEC status row still said "no real bus has run it", three weeks
   after one had.
 - The first Pi report was wrong about the Pi twice. `voice.engines: none

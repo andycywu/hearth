@@ -112,6 +112,8 @@ export interface CliOptions {
   /** The voice replies are spoken in (`HEARTH_TTS_VOICE`, `_SPEED`, `_PITCH`; the lab's Voice tab writes them to the config). */
   ttsVoice?: string;
   ttsSpeed?: number;
+  /** `--led-brightness`: the status ring's brightness, percent of its built-in levels (1-100). Default 5 (ring-brightness.ts). */
+  ledBrightness?: number;
   ttsPitch?: number;
   /** `--target N`: the CEC logical address a `hearth cec` command is aimed at. */
   target?: number;
@@ -207,6 +209,11 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
   if (env.HEARTH_CEC) opts.cec = env.HEARTH_CEC === "off" ? false : env.HEARTH_CEC;
   if (env.HEARTH_VOICE === "1") opts.voice = true;
   if (env.HEARTH_LEDS === "1") opts.leds = true;
+  if (env.HEARTH_LED_BRIGHTNESS) {
+    const n = Number(env.HEARTH_LED_BRIGHTNESS);
+    if (Number.isFinite(n) && n >= 1 && n <= 100) opts.ledBrightness = n;
+    else opts.warnings.push(`HEARTH_LED_BRIGHTNESS must be a percent from 1 to 100 (got "${env.HEARTH_LED_BRIGHTNESS}") — ignored`);
+  }
   if (env.HEARTH_WAKE) opts.wakeWord = env.HEARTH_WAKE;
   if (env.HEARTH_WAKE_DETECTOR) {
     const d = env.HEARTH_WAKE_DETECTOR.trim().toLowerCase();
@@ -254,6 +261,14 @@ export function parseArgs(argv: string[], env: Record<string, string | undefined
       }
       case "--voice": opts.voice = true; break;
       case "--leds": opts.leds = true; break;
+      case "--led-brightness": {
+        const v = takeValue("--led-brightness");
+        if (v === undefined) break;
+        const n = Number(v.replace(/%$/, ""));
+        if (Number.isFinite(n) && n >= 1 && n <= 100) opts.ledBrightness = n;
+        else opts.errors.push(`--led-brightness must be a percent from 1 to 100 (got "${v}")`);
+        break;
+      }
       case "--wake": { const v = takeValue("--wake"); if (v !== undefined) opts.wakeWord = v.trim() || undefined; break; }
       case "--no-wake": delete opts.wakeWord; break;
       case "--no-wake-aliases": opts.wakeAliases = false; break;
@@ -485,6 +500,8 @@ OPTIONS
       --asr-model <name>  transcription model (or $TV_AGENT_ASR_MODEL)
       --serve             keep listening until stopped, even with no terminal (a service)
       --leds              show each outcome on the APA102 status ring (linux)
+      --led-brightness <n> the ring's brightness, percent of its built-in levels (or $HEARTH_LED_BRIGHTNESS). Default 5;
+                          "make your lights brighter" changes it too, and keeps it
       --wake <word>       act only on what is said after this word is heard;
                           everything else is transcribed and dropped
       --no-wake           act on everything heard

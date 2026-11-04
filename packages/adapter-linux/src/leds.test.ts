@@ -112,6 +112,35 @@ describe("the status ring", () => {
     expect(rec.frames.at(-1)![4]).toBe(0xe0 | 1);
   });
 
+  it("dims every state by the same fraction, in the colours, so a quarter of idle is still lit", async () => {
+    // The ring was found too bright in a living room. The five-bit header has three steps left at idle; a quarter of
+    // three rounds to one, and the order between idle and an answer would go with it. The colours have 256.
+    const rec = recorder();
+    const ring = createStatusRing({ run: fakeRunner(), write: rec.write, count: 1, brightness: 10, level: 0.25 });
+    const q = (c: number) => Math.round(c * 0.25);
+    await ring.show("listening");
+    const [lr, lg, lb] = RING_COLOURS.listening;
+    expect([...rec.frames.at(-1)!.subarray(4, 8)]).toEqual([0xe0 | 3, q(lb), q(lg), q(lr)]);
+    await ring.show("verified");
+    const [r, g, b] = RING_COLOURS.verified;
+    expect([...rec.frames.at(-1)!.subarray(4, 8)]).toEqual([0xe0 | 10, q(b), q(g), q(r)]);
+  });
+
+  it("repaints a still state at once when the level changes, and keeps it for the next", async () => {
+    const rec = recorder();
+    const ring = createStatusRing({ run: fakeRunner(), write: rec.write, count: 1, level: 0.05 });
+    await ring.show("listening");
+    const [, g, b] = RING_COLOURS.listening;
+    expect([...rec.frames.at(-1)!.subarray(5, 7)]).toEqual([Math.round(b * 0.05), Math.round(g * 0.05)]);
+    await ring.setLevel!(0.5);
+    expect(ring.level!()).toBe(0.5);
+    expect([...rec.frames.at(-1)!.subarray(5, 7)]).toEqual([Math.round(b * 0.5), Math.round(g * 0.5)]);
+    const writes = rec.frames.length;
+    await ring.off();
+    await ring.setLevel!(0.25);
+    expect(rec.frames.length).toBe(writes + 1);   // the off frame only: a dark ring is not lit by being dimmed
+  });
+
   it("goes dark and then drops the power rail", async () => {
     const run = fakeRunner();
     const rec = recorder();

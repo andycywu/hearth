@@ -44,6 +44,8 @@ export function withStateFile(
   return {
     show: async (state) => { await ring.show(state); record(state); },
     off: async () => { await ring.off(); record("off"); },
+    ...(ring.setLevel ? { setLevel: (level: number) => ring.setLevel!(level) } : {}),
+    ...(ring.level ? { level: () => ring.level!() } : {}),
   };
 }
 

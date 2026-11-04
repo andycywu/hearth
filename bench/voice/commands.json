@@ -1,0 +1,16 @@
+{
+  "name": "spoken-commands",
+  "description": "Spoken commands, each with the wake word, and what the television should read back afterwards. Recorded with tools/voice-record.mjs, replayed with tools/voice-replay.mjs. The recordings are someone's voice and stay on the box that made them; see README.md.",
+  "items": [
+    { "id": "zh-ask-volume", "say": "小爐小爐，現在音量多少", "expect": { "says": "{volume}" } },
+    { "id": "zh-quieter", "say": "小爐小爐，小聲一點", "expect": { "volume": "down" } },
+    { "id": "zh-louder", "say": "小爐小爐，大聲一點", "expect": { "volume": "up" } },
+    { "id": "zh-volume-20", "say": "小爐小爐，音量調到二十", "expect": { "volume": 20 } },
+    { "id": "zh-mute", "say": "小爐小爐，靜音", "expect": { "mute": true } },
+    { "id": "zh-hdmi3", "say": "小爐小爐，切到 HDMI 3", "expect": { "input": "hdmi3" } },
+    { "id": "zh-panel", "say": "小爐小爐，把畫面縮小", "expect": { "layout": "panel" } },
+    { "id": "en-ask-volume", "say": "Hearth, what's the volume?", "expect": { "says": "{volume}" } },
+    { "id": "en-turn-it-down", "say": "Hearth, turn it down", "expect": { "volume": "down" } },
+    { "id": "en-hdmi3", "say": "Hearth, switch to HDMI 3", "expect": { "input": "hdmi3" } }
+  ]
+}

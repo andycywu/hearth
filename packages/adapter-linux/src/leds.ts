@@ -138,6 +138,13 @@ export interface StatusRingOptions {
    * was the moment the board reported under-voltage.
    */
   animBrightness?: number;
+  /**
+   * 0-1, how bright the whole ring is relative to the levels above: 0.25 is a quarter of every state, the order between
+   * them kept. Applied to the colours rather than the five-bit header, which at these levels has only a handful of steps
+   * left (idle is 3) and would round a quarter of it to nothing. Default 1. Asked for after the ring was found too bright
+   * in a living room in the evening; a room with more light around it can take more.
+   */
+  level?: number;
   /** Milliseconds per animation frame. Default 90. */
   frameMs?: number;
   /** How long an answer stays on the ring before it settles. Default 2500. */
@@ -154,6 +161,12 @@ export interface StatusRing {
   show(state: RingState): Promise<void>;
   /** Powers the ring down as well, so an idle device is dark rather than black. */
   off(): Promise<void>;
+  /**
+   * Change `level` (0-1) while running, and repaint what is showing. Optional: a ring that cannot be dimmed omits it.
+   * The ring is write-only — nothing reads back what an LED is showing — so `level()` reports what was written.
+   */
+  setLevel?(level: number): Promise<void>;
+  level?(): number;
 }
 
 const BLACK: Rgb = [0, 0, 0];
@@ -239,8 +252,10 @@ export function createStatusRing(opts: StatusRingOptions = {}): StatusRing {
     powered = on;
   };
 
+  const clampLevel = (l: number): number => Math.max(0, Math.min(1, Number.isFinite(l) ? l : 1));
+  let dim = clampLevel(opts.level ?? 1);
   const paint = async (pixels: readonly Rgb[], level = brightness): Promise<void> => {
-    await write(device, apa102Frame(pixels, level));
+    await write(device, apa102Frame(dim === 1 ? pixels : pixels.map((p) => scale(p, dim)), level));
   };
   const dark = Array.from({ length: count }, () => BLACK);
 
@@ -315,6 +330,14 @@ export function createStatusRing(opts: StatusRingOptions = {}): StatusRing {
       deferred = undefined;
       await apply("off");
     },
+    setLevel: async (level) => {
+      dim = clampLevel(level);
+      // A moving state picks the new level up on its next frame; a still one is painted again now, its hold left as it was.
+      if (current === "off" || ringFrame(current, 0, count)) return;
+      await paint(Array.from({ length: count }, () => RING_COLOURS[current as Exclude<RingState, "off">]),
+        current === "listening" ? idleBrightness : brightness);
+    },
+    level: () => dim,
   };
 }
 

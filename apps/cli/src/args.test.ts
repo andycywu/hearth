@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseArgs } from "./args.js";
+import { configAsEnv } from "./config.js";
 
 describe("parseArgs", () => {
   it("treats bare words as commands, in order", () => {
@@ -24,6 +25,16 @@ describe("parseArgs", () => {
   it("reads the environment when no flag says otherwise", () => {
     const opts = parseArgs([], { TV_PLATFORM: "linux", TV_AGENT_LLM: "http://x/v1", TV_AGENT_MODEL: "m" });
     expect(opts).toMatchObject({ platform: "linux", baseUrl: "http://x/v1", model: "m" });
+  });
+
+  it("takes the ring's brightness as a percent, from a flag, the environment or the config, and refuses one out of range", () => {
+    expect(parseArgs(["--led-brightness", "25"]).ledBrightness).toBe(25);
+    expect(parseArgs(["--led-brightness=75%"]).ledBrightness).toBe(75);
+    expect(parseArgs([], { HEARTH_LED_BRIGHTNESS: "25" }).ledBrightness).toBe(25);
+    expect(parseArgs(["--led-brightness", "75"], { HEARTH_LED_BRIGHTNESS: "25" }).ledBrightness).toBe(75);
+    expect(parseArgs(["--led-brightness", "0"]).errors[0]).toMatch(/1 to 100/);
+    expect(parseArgs([], { HEARTH_LED_BRIGHTNESS: "bright" }).warnings[0]).toMatch(/HEARTH_LED_BRIGHTNESS/);
+    expect(parseArgs([], configAsEnv({ ledBrightness: 25 })).ledBrightness).toBe(25);
   });
 
   it("rejects a platform it doesn't have, rather than silently using the mock", () => {
