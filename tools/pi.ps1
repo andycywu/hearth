@@ -20,6 +20,11 @@ if (-not $Pi) { throw "Set `$env:HEARTH_PI = 'user@host' or pass -Pi user@host."
 $Local = Split-Path -Parent $PSScriptRoot
 
 # tools/ is in the repo now; `git pull` on the Pi brings it. Nothing is pushed.
+# private/ is not (it is git-ignored: modules that cannot be published), so it is copied over as it is here.
+if (Test-Path "$Local\private") {
+  Write-Host "== copy private/ to the Pi" -ForegroundColor Cyan
+  scp -q -r "$Local\private" "${Pi}:$PiRepo/"
+}
 Write-Host "== run on the Pi: $Command" -ForegroundColor Cyan
 ssh -t $Pi "export HEARTH_TV=$Tv PATH=`$HOME/.local/node/bin:`$HOME/.local/bin:`$PATH; cd $PiRepo && $Command"
 
